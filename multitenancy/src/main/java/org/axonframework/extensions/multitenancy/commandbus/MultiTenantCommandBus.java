@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
 
 public class MultiTenantCommandBus implements CommandBus {
 
-    private final Map<String, CommandBus> tenantSegments = new ConcurrentHashMap<>();
-    private final Map<String, MessageHandler<? super CommandMessage<?>>> handlers = new ConcurrentHashMap<>();
+    private final Map<TenantDescriptor, CommandBus> tenantSegments = new ConcurrentHashMap<>();
+    private final Map<TenantDescriptor, MessageHandler<? super CommandMessage<?>>> handlers = new ConcurrentHashMap<>();
 
     private final Map<String, Map<String, Registration>> tenantRegistrations = new ConcurrentHashMap<>();
 
@@ -43,20 +43,20 @@ public class MultiTenantCommandBus implements CommandBus {
 
     @Override
     public <C> void dispatch(CommandMessage<C> command) {
-        String targetTenantId = targetTenantResolver.resolveTenant(command);
-        CommandBus tenantCommandBus = tenantSegments.get(targetTenantId);
+        TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(command, tenantSegments.keySet());
+        CommandBus tenantCommandBus = tenantSegments.get(tenantDescriptor);
         if (tenantCommandBus == null) {
-            throw new NoSuchTenantException(targetTenantId);
+            throw new NoSuchTenantException(tenantDescriptor.tenantId());
         }
         tenantCommandBus.dispatch(command);
     }
 
     @Override
     public <C, R> void dispatch(CommandMessage<C> command, CommandCallback<? super C, ? super R> callback) {
-        String targetTenantId = targetTenantResolver.resolveTenant(command);
-        CommandBus tenantCommandBus = tenantSegments.get(targetTenantId);
+        TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(command, tenantSegments.keySet());
+        CommandBus tenantCommandBus = tenantSegments.get(tenantDescriptor);
         if (tenantCommandBus == null) {
-            NoSuchTenantException dispatchException = new NoSuchTenantException(targetTenantId);
+            NoSuchTenantException dispatchException = new NoSuchTenantException(tenantDescriptor.tenantId());
             callback.onResult(
                     command, GenericCommandResultMessage.asCommandResultMessage(dispatchException)
             );
@@ -69,7 +69,7 @@ public class MultiTenantCommandBus implements CommandBus {
     public Registration subscribe(String commandName, MessageHandler<? super CommandMessage<?>> handler) {
         Map<String, Registration> registrationMap = tenantSegments.entrySet()
                 .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().subscribe(commandName, handler)));
+                .collect(Collectors.toMap(key -> key.getKey().tenantId(), entry -> entry.getValue().subscribe(commandName, handler)));
 
         //todo add too tenantRegistrations
 
@@ -95,14 +95,17 @@ public class MultiTenantCommandBus implements CommandBus {
     //call registration cancel of a specific teenant to stop listing his updates
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
 
-        CommandBus tenant = tenantSegmentFactory.apply(tenantDescriptor);
-
-        //todo addTo tenantSegments (tennatSegments.add(tenant)
+        CommandBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
+        tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
 
         return () -> {
-            CommandBus delegate = tenantSegments.remove(tenantDescriptor.tenantId());
+            CommandBus delegate = unregisterTenant(tenantDescriptor);
             return delegate != null;
         };
+    }
+
+    public CommandBus unregisterTenant(TenantDescriptor tenantDescriptor) {
+        return tenantSegments.remove(tenantDescriptor);
     }
 
     public static class Builder {

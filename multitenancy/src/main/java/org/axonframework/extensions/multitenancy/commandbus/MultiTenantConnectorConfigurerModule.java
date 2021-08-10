@@ -14,6 +14,7 @@ import org.axonframework.config.ModuleConfiguration;
 import org.axonframework.lifecycle.Phase;
 import org.axonframework.messaging.Message;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -34,14 +35,14 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
                     .transactionManager(config.getComponent(TransactionManager.class, NoTransactionManager::instance))
                     .build();
     private Function<Configuration, TargetTenantResolver<? super Message<?>>> targetTenantResolver =
-            config -> message -> "default"; //todo
+            config -> (message, tenantDescriptors) -> TenantDescriptor.tenantWithId("default");
 
     private MultiTenantCommandBus multiTenantCommandBus;
 
     @Override
     public void configureModule(Configurer configurer) {
         configurer.getModuleConfiguration(MultiTenantConnectorConfigurerModule.class)
-                .registerTenantsProvider(() -> null) //todo empty list or default context
+                .registerTenantsProvider(Collections::emptyList)
                 .registerTargetTenantResolver(null); //todo check target context resolver works
 
         configurer.registerComponent(TenantSegmentFactory.class, tenantSegmentFactory);
