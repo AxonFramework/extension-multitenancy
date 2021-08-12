@@ -7,7 +7,7 @@ public class TenantDescriptor {
 
     protected String tenantId;
 
-    protected String tenantName;
+    protected String tenantName; //todo probably not needed
 
     protected Map<String, String> properties;
 
@@ -53,7 +53,7 @@ public class TenantDescriptor {
     }
 
 
-    static TenantDescriptor tenantWithId(String id) {
+    public static TenantDescriptor tenantWithId(String id) {
         return new TenantDescriptor(id);
     }
 

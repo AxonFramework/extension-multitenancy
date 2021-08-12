@@ -28,7 +28,7 @@ public class MultiTenantCommandBus implements CommandBus {
 
     private final Map<String, Map<String, Registration>> tenantRegistrations = new ConcurrentHashMap<>();
 
-    private final TenantSegmentFactory tenantSegmentFactory;
+    private final TenantCommandSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<CommandMessage<?>> targetTenantResolver;
 
     public MultiTenantCommandBus(Builder builder) {
@@ -110,14 +110,14 @@ public class MultiTenantCommandBus implements CommandBus {
 
     public static class Builder {
 
-        public TenantSegmentFactory tenantSegmentFactory;
+        public TenantCommandSegmentFactory tenantSegmentFactory;
         public TargetTenantResolver<CommandMessage<?>> targetTenantResolver;
 
         /**
          * @param tenantSegmentFactory
          * @return
          */
-        public Builder tenantSegmentFactory(TenantSegmentFactory tenantSegmentFactory) {
+        public Builder tenantSegmentFactory(TenantCommandSegmentFactory tenantSegmentFactory) {
             BuilderUtils.assertNonNull(tenantSegmentFactory, "");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;

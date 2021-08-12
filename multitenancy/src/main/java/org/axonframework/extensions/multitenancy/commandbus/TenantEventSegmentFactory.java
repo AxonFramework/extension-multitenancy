@@ -1,19 +1,19 @@
 package org.axonframework.extensions.multitenancy.commandbus;
 
-import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.eventhandling.EventBus;
 
 import java.util.function.Function;
 
 /**
  * @author Stefan Dragisic
  */
-public interface TenantSegmentFactory extends Function<TenantDescriptor, CommandBus> {
+public interface TenantEventSegmentFactory extends Function<TenantDescriptor, EventBus> {
 
     /**
      * @param tenantDescriptor
      * @return
      */
-    default CommandBus buildTenantSegment(TenantDescriptor tenantDescriptor) {
+    default EventBus buildTenantSegment(TenantDescriptor tenantDescriptor) {
         return apply(tenantDescriptor);
     }
 }
