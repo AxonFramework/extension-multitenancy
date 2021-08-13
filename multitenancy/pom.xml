@@ -14,6 +14,9 @@
     <properties>
         <maven.compiler.source>14</maven.compiler.source>
         <maven.compiler.target>14</maven.compiler.target>
+
+        <axon.version>4.6.0-SNAPSHOT</axon.version>
+        <junit.jupiter.version>5.7.2</junit.jupiter.version>
     </properties>
 
     <dependencies>
@@ -21,13 +24,19 @@
             <groupId>org.axonframework</groupId>
             <artifactId>axon-messaging</artifactId>
             <scope>provided</scope>
-            <version>4.6.0-SNAPSHOT</version>
+            <version>${axon.version}</version>
         </dependency>
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-configuration</artifactId>
             <scope>provided</scope>
-            <version>4.6.0-SNAPSHOT</version>
+            <version>${axon.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>compile</scope>
         </dependency>
 
     </dependencies>

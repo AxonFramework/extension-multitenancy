@@ -7,32 +7,19 @@ public class TenantDescriptor {
 
     protected String tenantId;
 
-    protected String tenantName; //todo probably not needed
-
     protected Map<String, String> properties;
 
     public TenantDescriptor(String tenantId) {
         this.tenantId = tenantId;
-        this.tenantName = tenantId;
-    }
-
-    public TenantDescriptor(String tenantId, String tenantName) {
-        this.tenantId = tenantId;
-        this.tenantName = tenantName;
     }
 
     public TenantDescriptor(String tenantId, String tenantName, Map<String, String> properties) {
         this.tenantId = tenantId;
-        this.tenantName = tenantName;
         this.properties = properties;
     }
 
     public String tenantId() {
         return tenantId;
-    }
-
-    public String tenantName() {
-        return tenantName;
     }
 
     public Map<String, String> properties() {

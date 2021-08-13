@@ -21,6 +21,7 @@ import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -29,7 +30,14 @@ import java.util.function.Supplier;
  */
 public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, ModuleConfiguration {
 
-    private Supplier<List<TenantDescriptor>> tenantsProvider;
+    //todo
+    //set tenantProvider in MultitenancyAxonServerAutoConfiguration
+    //set tenantFilter from user bean?
+    //set targetTenantResolver from user bean?
+
+    private final Predicate<? super TenantDescriptor> tenantFilter = tenantDescriptor -> true; //todo change Predicate<? super TenantDescriptor>  to interface like TenantCommandSegmentFactory
+
+    private Supplier<List<TenantDescriptor>> tenantsProvider = () -> Collections.singletonList(TenantDescriptor.tenantWithId("default")); //invoked first
     private Function<Configuration, TenantCommandSegmentFactory> tenantCommandSegmentFactory =
             config -> tenantDescriptor -> SimpleCommandBus.builder()
                     .duplicateCommandHandlerResolver(
@@ -53,7 +61,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
                     .build();
 
     private Function<Configuration, TargetTenantResolver<? super Message<?>>> targetTenantResolver =
-            config -> (message, tenantDescriptors) -> TenantDescriptor.tenantWithId("default");
+            config -> (message, tenantDescriptors) -> tenantDescriptors.stream().findFirst().orElse(TenantDescriptor.tenantWithId("default"));
 
     private MultiTenantCommandBus multiTenantCommandBus;
     private MultiTenantEventBus multiTenantEventBus;
@@ -63,7 +71,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
     public void configureModule(Configurer configurer) {
         configurer.getModuleConfiguration(MultiTenantConnectorConfigurerModule.class)
                 .registerTenantsProvider(Collections::emptyList)
-                .registerTargetTenantResolver(targetTenantResolver); //todo check target context resolver works
+                .registerTargetTenantResolver(targetTenantResolver);
 
         configurer.registerComponent(TenantCommandSegmentFactory.class, tenantCommandSegmentFactory);
         configurer.registerComponent(TenantQuerySegmentFactory.class, tenantQuerySegmentFactory);
@@ -80,7 +88,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
     public void initialize(Configuration config) {
         config.onStart(
                 Phase.LOCAL_MESSAGE_HANDLER_REGISTRATIONS - 1,
-                () -> tenantsProvider.get().forEach(tenantDescriptor -> {
+                () -> tenantsProvider.get().stream().filter(tenantFilter).forEach(tenantDescriptor -> {
                     multiTenantCommandBus.registerTenant(tenantDescriptor);
                     multiTenantEventBus.registerTenant(tenantDescriptor);
                     multiTenantQueryBus.registerTenant(tenantDescriptor);
