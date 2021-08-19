@@ -13,7 +13,7 @@ public class TenantDescriptor {
         this.tenantId = tenantId;
     }
 
-    public TenantDescriptor(String tenantId, String tenantName, Map<String, String> properties) {
+    public TenantDescriptor(String tenantId, Map<String, String> properties) {
         this.tenantId = tenantId;
         this.properties = properties;
     }

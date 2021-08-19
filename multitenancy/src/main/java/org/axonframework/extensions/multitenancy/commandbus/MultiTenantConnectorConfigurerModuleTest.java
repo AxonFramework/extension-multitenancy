@@ -25,7 +25,7 @@ class MultiTenantConnectorConfigurerModuleTest {
         assertNotNull(testSubject.getComponent(TenantEventSegmentFactory.class));
         assertNotNull(testSubject.getComponent(TargetTenantResolver.class));
         assertNotNull(testSubject.getComponent(MultiTenantCommandBus.class));
-        assertNotNull(testSubject.getComponent(MultiTenantEventBus.class));
+        assertNotNull(testSubject.getComponent(MultiTenantEventStore.class));
         assertNotNull(testSubject.getComponent(MultiTenantQueryBus.class));
     }
 

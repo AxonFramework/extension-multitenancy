@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 @author Stefan Dragisic
  */
 
-public class MultiTenantQueryBus implements QueryBus {
+public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
 
     private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<TenantDescriptor, MessageHandler<? super QueryMessage<?, ?>>> handlers = new ConcurrentHashMap<>();
@@ -56,6 +56,11 @@ public class MultiTenantQueryBus implements QueryBus {
             QueryBus delegate = unregisterTenant(tenantDescriptor);
             return delegate != null;
         };
+    }
+
+    @Override
+    public void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor) {
+
     }
 
     public QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {

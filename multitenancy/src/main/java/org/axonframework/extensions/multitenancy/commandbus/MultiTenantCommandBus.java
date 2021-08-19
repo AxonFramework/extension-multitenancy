@@ -23,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @author Stefan Dragisic
  */
 
-public class MultiTenantCommandBus implements CommandBus {
+public class MultiTenantCommandBus implements CommandBus, MultiTenantBus {
 
     private final Map<TenantDescriptor, CommandBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, MessageHandler<? super CommandMessage<?>>> commandHandlers = new ConcurrentHashMap<>();
@@ -110,7 +110,8 @@ public class MultiTenantCommandBus implements CommandBus {
     //tennant descriptor is created from list all context api
     //call registration cancel of a specific teenant to stop listing his updates
 
-    //to be used inside configuration
+    //todo move to builder
+    @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
 
         CommandBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
@@ -122,13 +123,13 @@ public class MultiTenantCommandBus implements CommandBus {
         };
     }
 
-    public CommandBus unregisterTenant(TenantDescriptor tenantDescriptor) {
+    private CommandBus unregisterTenant(TenantDescriptor tenantDescriptor) {
         subscribeRegistrations.remove(tenantDescriptor).cancel();
         return tenantSegments.remove(tenantDescriptor);
     }
 
     //to be used by user or independently durring runtime
-
+    @Override
     public void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor) {
         tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
             CommandBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);

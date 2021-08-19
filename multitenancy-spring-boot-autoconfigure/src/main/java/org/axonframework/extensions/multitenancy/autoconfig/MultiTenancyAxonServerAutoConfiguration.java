@@ -13,6 +13,8 @@ import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
+import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
 import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
 import org.axonframework.queryhandling.QueryBus;
@@ -22,7 +24,9 @@ import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.axonframework.queryhandling.SimpleQueryBus;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.AxonConfiguration;
+import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,8 +39,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConditionalOnClass(AxonServerConfiguration.class)
 @ConditionalOnProperty(name = "axon.axonserver.enabled", matchIfMissing = true)
-@AutoConfigureAfter(MultiTenancyAutoConfiguration.class)
+@AutoConfigureAfter(AxonServerAutoConfiguration.class)
 public class MultiTenancyAxonServerAutoConfiguration {
+
+
+    @Bean
+    @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
+    public TenantProvider tenantProvider(@Value("${axon.axonserver.contexts:}") String contexts,
+                                         TenantConnectPredicate tenantConnectPredicate) {
+        return new AxonServerTenantProvider(contexts, tenantConnectPredicate);
+    }
 
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
@@ -48,19 +60,20 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                                                              TargetContextResolver<? super CommandMessage<?>> targetContextResolver,
                                                                              AxonServerConfiguration axonServerConfiguration,
                                                                              AxonServerConnectionManager connectionManager) {
-        return tenantDescriptor ->
-                AxonServerCommandBus.builder()
-                        .localSegment(localSegment)
-                        .serializer(messageSerializer)
-                        .routingStrategy(routingStrategy)
-                        .priorityCalculator(priorityCalculator)
-                        .loadFactorProvider(loadFactorProvider)
-                        .targetContextResolver(targetContextResolver)
-                        .axonServerConnectionManager(connectionManager)
-                        .configuration(axonServerConfiguration)
-                        .defaultContext(tenantDescriptor.tenantId())
-                        .build();
+
+        return tenantDescriptor -> AxonServerCommandBus.builder()
+                .localSegment(localSegment)
+                .serializer(messageSerializer)
+                .routingStrategy(routingStrategy)
+                .priorityCalculator(priorityCalculator)
+                .loadFactorProvider(loadFactorProvider)
+                .targetContextResolver(targetContextResolver)
+                .axonServerConnectionManager(connectionManager)
+                .configuration(axonServerConfiguration)
+                .defaultContext(tenantDescriptor.tenantId())
+                .build();
     }
+
 
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.query.AxonServerQueryBus")

@@ -11,7 +11,6 @@ import org.axonframework.config.Configurer;
 import org.axonframework.config.ConfigurerModule;
 import org.axonframework.config.ModuleConfiguration;
 import org.axonframework.eventhandling.EventBus;
-import org.axonframework.eventhandling.SimpleEventBus;
 import org.axonframework.lifecycle.Phase;
 import org.axonframework.messaging.Message;
 import org.axonframework.queryhandling.QueryBus;
@@ -19,10 +18,7 @@ import org.axonframework.queryhandling.SimpleQueryBus;
 import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 
 /**
  * @author Steven van Beelen
@@ -30,14 +26,9 @@ import java.util.function.Supplier;
  */
 public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, ModuleConfiguration {
 
-    //todo
-    //set tenantProvider in MultitenancyAxonServerAutoConfiguration
-    //set tenantFilter from user bean?
-    //set targetTenantResolver from user bean?
+    private final TenantConnectPredicate tenantFilter = tenantDescriptor -> true;
 
-    private final Predicate<? super TenantDescriptor> tenantFilter = tenantDescriptor -> true; //todo change Predicate<? super TenantDescriptor>  to interface like TenantCommandSegmentFactory
-
-    private Supplier<List<TenantDescriptor>> tenantsProvider = () -> Collections.singletonList(TenantDescriptor.tenantWithId("default")); //invoked first
+    private TenantProvider tenantsProvider = () -> Collections.singletonList(TenantDescriptor.tenantWithId("default")); //invoked first
     private Function<Configuration, TenantCommandSegmentFactory> tenantCommandSegmentFactory =
             config -> tenantDescriptor -> SimpleCommandBus.builder()
                     .duplicateCommandHandlerResolver(
@@ -48,9 +39,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
                     .build();
 
     private Function<Configuration, TenantEventSegmentFactory> tenantEventSegmentFactory =
-            config -> tenantDescriptor -> SimpleEventBus.builder()
-                    .messageMonitor(config.messageMonitor(EventBus.class, "eventBus"))
-                    .build();
+            config -> tenantDescriptor -> null; //todo set default event store
 
     private Function<Configuration, TenantQuerySegmentFactory> tenantQuerySegmentFactory =
             config -> tenantDescriptor -> SimpleQueryBus.builder()
@@ -64,7 +53,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
             config -> (message, tenantDescriptors) -> tenantDescriptors.stream().findFirst().orElse(TenantDescriptor.tenantWithId("default"));
 
     private MultiTenantCommandBus multiTenantCommandBus;
-    private MultiTenantEventBus multiTenantEventBus;
+    private MultiTenantEventStore multiTenantEventStore;
     private MultiTenantQueryBus multiTenantQueryBus;
 
     @Override
@@ -90,7 +79,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
                 Phase.LOCAL_MESSAGE_HANDLER_REGISTRATIONS - 1,
                 () -> tenantsProvider.get().stream().filter(tenantFilter).forEach(tenantDescriptor -> {
                     multiTenantCommandBus.registerTenant(tenantDescriptor);
-                    multiTenantEventBus.registerTenant(tenantDescriptor);
+                    multiTenantEventStore.registerTenant(tenantDescriptor);
                     multiTenantQueryBus.registerTenant(tenantDescriptor);
                 }) //todo - who call registration.cancel?
         );
@@ -105,11 +94,11 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
     }
 
     private EventBus buildMultiTenantEventBus(Configuration config) {
-        multiTenantEventBus = MultiTenantEventBus.builder()
+        multiTenantEventStore = MultiTenantEventStore.builder()
                 .tenantSegmentFactory(config.getComponent(TenantEventSegmentFactory.class))
                 .targetTenantResolver(config.getComponent(TargetTenantResolver.class))
                 .build();
-        return multiTenantEventBus;
+        return multiTenantEventStore;
     }
 
     private QueryBus buildMultiTenantQueryBus(Configuration config) {
@@ -124,7 +113,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
      * @param tenantsProvider
      * @return
      */
-    public MultiTenantConnectorConfigurerModule registerTenantsProvider(Supplier<List<TenantDescriptor>> tenantsProvider) {
+    public MultiTenantConnectorConfigurerModule registerTenantsProvider(TenantProvider tenantsProvider) {
         this.tenantsProvider = tenantsProvider;
         return this;
     }

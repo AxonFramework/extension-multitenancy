@@ -1,69 +1,62 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.extensions.multitenancy.commandbus.MultiTenantCommandBus;
 import org.axonframework.extensions.multitenancy.commandbus.MultiTenantConnectorConfigurerModule;
 import org.axonframework.extensions.multitenancy.commandbus.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
+import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /**
  * @author Stefan Dragisic
  */
 @Configuration
 @ConditionalOnClass(MultiTenantConnectorConfigurerModule.class)
-@AutoConfigureAfter(name = {
-        "org.axonframework.springboot.autoconfig.InfraConfiguration",
-        "org.axonframework.springboot.autoconfig.AxonAutoConfiguration",
-        "org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration"
-})
+@AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
+
 public class MultiTenancyAutoConfiguration {
 
     @Bean
-    public MultiTenantCommandBus multiTenantCommandBus(TargetTenantResolver targetTenantResolver) {
-        return MultiTenantCommandBus.builder()
-                .targetTenantResolver(targetTenantResolver)
-                .build();
-    }
-
-    @Bean
+    @ConditionalOnMissingBean
     public TargetTenantResolver targetTenantResolver() {
         return (message, tenantDescriptors) -> TenantDescriptor.tenantWithId("default");
     }
 
-    //todo same for event and query bus
+    @Bean
+    @ConditionalOnMissingBean
+    public TenantConnectPredicate tenantFilterPredicate() {
+        return tenant -> true;
+    }
 
-//    @Bean
-//    @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
-//    public TenantCommandSegmentFactory tenantAxonServerCommandSegmentFactory(@Qualifier("messageSerializer") Serializer messageSerializer,
-//                                                                             RoutingStrategy routingStrategy,
-//                                                                             CommandPriorityCalculator priorityCalculator,
-//                                                                             CommandLoadFactorProvider loadFactorProvider,
-//                                                                             TargetContextResolver<? super CommandMessage<?>> targetContextResolver) {
-//        return tenantDescriptor -> {
-//            AxonServerCommandBus.Builder builder = AxonServerCommandBus.builder()
-//                    .localSegment(SimpleCommandBus.builder().build())
-//                    .serializer(messageSerializer)
-//                    .routingStrategy(routingStrategy)
-//                    .priorityCalculator(priorityCalculator)
-//                    .loadFactorProvider(loadFactorProvider)
-//                    .targetContextResolver(targetContextResolver);
-//
-//            AxonServerConfiguration customContextConfig = AxonServerConfiguration.builder()
-//                    .servers("localhost")
-//                    .context(tenantDescriptor.tenantId())
-//                    .componentName("demo-app")
-//                    .build();
-//
-//            return builder.configuration(customContextConfig)
-//                    .axonServerConnectionManager(AxonServerConnectionManager.builder()
-//                            .axonServerConfiguration(customContextConfig)
-//                            .build())
-//                    .build();
-//
-//        };
-//    }
+    @Bean
+    @Primary
+    @ConditionalOnMissingQualifiedBean(qualifier = "!localSegment", beanClass = CommandBus.class)
+    public MultiTenantCommandBus multiTenantCommandBus(TenantCommandSegmentFactory tenantCommandSegmentFactory,
+                                                       TargetTenantResolver targetTenantResolver,
+                                                       TenantProvider tenantProvider) {
+
+        MultiTenantCommandBus commandBus = MultiTenantCommandBus.builder()
+                .tenantSegmentFactory(tenantCommandSegmentFactory)
+                .targetTenantResolver(targetTenantResolver)
+                .build();
+
+        tenantProvider.get()
+                .forEach(commandBus::registerTenant);
+
+        tenantProvider.subscribeTenantUpdates(commandBus);
+
+        return commandBus;
+    }
+
+
 
 }

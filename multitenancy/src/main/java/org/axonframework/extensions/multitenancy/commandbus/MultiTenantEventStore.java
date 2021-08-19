@@ -1,14 +1,26 @@
 package org.axonframework.extensions.multitenancy.commandbus;
 
+import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
+import org.axonframework.common.stream.BlockingStream;
+import org.axonframework.eventhandling.DomainEventMessage;
 import org.axonframework.eventhandling.EventBus;
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.eventhandling.TrackedEventMessage;
+import org.axonframework.eventhandling.TrackingToken;
+import org.axonframework.eventsourcing.MultiStreamableMessageSource;
+import org.axonframework.eventsourcing.eventstore.DomainEventStream;
+import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
+import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -19,17 +31,18 @@ import java.util.stream.Collectors;
 @author Stefan Dragisic
  */
 
-public class MultiTenantEventBus implements EventBus {
+public class MultiTenantEventStore implements EventStore, MultiTenantBus {
 
-    private final Map<TenantDescriptor, EventBus> tenantSegments = new ConcurrentHashMap<>();
+    private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
     private final Map<TenantDescriptor, MessageHandler<? super EventMessage<?>>> handlers = new ConcurrentHashMap<>();
 
     private final Map<String, Map<String, Registration>> tenantRegistrations = new ConcurrentHashMap<>();
+    private MultiStreamableMessageSource multiSource;
 
     private final TenantEventSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<EventMessage<?>> targetTenantResolver;
 
-    public MultiTenantEventBus(Builder builder) {
+    public MultiTenantEventStore(Builder builder) {
         builder.validate();
         this.tenantSegmentFactory = builder.tenantSegmentFactory;
         this.targetTenantResolver = builder.targetTenantResolver;
@@ -41,13 +54,18 @@ public class MultiTenantEventBus implements EventBus {
 
 
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
-        EventBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
+        EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
         tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
 
         return () -> {
             EventBus delegate = unregisterTenant(tenantDescriptor);
             return delegate != null;
         };
+    }
+
+    @Override
+    public void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor) {
+
     }
 
     public EventBus unregisterTenant(TenantDescriptor tenantDescriptor) {
@@ -95,6 +113,71 @@ public class MultiTenantEventBus implements EventBus {
         return tenantEventBus;
     }
 
+    @Override
+    public DomainEventStream readEvents(String aggregateIdentifier) {
+        EventStore tenantEventStore = getTenantSegment();
+
+        return tenantEventStore.readEvents(aggregateIdentifier);
+    }
+
+//    public DomainEventStream readEvents(String aggregateIdentifier, String tenant) { todo
+//        EventStore tenantEventStore = getTenantSegment();
+//
+//        return tenantEventStore.readEvents(aggregateIdentifier);
+//    }
+
+    private EventStore getTenantSegment() {
+        TenantDescriptor tenantDescriptor = CurrentUnitOfWork.get().getResource("tenantDescriptor");
+        if (Objects.isNull(tenantDescriptor)) {
+            throw new AxonConfigurationException("todo");
+        }
+
+        EventStore tenantEventStore = tenantSegments.get(tenantDescriptor);
+        if (Objects.isNull(tenantEventStore)) {
+            throw new AxonConfigurationException("todo");
+        }
+        return tenantEventStore;
+    }
+
+    @Override
+    public void storeSnapshot(DomainEventMessage<?> snapshot) {
+        getTenantSegment().storeSnapshot(snapshot);
+    }
+
+    @Override
+    public BlockingStream<TrackedEventMessage<?>> openStream(TrackingToken trackingToken) {
+        return multiSource().openStream(trackingToken);
+    }
+
+    private MultiStreamableMessageSource multiSource() {
+        if (Objects.isNull(multiSource)) {
+            MultiStreamableMessageSource.Builder sourceBuilder = MultiStreamableMessageSource.builder();
+            tenantSegments.forEach((key, value) -> sourceBuilder.addMessageSource(key.tenantId(), value));
+            this.multiSource = sourceBuilder.build();
+        }
+        return multiSource;
+    }
+
+    @Override
+    public TrackingToken createTailToken() {
+        return multiSource().createTailToken();
+    }
+
+    @Override
+    public TrackingToken createHeadToken() {
+        return multiSource().createHeadToken();
+    }
+
+    @Override
+    public TrackingToken createTokenAt(Instant dateTime) {
+        return multiSource().createTokenAt(dateTime);
+    }
+
+    @Override
+    public TrackingToken createTokenSince(Duration duration) {
+        return multiSource().createTokenSince(duration);
+    }
+
     public static class Builder {
 
         public TenantEventSegmentFactory tenantSegmentFactory;
@@ -120,8 +203,8 @@ public class MultiTenantEventBus implements EventBus {
             return this;
         }
 
-        public MultiTenantEventBus build() {
-            return new MultiTenantEventBus(this);
+        public MultiTenantEventStore build() {
+            return new MultiTenantEventStore(this);
         }
 
         protected void validate() {
