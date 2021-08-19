@@ -59,8 +59,9 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
     }
 
     @Override
-    public void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor) {
+    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
 
+        return null;
     }
 
     public QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {

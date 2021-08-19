@@ -9,6 +9,6 @@ public interface MultiTenantBus {
 
     Registration registerTenant(TenantDescriptor tenantDescriptor);
 
-    void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor);
+    Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor);
 
 }

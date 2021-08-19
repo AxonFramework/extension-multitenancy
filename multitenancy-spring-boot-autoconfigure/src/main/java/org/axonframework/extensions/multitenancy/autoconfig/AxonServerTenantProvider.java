@@ -1,5 +1,7 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.axonserver.connector.AxonServerConnectionManager;
+import org.axonframework.common.Registration;
 import org.axonframework.common.StringUtils;
 import org.axonframework.extensions.multitenancy.commandbus.MultiTenantBus;
 import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
@@ -9,10 +11,13 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -34,11 +39,18 @@ public class AxonServerTenantProvider implements TenantProvider {
 
     private TenantConnectPredicate tenantConnectPredicate;
 
+    private AxonServerConnectionManager axonServerConnectionManager;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public AxonServerTenantProvider(String preDefinedContexts, TenantConnectPredicate tenantConnectPredicate) {
+    private ConcurrentHashMap<TenantDescriptor, Registration> registrationMap = new ConcurrentHashMap<>();
+
+    public AxonServerTenantProvider(String preDefinedContexts,
+                                    TenantConnectPredicate tenantConnectPredicate,
+                                    AxonServerConnectionManager axonServerConnectionManager) {
         this.preDefinedContexts = preDefinedContexts;
         this.tenantConnectPredicate = tenantConnectPredicate;
+        this.axonServerConnectionManager = axonServerConnectionManager;
     }
 
     public AxonServerTenantProvider() {
@@ -48,7 +60,7 @@ public class AxonServerTenantProvider implements TenantProvider {
         if (!StringUtils.nonEmptyOrNull(preDefinedContexts)) {
             scheduler.scheduleAtFixedRate(() -> Objects.requireNonNull(updates()).stream()
                             .filter(Objects::nonNull)
-                            .forEach(tenantDescriptor -> buses.forEach(bus -> bus.registerAndSubscribeTenant(tenantDescriptor))),
+                            .forEach(tenantDescriptor -> buses.forEach(bus -> bus.registerTenantAndSubscribe(tenantDescriptor))),
                     5, 5, TimeUnit.SECONDS); //todo parametarize
         }
     }
@@ -60,17 +72,15 @@ public class AxonServerTenantProvider implements TenantProvider {
 //
 //        latestTenants.retainAll(null); //todo unregister
 
-        return get().stream()
+        return getTenants().stream()
                 .filter(tenantConnectPredicate)
-                .peek(tenantDescriptor -> {
-                    buses.forEach(it -> it.registerAndSubscribeTenant(tenantDescriptor));
-                })
+                .peek(this::addTenant)
                 .collect(Collectors.toList());
     }
 
     //gets called initially
     @Override
-    public List<TenantDescriptor> get() {
+    public List<TenantDescriptor> getTenants() {
         System.out.println("Getting tenants list...");
 //        if (!tenantDescriptors.isEmpty()) {
 //            return Collections.unmodifiableList(tenantDescriptors);
@@ -94,11 +104,38 @@ public class AxonServerTenantProvider implements TenantProvider {
         }).getBody()).stream().map(context -> new TenantDescriptor(context.getContext(), context.getMetaData())).filter(tenantConnectPredicate).collect(Collectors.toList());
     }
 
+    protected void addTenant(TenantDescriptor tenantDescriptor) {
+        buses.forEach(bus -> registrationMap.putIfAbsent(tenantDescriptor, bus.registerTenantAndSubscribe(tenantDescriptor)));
+    }
+
+    protected boolean removeTenant(TenantDescriptor tenantDescriptor) {
+        boolean canceled = registrationMap.get(tenantDescriptor).cancel();
+        axonServerConnectionManager.disconnect(tenantDescriptor.tenantId());
+        return canceled;
+    }
+
     @Override
-    public void subscribeTenantUpdates(MultiTenantBus bus) {
+    public Registration subscribe(MultiTenantBus bus) {
+        Map<TenantDescriptor, Registration> registrations = getTenants().stream()
+                .flatMap(tenant -> buses.stream().map(b -> new AbstractMap.SimpleEntry<>(tenant, b.registerTenant(tenant))))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
+
+        registrationMap.putAll(registrations);
+
         if (!StringUtils.nonEmptyOrNull(preDefinedContexts)) {
             buses.add(bus);
         }
+
+        return () -> {
+            scheduler.shutdown();
+            registrationMap.forEach((tenant, registration) -> {
+                registration.cancel();
+                axonServerConnectionManager.disconnect(tenant.tenantId());
+                buses.removeIf(t -> true);
+            });
+            registrationMap = new ConcurrentHashMap<>();
+            return true;
+        };
     }
 
 

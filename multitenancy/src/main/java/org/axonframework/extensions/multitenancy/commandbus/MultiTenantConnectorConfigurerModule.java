@@ -4,6 +4,7 @@ import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.commandhandling.DuplicateCommandHandlerResolver;
 import org.axonframework.commandhandling.LoggingDuplicateCommandHandlerResolver;
 import org.axonframework.commandhandling.SimpleCommandBus;
+import org.axonframework.common.Registration;
 import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
@@ -17,7 +18,7 @@ import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.SimpleQueryBus;
 import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 
-import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -28,7 +29,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
 
     private final TenantConnectPredicate tenantFilter = tenantDescriptor -> true;
 
-    private TenantProvider tenantsProvider = () -> Collections.singletonList(TenantDescriptor.tenantWithId("default")); //invoked first
+    private TenantProvider tenantsProvider = null; //todo () -> Collections.singletonList(TenantDescriptor.tenantWithId("default")); //invoked first
     private Function<Configuration, TenantCommandSegmentFactory> tenantCommandSegmentFactory =
             config -> tenantDescriptor -> SimpleCommandBus.builder()
                     .duplicateCommandHandlerResolver(
@@ -59,7 +60,7 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
     @Override
     public void configureModule(Configurer configurer) {
         configurer.getModuleConfiguration(MultiTenantConnectorConfigurerModule.class)
-                .registerTenantsProvider(Collections::emptyList)
+                .registerTenantsProvider(null) //todo create simple tenant provider, hardcodded values
                 .registerTargetTenantResolver(targetTenantResolver);
 
         configurer.registerComponent(TenantCommandSegmentFactory.class, tenantCommandSegmentFactory);
@@ -75,14 +76,18 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
 
     @Override
     public void initialize(Configuration config) {
+        AtomicReference<Registration> registration = new AtomicReference<>();
         config.onStart(
                 Phase.LOCAL_MESSAGE_HANDLER_REGISTRATIONS - 1,
-                () -> tenantsProvider.get().stream().filter(tenantFilter).forEach(tenantDescriptor -> {
-                    multiTenantCommandBus.registerTenant(tenantDescriptor);
-                    multiTenantEventStore.registerTenant(tenantDescriptor);
-                    multiTenantQueryBus.registerTenant(tenantDescriptor);
-                }) //todo - who call registration.cancel?
+                () -> {
+                    registration.set(tenantsProvider.subscribe(multiTenantCommandBus));
+                    registration.set(tenantsProvider.subscribe(multiTenantQueryBus));
+                    registration.set(tenantsProvider.subscribe(multiTenantEventStore));
+                }
         );
+        config.onShutdown(() -> {
+            registration.get().cancel();
+        });
     }
 
     private CommandBus buildMultiTenantCommandBus(Configuration config) {

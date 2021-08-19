@@ -1,14 +1,16 @@
 package org.axonframework.extensions.multitenancy.commandbus;
 
+import org.axonframework.common.Registration;
+
 import java.util.List;
-import java.util.function.Supplier;
 
 /**
  * @author Stefan Dragisic
  */
-public interface TenantProvider extends Supplier<List<TenantDescriptor>> {
+public interface TenantProvider {
 
-    default void subscribeTenantUpdates(MultiTenantBus bus) {
-    }
+    List<TenantDescriptor> getTenants();
+
+    Registration subscribe(MultiTenantBus bus);
 
 }

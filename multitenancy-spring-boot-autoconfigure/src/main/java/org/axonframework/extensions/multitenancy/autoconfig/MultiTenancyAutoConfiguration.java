@@ -49,10 +49,7 @@ public class MultiTenancyAutoConfiguration {
                 .targetTenantResolver(targetTenantResolver)
                 .build();
 
-        tenantProvider.get()
-                .forEach(commandBus::registerTenant);
-
-        tenantProvider.subscribeTenantUpdates(commandBus);
+        tenantProvider.subscribe(commandBus);
 
         return commandBus;
     }

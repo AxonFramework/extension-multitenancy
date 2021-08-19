@@ -105,12 +105,6 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantBus {
         return () -> handlerInterceptorsRegistration.stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
     }
 
-    //who ever call this method needs to records all registrations and keep list of them
-    //factory method needs call AxonServerConnectorModule and create segment from teenat descriptor
-    //tennant descriptor is created from list all context api
-    //call registration cancel of a specific teenant to stop listing his updates
-
-    //todo move to builder
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
 
@@ -128,9 +122,8 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantBus {
         return tenantSegments.remove(tenantDescriptor);
     }
 
-    //to be used by user or independently durring runtime
     @Override
-    public void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor) {
+    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
         tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
             CommandBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
 
@@ -145,6 +138,11 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantBus {
 
             return tenantSegment;
         });
+
+        return () -> {
+            CommandBus delegate = unregisterTenant(tenantDescriptor);
+            return delegate != null;
+        };
     }
 
     public static class Builder {
@@ -178,9 +176,6 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantBus {
 
         protected void validate() {
             // todo
-            //assert targetTenantResolver set
-            //assert tenantSegmentFactory set
-
         }
     }
 }

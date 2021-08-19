@@ -64,8 +64,9 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
     }
 
     @Override
-    public void registerAndSubscribeTenant(TenantDescriptor tenantDescriptor) {
+    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
 
+        return null;
     }
 
     public EventBus unregisterTenant(TenantDescriptor tenantDescriptor) {
