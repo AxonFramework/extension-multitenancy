@@ -31,7 +31,9 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
 
 /**
  * @author Stefan Dragisic
@@ -40,6 +42,8 @@ import org.springframework.context.annotation.Configuration;
 @ConditionalOnClass(AxonServerConfiguration.class)
 @ConditionalOnProperty(name = "axon.axonserver.enabled", matchIfMissing = true)
 @AutoConfigureAfter(AxonServerAutoConfiguration.class)
+@ComponentScan(excludeFilters = {
+        @ComponentScan.Filter(type = FilterType.REGEX, pattern = "org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration.class")})
 public class MultiTenancyAxonServerAutoConfiguration {
 
 
