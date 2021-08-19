@@ -116,4 +116,23 @@ public class MultiTenancyAxonServerAutoConfiguration {
                     .build();
         };
     }
+
+//    @Bean
+//    @ConditionalOnMissingBean
+//    public EventStore eventStore(AxonServerConfiguration axonServerConfiguration,
+//                                 AxonConfiguration configuration,
+//                                 AxonServerConnectionManager axonServerConnectionManager,
+//                                 Serializer snapshotSerializer,
+//                                 @Qualifier("eventSerializer") Serializer eventSerializer) {
+//        return AxonServerEventStore.builder()
+//                .messageMonitor(configuration
+//                        .messageMonitor(AxonServerEventStore.class, "eventStore"))
+//                .configuration(axonServerConfiguration)
+//                .platformConnectionManager(axonServerConnectionManager)
+//                .snapshotSerializer(snapshotSerializer)
+//                .eventSerializer(eventSerializer)
+//                .snapshotFilter(configuration.snapshotFilter())
+//                .upcasterChain(configuration.upcasterChain())
+//                .build();
+//    }
 }

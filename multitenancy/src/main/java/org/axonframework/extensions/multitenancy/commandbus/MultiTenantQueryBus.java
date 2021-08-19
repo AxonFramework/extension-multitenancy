@@ -5,20 +5,23 @@ import org.axonframework.common.Registration;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
+import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryResponseMessage;
+import org.axonframework.queryhandling.QuerySubscription;
 import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.axonframework.queryhandling.SubscriptionQueryMessage;
 import org.axonframework.queryhandling.SubscriptionQueryResult;
 import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
 
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -30,9 +33,15 @@ import java.util.stream.Stream;
 public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
 
     private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
-    private final Map<TenantDescriptor, MessageHandler<? super QueryMessage<?, ?>>> handlers = new ConcurrentHashMap<>();
+    private final Map<String, QuerySubscription<?>> handlers = new ConcurrentHashMap<>();
 
-    private final Map<String, Map<String, Registration>> tenantRegistrations = new ConcurrentHashMap<>();
+    private final List<MessageDispatchInterceptor<? super QueryMessage<?, ?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
+    private final List<Registration> dispatchInterceptorsRegistration = new CopyOnWriteArrayList<>();
+
+    private final List<MessageHandlerInterceptor<? super QueryMessage<?, ?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
+    private final List<Registration> handlerInterceptorsRegistration = new CopyOnWriteArrayList<>();
+
+    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
 
     private final TenantQuerySegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver;
@@ -45,27 +54,6 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
 
     public static Builder builder() {
         return new Builder();
-    }
-
-
-    public Registration registerTenant(TenantDescriptor tenantDescriptor) {
-        QueryBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
-        tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
-
-        return () -> {
-            QueryBus delegate = unregisterTenant(tenantDescriptor);
-            return delegate != null;
-        };
-    }
-
-    @Override
-    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
-
-        return null;
-    }
-
-    public QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {
-        return tenantSegments.remove(tenantDescriptor);
     }
 
     @Override
@@ -81,6 +69,88 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
         return tenantQueryBus.scatterGather(query, timeout, unit);
     }
 
+
+    @Override
+    public <R> Registration subscribe(String queryName, Type responseType, MessageHandler<? super QueryMessage<?, R>> handler) {
+        handlers.computeIfAbsent(queryName, k -> {
+            tenantSegments.forEach((tenant, segment) ->
+                    subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(queryName, responseType, handler)));
+            return new QuerySubscription<>(responseType, handler);
+        });
+        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+    }
+
+    @Override
+    public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super QueryMessage<?, ?>> dispatchInterceptor) {
+        dispatchInterceptors.add(dispatchInterceptor);
+        tenantSegments.forEach((tenant, bus) ->
+                dispatchInterceptorsRegistration.add(bus.registerDispatchInterceptor(dispatchInterceptor)));
+
+        return () -> dispatchInterceptorsRegistration.stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+    }
+
+    @Override
+    public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super QueryMessage<?, ?>> handlerInterceptor) {
+        handlerInterceptors.add(handlerInterceptor);
+        tenantSegments.forEach((tenant, bus) ->
+                handlerInterceptorsRegistration.add(bus.registerHandlerInterceptor(handlerInterceptor)));
+
+        return () -> handlerInterceptorsRegistration.stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+    }
+
+    @Override
+    public Registration registerTenant(TenantDescriptor tenantDescriptor) {
+        QueryBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
+        tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
+
+        return () -> {
+            QueryBus delegate = unregisterTenant(tenantDescriptor);
+            return delegate != null;
+        };
+    }
+
+    public QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {
+        subscribeRegistrations.remove(tenantDescriptor).cancel();
+        return tenantSegments.remove(tenantDescriptor);
+    }
+
+    @Override
+    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
+        tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
+            QueryBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
+
+            dispatchInterceptors.forEach(dispatchInterceptor ->
+                    dispatchInterceptorsRegistration.add(tenantSegment.registerDispatchInterceptor(dispatchInterceptor)));
+
+            handlerInterceptors.forEach(handlerInterceptor ->
+                    handlerInterceptorsRegistration.add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
+
+            handlers.forEach((queryName, querySubscription) ->
+                    subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(queryName,
+                            querySubscription.getResponseType(),
+                            querySubscription.getQueryHandler())));
+
+            return tenantSegment;
+        });
+
+        return () -> {
+            QueryBus delegate = unregisterTenant(tenantDescriptor);
+            return delegate != null;
+        };
+    }
+
+    @Override
+    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(SubscriptionQueryMessage<Q, I, U> query) {
+        return resolveTenant(query)
+                .subscriptionQuery(query);
+    }
+
+    @Override
+    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(SubscriptionQueryMessage<Q, I, U> query, int updateBufferSize) {
+        return resolveTenant(query)
+                .subscriptionQuery(query, updateBufferSize);
+    }
+
     private QueryBus resolveTenant(QueryMessage<?, ?> queryMessage) {
         TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(queryMessage, tenantSegments.keySet());
         QueryBus tenantQueryBus = tenantSegments.get(tenantDescriptor);
@@ -91,44 +161,14 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
     }
 
     @Override
-    public <R> Registration subscribe(String queryName, Type responseType, MessageHandler<? super QueryMessage<?, R>> handler) {
-        Map<String, Registration> registrationMap = tenantSegments.entrySet()
-                .stream()
-                .collect(Collectors.toMap(key -> key.getKey().tenantId(), entry -> entry.getValue().subscribe(queryName, responseType, handler)));
-
-        //todo add too tenantRegistrations
-
-        return () -> {
-            //todo iterate registrationMap and cancel all
-            return true;
-        };
-    }
-
-    @Override
-    public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super QueryMessage<?, ?>> dispatchInterceptor) {
-        return null;
-    }
-
-    @Override
-    public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super QueryMessage<?, ?>> handlerInterceptor) {
-        return null;
-    }
-
-    @Override
-    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(SubscriptionQueryMessage<Q, I, U> query) {
-        QueryBus tenantQueryBus = resolveTenant(query);
-        return tenantQueryBus.subscriptionQuery(query);
-    }
-
-    @Override
-    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(SubscriptionQueryMessage<Q, I, U> query, int updateBufferSize) {
-        QueryBus tenantQueryBus = resolveTenant(query);
-        return tenantQueryBus.subscriptionQuery(query, updateBufferSize);
-    }
-
-    @Override
     public QueryUpdateEmitter queryUpdateEmitter() {
-        return null;
+        return resolveTenant((QueryMessage<?, ?>) CurrentUnitOfWork.get().getMessage())
+                .queryUpdateEmitter(); //todo throw an error
+    }
+
+    public QueryUpdateEmitter queryUpdateEmitter(TenantDescriptor tenantDescriptor) {
+        return tenantSegments.get(tenantDescriptor)
+                .queryUpdateEmitter();
     }
 
     public static class Builder {
