@@ -81,7 +81,6 @@ public class AxonServerTenantProvider implements TenantProvider {
     //gets called initially
     @Override
     public List<TenantDescriptor> getTenants() {
-        System.out.println("Getting tenants list...");
 //        if (!tenantDescriptors.isEmpty()) {
 //            return Collections.unmodifiableList(tenantDescriptors);
 //        }
@@ -118,7 +117,9 @@ public class AxonServerTenantProvider implements TenantProvider {
     public Registration subscribe(MultiTenantBus bus) {
         Map<TenantDescriptor, Registration> registrations = getTenants().stream()
                 .flatMap(tenant -> buses.stream().map(b -> new AbstractMap.SimpleEntry<>(tenant, b.registerTenant(tenant))))
-                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (t1, t2) -> {
+                    return () -> t1.cancel() && t2.cancel(); //todo clean up to Map<TenantDescriptor, List<Registration>>
+                }));
 
         registrationMap.putAll(registrations);
 

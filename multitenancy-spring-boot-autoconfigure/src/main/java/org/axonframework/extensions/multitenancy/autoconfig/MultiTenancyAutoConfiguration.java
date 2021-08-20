@@ -3,11 +3,13 @@ package org.axonframework.extensions.multitenancy.autoconfig;
 import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.extensions.multitenancy.commandbus.MultiTenantCommandBus;
 import org.axonframework.extensions.multitenancy.commandbus.MultiTenantConnectorConfigurerModule;
+import org.axonframework.extensions.multitenancy.commandbus.MultiTenantEventStore;
 import org.axonframework.extensions.multitenancy.commandbus.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.commandbus.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
 import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
 import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
@@ -72,5 +74,20 @@ public class MultiTenancyAutoConfiguration {
         return queryBus;
     }
 
+    @Bean
+    @Primary
+    public MultiTenantEventStore multiTenantEventStore(TenantEventSegmentFactory tenantEventSegmentFactory,
+                                                       TargetTenantResolver targetTenantResolver,
+                                                       TenantProvider tenantProvider) {
+
+        MultiTenantEventStore multiTenantEventStore = MultiTenantEventStore.builder()
+                .tenantSegmentFactory(tenantEventSegmentFactory)
+                .targetTenantResolver(targetTenantResolver)
+                .build();
+
+        tenantProvider.subscribe(multiTenantEventStore);
+
+        return multiTenantEventStore;
+    }
 
 }

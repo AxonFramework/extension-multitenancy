@@ -6,6 +6,7 @@ import org.axonframework.axonserver.connector.TargetContextResolver;
 import org.axonframework.axonserver.connector.command.AxonServerCommandBus;
 import org.axonframework.axonserver.connector.command.CommandLoadFactorProvider;
 import org.axonframework.axonserver.connector.command.CommandPriorityCalculator;
+import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore;
 import org.axonframework.axonserver.connector.query.AxonServerQueryBus;
 import org.axonframework.axonserver.connector.query.QueryPriorityCalculator;
 import org.axonframework.commandhandling.CommandBus;
@@ -14,6 +15,7 @@ import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
 import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
+import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
 import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
@@ -117,22 +119,25 @@ public class MultiTenancyAxonServerAutoConfiguration {
         };
     }
 
-//    @Bean
-//    @ConditionalOnMissingBean
-//    public EventStore eventStore(AxonServerConfiguration axonServerConfiguration,
-//                                 AxonConfiguration configuration,
-//                                 AxonServerConnectionManager axonServerConnectionManager,
-//                                 Serializer snapshotSerializer,
-//                                 @Qualifier("eventSerializer") Serializer eventSerializer) {
-//        return AxonServerEventStore.builder()
-//                .messageMonitor(configuration
-//                        .messageMonitor(AxonServerEventStore.class, "eventStore"))
-//                .configuration(axonServerConfiguration)
-//                .platformConnectionManager(axonServerConnectionManager)
-//                .snapshotSerializer(snapshotSerializer)
-//                .eventSerializer(eventSerializer)
-//                .snapshotFilter(configuration.snapshotFilter())
-//                .upcasterChain(configuration.upcasterChain())
-//                .build();
-//    }
+    @Bean
+    @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
+    public TenantEventSegmentFactory tenantEventSegmentFactory(AxonServerConfiguration axonServerConfiguration,
+                                                               AxonConfiguration configuration,
+                                                               AxonServerConnectionManager axonServerConnectionManager,
+                                                               Serializer snapshotSerializer,
+                                                               @Qualifier("eventSerializer") Serializer eventSerializer) {
+
+        return tenant -> AxonServerEventStore.builder()
+                .messageMonitor(configuration
+                        .messageMonitor(AxonServerEventStore.class, "eventStore"))
+                .configuration(axonServerConfiguration)
+                .platformConnectionManager(axonServerConnectionManager)
+                .snapshotSerializer(snapshotSerializer)
+                .eventSerializer(eventSerializer)
+                .defaultContext(tenant.tenantId())
+                .snapshotFilter(configuration.snapshotFilter())
+                .upcasterChain(configuration.upcasterChain())
+                .build();
+    }
+
 }

@@ -1,19 +1,17 @@
 package org.axonframework.extensions.multitenancy.commandbus;
 
-import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.common.stream.BlockingStream;
 import org.axonframework.eventhandling.DomainEventMessage;
-import org.axonframework.eventhandling.EventBus;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.TrackedEventMessage;
 import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.eventsourcing.MultiStreamableMessageSource;
 import org.axonframework.eventsourcing.eventstore.DomainEventStream;
 import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
-import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 
 import java.time.Duration;
@@ -22,8 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 
 /*
@@ -34,13 +32,17 @@ import java.util.stream.Collectors;
 public class MultiTenantEventStore implements EventStore, MultiTenantBus {
 
     private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
-    private final Map<TenantDescriptor, MessageHandler<? super EventMessage<?>>> handlers = new ConcurrentHashMap<>();
+    private final List<Consumer<List<? extends EventMessage<?>>>> messageProcessors = new CopyOnWriteArrayList<>();
 
-    private final Map<String, Map<String, Registration>> tenantRegistrations = new ConcurrentHashMap<>();
-    private MultiStreamableMessageSource multiSource;
+    private final List<MessageDispatchInterceptor<? super EventMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
+    private final List<Registration> dispatchInterceptorsRegistration = new CopyOnWriteArrayList<>();
+
+    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
 
     private final TenantEventSegmentFactory tenantSegmentFactory;
-    private final TargetTenantResolver<EventMessage<?>> targetTenantResolver;
+    private final TargetTenantResolver<Message<?>> targetTenantResolver;
+
+    private MultiStreamableMessageSource multiSource;
 
     public MultiTenantEventStore(Builder builder) {
         builder.validate();
@@ -52,97 +54,116 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
         return new Builder();
     }
 
+    @Override
+    public void publish(List<? extends EventMessage<?>> events) {
+        EventStore tenantSegment = resolveSegment();
+        if (tenantSegment != null) {
+            tenantSegment.publish(events);
+        } else {
+            resolveTenant(events.get(0))
+                    .publish(events);
+        }
+    }
+
+    @Override
+    public void publish(EventMessage<?>... events) {
+        EventStore tenantSegment = resolveSegment();
+        if (tenantSegment != null) {
+            tenantSegment.publish(events);
+        } else {
+            resolveTenant(events[0])
+                    .publish(events);
+        }
+    }
+
+    @Override
+    public Registration subscribe(Consumer<List<? extends EventMessage<?>>> messageProcessor) {
+        messageProcessors.add(messageProcessor);
+
+        tenantSegments.forEach((tenant, segment) ->
+                subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(messageProcessor)));
+
+        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+    }
+
+    @Override
+    public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super EventMessage<?>> dispatchInterceptor) {
+        dispatchInterceptors.add(dispatchInterceptor);
+        tenantSegments.forEach((tenant, bus) ->
+                dispatchInterceptorsRegistration.add(bus.registerDispatchInterceptor(dispatchInterceptor)));
+
+        return () -> dispatchInterceptorsRegistration.stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+    }
 
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
         tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
 
         return () -> {
-            EventBus delegate = unregisterTenant(tenantDescriptor);
+            EventStore delegate = unregisterTenant(tenantDescriptor);
             return delegate != null;
         };
     }
 
-    @Override
-    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
-
-        return null;
-    }
-
-    public EventBus unregisterTenant(TenantDescriptor tenantDescriptor) {
+    public EventStore unregisterTenant(TenantDescriptor tenantDescriptor) {
+        subscribeRegistrations.remove(tenantDescriptor).cancel();
         return tenantSegments.remove(tenantDescriptor);
     }
 
     @Override
-    public void publish(EventMessage<?>... events) {
-        EventBus tenantEventBus = resolveTenant(events[0]); //todo better solution
-        tenantEventBus.publish(events);
-    }
+    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
+        tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
+            EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
 
-    @Override
-    public void publish(List<? extends EventMessage<?>> events) {
-        EventBus tenantEventBus = resolveTenant(events.get(0)); //todo better solution
-        tenantEventBus.publish(events);
-    }
+            dispatchInterceptors.forEach(dispatchInterceptor ->
+                    dispatchInterceptorsRegistration.add(tenantSegment.registerDispatchInterceptor(dispatchInterceptor)));
 
-    @Override
-    public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super EventMessage<?>> dispatchInterceptor) {
-        return null;
-    }
+            messageProcessors.forEach(processor ->
+                    subscribeRegistrations.putIfAbsent(tenantDescriptor,
+                            tenantSegment.subscribe(processor)));
 
-    @Override
-    public Registration subscribe(Consumer<List<? extends EventMessage<?>>> messageProcessor) {
-        Map<String, Registration> registrationMap = tenantSegments.entrySet()
-                .stream()
-                .collect(Collectors.toMap(key -> key.getKey().tenantId(), entry -> entry.getValue().subscribe(messageProcessor)));
-
-        //todo add too tenantRegistrations
+            return tenantSegment;
+        });
 
         return () -> {
-            //todo iterate registrationMap and cancel all
-            return true;
+            EventStore delegate = unregisterTenant(tenantDescriptor);
+            return delegate != null;
         };
     }
 
-
-    private EventBus resolveTenant(EventMessage<?> eventMessage) {
+    private EventStore resolveTenantSilently(Message<?> eventMessage) {
         TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(eventMessage, tenantSegments.keySet());
-        EventBus tenantEventBus = tenantSegments.get(tenantDescriptor);
-        if (tenantEventBus == null) {
-            throw new NoSuchTenantException(tenantDescriptor.tenantId());
-        }
-        return tenantEventBus;
+        return tenantSegments.get(tenantDescriptor);
     }
 
-    @Override
-    public DomainEventStream readEvents(String aggregateIdentifier) {
-        EventStore tenantEventStore = getTenantSegment();
-
-        return tenantEventStore.readEvents(aggregateIdentifier);
-    }
-
-//    public DomainEventStream readEvents(String aggregateIdentifier, String tenant) { todo
-//        EventStore tenantEventStore = getTenantSegment();
-//
-//        return tenantEventStore.readEvents(aggregateIdentifier);
-//    }
-
-    private EventStore getTenantSegment() {
-        TenantDescriptor tenantDescriptor = CurrentUnitOfWork.get().getResource("tenantDescriptor");
-        if (Objects.isNull(tenantDescriptor)) {
-            throw new AxonConfigurationException("todo");
-        }
-
+    private EventStore resolveTenant(Message<?> eventMessage) {
+        TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(eventMessage, tenantSegments.keySet());
         EventStore tenantEventStore = tenantSegments.get(tenantDescriptor);
-        if (Objects.isNull(tenantEventStore)) {
-            throw new AxonConfigurationException("todo");
+        if (tenantEventStore == null) {
+            throw new NoSuchTenantException(tenantDescriptor.tenantId());
         }
         return tenantEventStore;
     }
 
+    private EventStore resolveSegment() {
+        return resolveTenantSilently(CurrentUnitOfWork.get().getMessage());
+    }
+
+    @Override
+    public DomainEventStream readEvents(String aggregateIdentifier) {
+        return resolveSegment()
+                .readEvents(aggregateIdentifier);
+    }
+
+    public DomainEventStream readEvents(String aggregateIdentifier, TenantDescriptor tenantDescriptor) {
+        return tenantSegments.get(tenantDescriptor)
+                .readEvents(aggregateIdentifier);
+    }
+
     @Override
     public void storeSnapshot(DomainEventMessage<?> snapshot) {
-        getTenantSegment().storeSnapshot(snapshot);
+        resolveSegment()
+                .storeSnapshot(snapshot);
     }
 
     @Override
@@ -150,7 +171,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
         return multiSource().openStream(trackingToken);
     }
 
-    private MultiStreamableMessageSource multiSource() {
+    private MultiStreamableMessageSource multiSource() { //todo add message source in runtime
         if (Objects.isNull(multiSource)) {
             MultiStreamableMessageSource.Builder sourceBuilder = MultiStreamableMessageSource.builder();
             tenantSegments.forEach((key, value) -> sourceBuilder.addMessageSource(key.tenantId(), value));
@@ -182,7 +203,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
     public static class Builder {
 
         public TenantEventSegmentFactory tenantSegmentFactory;
-        public TargetTenantResolver<EventMessage<?>> targetTenantResolver;
+        public TargetTenantResolver<Message<?>> targetTenantResolver;
 
         /**
          * @param tenantSegmentFactory
@@ -198,7 +219,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
          * @param targetTenantResolver
          * @return
          */
-        public Builder targetTenantResolver(TargetTenantResolver<EventMessage<?>> targetTenantResolver) {
+        public Builder targetTenantResolver(TargetTenantResolver<Message<?>> targetTenantResolver) {
             BuilderUtils.assertNonNull(targetTenantResolver, "");
             this.targetTenantResolver = targetTenantResolver;
             return this;
