@@ -7,12 +7,14 @@ import org.axonframework.axonserver.connector.command.AxonServerCommandBus;
 import org.axonframework.axonserver.connector.command.CommandLoadFactorProvider;
 import org.axonframework.axonserver.connector.command.CommandPriorityCalculator;
 import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore;
+import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
 import org.axonframework.axonserver.connector.query.AxonServerQueryBus;
 import org.axonframework.axonserver.connector.query.QueryPriorityCalculator;
 import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
+import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
 import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
@@ -137,6 +139,16 @@ public class MultiTenancyAxonServerAutoConfiguration {
                 .snapshotFilter(configuration.snapshotFilter())
                 .upcasterChain(configuration.upcasterChain())
                 .build();
+    }
+
+    @Bean
+    public EventProcessorInfoConfiguration processorInfoConfiguration(
+            EventProcessingConfiguration eventProcessingConfiguration,
+            AxonServerConnectionManager connectionManager,
+            AxonServerConfiguration configuration) {
+        return new EventProcessorInfoConfiguration(c -> eventProcessingConfiguration,
+                c -> connectionManager,
+                c -> configuration);
     }
 
 }

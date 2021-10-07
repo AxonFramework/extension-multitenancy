@@ -2,6 +2,7 @@ package org.axonframework.extensions.multitenancy.commandbus;
 
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
+import org.axonframework.extensions.multitenancy.MultiTenantAwareComponent;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
@@ -30,7 +31,7 @@ import java.util.stream.Stream;
 @author Stefan Dragisic
  */
 
-public class MultiTenantQueryBus implements QueryBus, MultiTenantBus {
+public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent {
 
     private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, QuerySubscription<?>> handlers = new ConcurrentHashMap<>();

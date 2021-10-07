@@ -11,6 +11,7 @@ public class ContextObject {
 
     private String context;
     private Map<String, String> metaData;
+    private String replicationGroup;
 
     public String getContext() {
         return context;
@@ -22,11 +23,16 @@ public class ContextObject {
 
 
     public Map<String, String> getMetaData() {
+        metaData.putIfAbsent("replicationGroup", replicationGroup);
         return metaData;
     }
 
     public void setMetaData(Map<String, String> metaData) {
         this.metaData = metaData;
+    }
+
+    public void setReplicationGroup(String replicationGroup) {
+        this.replicationGroup = replicationGroup;
     }
 }
 

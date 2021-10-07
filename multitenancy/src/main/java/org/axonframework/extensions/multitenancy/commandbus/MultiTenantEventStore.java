@@ -10,6 +10,7 @@ import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.eventsourcing.MultiStreamableMessageSource;
 import org.axonframework.eventsourcing.eventstore.DomainEventStream;
 import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.extensions.multitenancy.MultiTenantAwareComponent;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
@@ -29,7 +30,7 @@ import java.util.function.Consumer;
 @author Stefan Dragisic
  */
 
-public class MultiTenantEventStore implements EventStore, MultiTenantBus {
+public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent {
 
     private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
     private final List<Consumer<List<? extends EventMessage<?>>>> messageProcessors = new CopyOnWriteArrayList<>();
@@ -61,8 +62,8 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
             tenantSegment.publish(events);
         } else {
             resolveTenant(events.get(0))
-                    .publish(events);
-        }
+                    .publish(events); //todo otherway around
+        } //todo add corelation data provider
     }
 
     @Override
@@ -171,7 +172,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
         return multiSource().openStream(trackingToken);
     }
 
-    private MultiStreamableMessageSource multiSource() { //todo add message source in runtime
+    private MultiStreamableMessageSource multiSource() {
         if (Objects.isNull(multiSource)) {
             MultiStreamableMessageSource.Builder sourceBuilder = MultiStreamableMessageSource.builder();
             tenantSegments.forEach((key, value) -> sourceBuilder.addMessageSource(key.tenantId(), value));
@@ -198,6 +199,14 @@ public class MultiTenantEventStore implements EventStore, MultiTenantBus {
     @Override
     public TrackingToken createTokenSince(Duration duration) {
         return multiSource().createTokenSince(duration);
+    }
+
+    /**
+     * @param tenantDescriptor
+     * @return
+     */
+    public EventStore tenantSegment(TenantDescriptor tenantDescriptor) {
+        return tenantSegments.get(tenantDescriptor);
     }
 
     public static class Builder {

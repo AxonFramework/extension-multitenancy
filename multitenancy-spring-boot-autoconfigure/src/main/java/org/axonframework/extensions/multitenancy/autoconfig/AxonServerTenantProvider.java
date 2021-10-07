@@ -3,7 +3,7 @@ package org.axonframework.extensions.multitenancy.autoconfig;
 import org.axonframework.axonserver.connector.AxonServerConnectionManager;
 import org.axonframework.common.Registration;
 import org.axonframework.common.StringUtils;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantBus;
+import org.axonframework.extensions.multitenancy.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
@@ -27,11 +27,11 @@ import java.util.stream.Collectors;
 /**
  * @author Stefan Dragisic
  */
-public class AxonServerTenantProvider implements TenantProvider {
+public class AxonServerTenantProvider implements TenantProvider { //todo rename Supplier?
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-    private final List<MultiTenantBus> buses = new CopyOnWriteArrayList<>();
+    private final List<MultiTenantAwareComponent> buses = new CopyOnWriteArrayList<>();
 
     private List<TenantDescriptor> tenantDescriptors = new CopyOnWriteArrayList<>();
 
@@ -85,7 +85,7 @@ public class AxonServerTenantProvider implements TenantProvider {
 //            return Collections.unmodifiableList(tenantDescriptors);
 //        }
 
-        if (StringUtils.nonEmptyOrNull(preDefinedContexts)) {
+        if (StringUtils.nonEmptyOrNull(preDefinedContexts) && !preDefinedContexts.startsWith("$")) {
             tenantDescriptors = Arrays.stream(preDefinedContexts.split(","))
                     .map(TenantDescriptor::tenantWithId)
                     .collect(Collectors.toList());
@@ -114,7 +114,9 @@ public class AxonServerTenantProvider implements TenantProvider {
     }
 
     @Override
-    public Registration subscribe(MultiTenantBus bus) {
+    public Registration subscribe(MultiTenantAwareComponent bus) { //todo provide consumer of new tenant
+        buses.add(bus);
+
         Map<TenantDescriptor, Registration> registrations = getTenants().stream()
                 .flatMap(tenant -> buses.stream().map(b -> new AbstractMap.SimpleEntry<>(tenant, b.registerTenant(tenant))))
                 .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (t1, t2) -> {
@@ -123,9 +125,9 @@ public class AxonServerTenantProvider implements TenantProvider {
 
         registrationMap.putAll(registrations);
 
-        if (!StringUtils.nonEmptyOrNull(preDefinedContexts)) {
-            buses.add(bus);
-        }
+//        if (!StringUtils.nonEmptyOrNull(preDefinedContexts) && !preDefinedContexts.startsWith("$")) {
+//            buses.add(bus);
+//        }
 
         return () -> {
             scheduler.shutdown();

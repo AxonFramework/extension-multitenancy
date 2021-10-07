@@ -1,7 +1,14 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy.configuration;
 
 import org.axonframework.config.Configuration;
 import org.axonframework.config.DefaultConfigurer;
+import org.axonframework.extensions.multitenancy.commandbus.MultiTenantCommandBus;
+import org.axonframework.extensions.multitenancy.commandbus.MultiTenantEventStore;
+import org.axonframework.extensions.multitenancy.commandbus.MultiTenantQueryBus;
+import org.axonframework.extensions.multitenancy.commandbus.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
+import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

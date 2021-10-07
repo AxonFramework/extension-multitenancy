@@ -6,6 +6,7 @@ import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.GenericCommandResultMessage;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
+import org.axonframework.extensions.multitenancy.MultiTenantAwareComponent;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
@@ -22,7 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @author Stefan Dragisic
  */
 
-public class MultiTenantCommandBus implements CommandBus, MultiTenantBus {
+public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareComponent {
 
     private final Map<TenantDescriptor, CommandBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, MessageHandler<? super CommandMessage<?>>> handlers = new ConcurrentHashMap<>();

@@ -1,11 +1,12 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy;
 
 import org.axonframework.common.Registration;
+import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
 
 /**
  * @author Stefan Dragisic
  */
-public interface MultiTenantBus {
+public interface MultiTenantAwareComponent {
 
     Registration registerTenant(TenantDescriptor tenantDescriptor);
 
