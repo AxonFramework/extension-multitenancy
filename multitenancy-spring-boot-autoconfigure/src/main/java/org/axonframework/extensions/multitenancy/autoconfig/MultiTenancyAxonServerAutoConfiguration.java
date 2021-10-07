@@ -48,7 +48,6 @@ import org.springframework.context.annotation.FilterType;
         @ComponentScan.Filter(type = FilterType.REGEX, pattern = "org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration.class")})
 public class MultiTenancyAxonServerAutoConfiguration {
 
-
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
     public TenantProvider tenantProvider(@Value("${axon.axonserver.contexts:}") String contexts,

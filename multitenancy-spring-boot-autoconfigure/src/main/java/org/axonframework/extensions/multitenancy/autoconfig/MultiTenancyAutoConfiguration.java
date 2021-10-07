@@ -26,7 +26,6 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 @ConditionalOnClass(MultiTenantConnectorConfigurerModule.class)
 @AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
-
 public class MultiTenancyAutoConfiguration {
 
     @Bean
