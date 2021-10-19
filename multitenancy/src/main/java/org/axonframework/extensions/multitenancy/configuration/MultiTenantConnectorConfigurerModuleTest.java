@@ -2,13 +2,13 @@ package org.axonframework.extensions.multitenancy.configuration;
 
 import org.axonframework.config.Configuration;
 import org.axonframework.config.DefaultConfigurer;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantCommandBus;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantEventStore;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantQueryBus;
-import org.axonframework.extensions.multitenancy.commandbus.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
-import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
-import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
+import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.components.commandhandeling.MultiTenantCommandBus;
+import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

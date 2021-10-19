@@ -1,6 +1,7 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy.components.commandhandeling;
 
 import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 
 import java.util.function.Function;
 

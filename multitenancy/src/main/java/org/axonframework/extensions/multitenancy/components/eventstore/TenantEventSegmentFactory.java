@@ -1,6 +1,7 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 
 import java.util.function.Function;
 

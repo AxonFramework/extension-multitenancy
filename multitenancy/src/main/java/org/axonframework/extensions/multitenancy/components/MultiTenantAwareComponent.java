@@ -1,7 +1,6 @@
-package org.axonframework.extensions.multitenancy;
+package org.axonframework.extensions.multitenancy.components;
 
 import org.axonframework.common.Registration;
-import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
 
 /**
  * @author Stefan Dragisic

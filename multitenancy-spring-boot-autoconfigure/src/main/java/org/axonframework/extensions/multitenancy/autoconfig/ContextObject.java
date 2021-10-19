@@ -31,6 +31,10 @@ public class ContextObject {
         this.metaData = metaData;
     }
 
+    public String getReplicationGroup() {
+        return replicationGroup;
+    }
+
     public void setReplicationGroup(String replicationGroup) {
         this.replicationGroup = replicationGroup;
     }

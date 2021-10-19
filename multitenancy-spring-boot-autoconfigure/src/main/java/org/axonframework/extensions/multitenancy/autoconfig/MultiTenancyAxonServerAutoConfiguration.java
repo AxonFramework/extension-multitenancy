@@ -15,11 +15,11 @@ import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.EventProcessingConfiguration;
-import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
-import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
-import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
-import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
-import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
+import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
+import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
 import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryInvocationErrorHandler;
@@ -54,8 +54,12 @@ public class MultiTenancyAxonServerAutoConfiguration {
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
     public TenantProvider tenantProvider(@Value("${axon.axonserver.contexts:}") String contexts,
                                          TenantConnectPredicate tenantConnectPredicate,
-                                         AxonServerConnectionManager axonServerConnectionManager) {
-        return new AxonServerTenantProvider(contexts, tenantConnectPredicate, axonServerConnectionManager);
+                                         AxonServerConnectionManager axonServerConnectionManager,
+                                         AxonServerConfiguration axonServerConfiguration) {
+        return new AxonServerTenantProvider(contexts,
+                tenantConnectPredicate,
+                axonServerConnectionManager,
+                axonServerConfiguration);
     }
 
     @Bean

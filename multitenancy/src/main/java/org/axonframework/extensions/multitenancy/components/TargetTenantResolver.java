@@ -1,4 +1,4 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy.components;
 
 import org.axonframework.messaging.Message;
 

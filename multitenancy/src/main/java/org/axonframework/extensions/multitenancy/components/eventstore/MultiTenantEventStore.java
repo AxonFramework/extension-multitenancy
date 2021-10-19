@@ -1,4 +1,4 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
@@ -10,7 +10,10 @@ import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.eventsourcing.MultiStreamableMessageSource;
 import org.axonframework.eventsourcing.eventstore.DomainEventStream;
 import org.axonframework.eventsourcing.eventstore.EventStore;
-import org.axonframework.extensions.multitenancy.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
+import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
@@ -107,7 +110,8 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     }
 
     public EventStore unregisterTenant(TenantDescriptor tenantDescriptor) {
-        subscribeRegistrations.remove(tenantDescriptor).cancel();
+        Registration remove = subscribeRegistrations.remove(tenantDescriptor);
+        if (remove != null) remove.cancel();
         return tenantSegments.remove(tenantDescriptor);
     }
 

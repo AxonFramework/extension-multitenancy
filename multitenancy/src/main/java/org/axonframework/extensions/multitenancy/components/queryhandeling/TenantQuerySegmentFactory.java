@@ -1,5 +1,6 @@
-package org.axonframework.extensions.multitenancy.commandbus;
+package org.axonframework.extensions.multitenancy.components.queryhandeling;
 
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.queryhandling.QueryBus;
 
 import java.util.function.Function;

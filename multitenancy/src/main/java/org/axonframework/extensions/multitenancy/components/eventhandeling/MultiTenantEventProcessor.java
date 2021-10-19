@@ -1,13 +1,17 @@
-package org.axonframework.extensions.multitenancy.eventhandeling;
+package org.axonframework.extensions.multitenancy.components.eventhandeling;
 
 import org.axonframework.common.Registration;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.EventProcessor;
-import org.axonframework.extensions.multitenancy.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.lifecycle.Phase;
+import org.axonframework.lifecycle.ShutdownHandler;
+import org.axonframework.lifecycle.StartHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -23,20 +27,12 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
 public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwareComponent {
 
     private final Map<TenantDescriptor, EventProcessor> tenantSegments = new ConcurrentHashMap<>();
-    private final Map<TenantDescriptor, Registration> registrations = new ConcurrentHashMap<>();
 
     private final List<MessageHandlerInterceptor<? super EventMessage<?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
-    private final List<Registration> handlerInterceptorsRegistration = new CopyOnWriteArrayList<>();
+    private final Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
 
     private final String name;
     private final TenantEventProcessorSegmentFactory tenantSegmentFactory;
-
-    /**
-     * @return
-     */
-    public static Builder builder() {
-        return new Builder();
-    }
 
     /**
      * @param builder
@@ -45,6 +41,13 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
         builder.validate();
         this.name = builder.name;
         this.tenantSegmentFactory = builder.tenantSegmentFactory;
+    }
+
+    /**
+     * @return
+     */
+    public static Builder builder() {
+        return new Builder();
     }
 
     @Override
@@ -58,11 +61,13 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
     }
 
     @Override
+    @StartHandler(phase = Phase.INBOUND_EVENT_CONNECTORS)
     public void start() {
         tenantSegments.values().forEach(EventProcessor::start);
     }
 
     @Override
+    @ShutdownHandler(phase = Phase.INBOUND_EVENT_CONNECTORS)
     public void shutDown() {
         tenantSegments.values().forEach(EventProcessor::shutDown);
     }
@@ -99,9 +104,13 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
     public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super EventMessage<?>> handlerInterceptor) {
         handlerInterceptors.add(handlerInterceptor);
         tenantSegments.forEach((tenant, bus) ->
-                handlerInterceptorsRegistration.add(bus.registerHandlerInterceptor(handlerInterceptor)));
+                handlerInterceptorsRegistration
+                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                        .add(bus.registerHandlerInterceptor(handlerInterceptor)));
 
-        return () -> handlerInterceptorsRegistration.stream()
+        return () -> handlerInterceptorsRegistration.values()
+                .stream()
+                .flatMap(Collection::stream)
                 .map(Registration::cancel)
                 .reduce((prev, acc) -> prev && acc)
                 .orElse(false);
@@ -112,33 +121,36 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
         EventProcessor tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
         tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
 
-        return () -> {
-            EventProcessor delegate = unregisterTenant(tenantDescriptor);
-            return delegate != null;
-        };
+        return () -> unregisterTenant(tenantDescriptor);
     }
 
     @Override
     public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
-        tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
-            EventProcessor tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
+        tenantSegments.computeIfAbsent(tenantDescriptor, tenant -> {
+            EventProcessor tenantSegment = tenantSegmentFactory.apply(tenant);
 
             handlerInterceptors.forEach(handlerInterceptor ->
-                    handlerInterceptorsRegistration.add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
+                    handlerInterceptorsRegistration
+                            .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                            .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
 
             tenantSegment.start();
 
             return tenantSegment;
         });
 
-        return () -> {
-            EventProcessor delegate = unregisterTenant(tenantDescriptor);
-            if (delegate != null) {
-                delegate.shutDown();
-                return true;
-            }
-            return false;
-        };
+        return () -> unregisterTenant(tenantDescriptor);
+    }
+
+    private boolean unregisterTenant(TenantDescriptor tenantDescriptor) {
+        List<Registration> registrations = handlerInterceptorsRegistration.remove(tenantDescriptor);
+        if (registrations != null) registrations.forEach(Registration::cancel);
+        EventProcessor delegate = tenantSegments.remove(tenantDescriptor);
+        if (delegate != null) {
+            delegate.shutDown();
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -148,10 +160,6 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
         return Collections.unmodifiableList(new ArrayList<>(tenantSegments.values()));
     }
 
-    private EventProcessor unregisterTenant(TenantDescriptor tenantDescriptor) {
-        registrations.remove(tenantDescriptor).cancel();
-        return tenantSegments.remove(tenantDescriptor);
-    }
 
     public static class Builder {
 

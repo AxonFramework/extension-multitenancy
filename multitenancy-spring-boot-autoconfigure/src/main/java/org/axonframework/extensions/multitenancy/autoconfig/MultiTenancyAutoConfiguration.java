@@ -1,16 +1,16 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.commandhandling.CommandBus;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantCommandBus;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantEventStore;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantQueryBus;
-import org.axonframework.extensions.multitenancy.commandbus.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.commandbus.TenantCommandSegmentFactory;
-import org.axonframework.extensions.multitenancy.commandbus.TenantConnectPredicate;
-import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
-import org.axonframework.extensions.multitenancy.commandbus.TenantEventSegmentFactory;
-import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
-import org.axonframework.extensions.multitenancy.commandbus.TenantQuerySegmentFactory;
+import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.commandhandeling.MultiTenantCommandBus;
+import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantConnectorConfigurerModule;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;

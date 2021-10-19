@@ -14,4 +14,4 @@
 # limitations under the License.
 #
 
-org.axonframework.extensions.multitenancy.commandbus.MultiTenantConnectorConfigurerModule
+org.axonframework.extensions.multitenancy.configuration.MultiTenantConnectorConfigurerModule

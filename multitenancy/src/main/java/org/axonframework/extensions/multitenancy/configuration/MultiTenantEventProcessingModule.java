@@ -12,10 +12,10 @@ import org.axonframework.eventhandling.TrackedEventMessage;
 import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
-import org.axonframework.extensions.multitenancy.commandbus.MultiTenantEventStore;
-import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
-import org.axonframework.extensions.multitenancy.commandbus.TenantProvider;
-import org.axonframework.extensions.multitenancy.eventhandeling.MultiTenantEventProcessor;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.messaging.StreamableMessageSource;
 import org.axonframework.messaging.SubscribableMessageSource;
 

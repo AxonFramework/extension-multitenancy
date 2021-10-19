@@ -1,7 +1,7 @@
-package org.axonframework.extensions.multitenancy.eventhandeling;
+package org.axonframework.extensions.multitenancy.components.eventhandeling;
 
 import org.axonframework.eventhandling.EventProcessor;
-import org.axonframework.extensions.multitenancy.commandbus.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 
 import java.util.function.Function;
 
