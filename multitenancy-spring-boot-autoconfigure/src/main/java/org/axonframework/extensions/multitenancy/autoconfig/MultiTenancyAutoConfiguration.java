@@ -13,10 +13,13 @@ import org.axonframework.extensions.multitenancy.components.queryhandeling.Multi
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantConnectorConfigurerModule;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
+import org.axonframework.messaging.Message;
+import org.axonframework.messaging.correlation.CorrelationDataProvider;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -29,17 +32,14 @@ import org.springframework.context.annotation.Primary;
 @AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
 public class MultiTenancyAutoConfiguration {
 
-    @Bean
-    @ConditionalOnMissingBean
-    public TargetTenantResolver targetTenantResolver() {
-        return (message, tenantDescriptors) -> TenantDescriptor.tenantWithId("default");
-    }
+    private static final String DEFAULT_TENANT_CORRELATION_KEY = "tenantId";
 
     @Bean
     @ConditionalOnMissingBean
     public TenantConnectPredicate tenantFilterPredicate() {
         return tenant -> true;
     }
+
 
     @Bean
     @Primary
@@ -49,9 +49,9 @@ public class MultiTenancyAutoConfiguration {
                                                        TenantProvider tenantProvider) {
 
         MultiTenantCommandBus commandBus = MultiTenantCommandBus.builder()
-                .tenantSegmentFactory(tenantCommandSegmentFactory)
-                .targetTenantResolver(targetTenantResolver)
-                .build();
+                                                                .tenantSegmentFactory(tenantCommandSegmentFactory)
+                                                                .targetTenantResolver(targetTenantResolver)
+                                                                .build();
 
         tenantProvider.subscribe(commandBus);
 
@@ -65,9 +65,9 @@ public class MultiTenancyAutoConfiguration {
                                                    TenantProvider tenantProvider) {
 
         MultiTenantQueryBus queryBus = MultiTenantQueryBus.builder()
-                .tenantSegmentFactory(tenantQuerySegmentFactory)
-                .targetTenantResolver(targetTenantResolver)
-                .build();
+                                                          .tenantSegmentFactory(tenantQuerySegmentFactory)
+                                                          .targetTenantResolver(targetTenantResolver)
+                                                          .build();
 
         tenantProvider.subscribe(queryBus);
 
@@ -81,9 +81,10 @@ public class MultiTenancyAutoConfiguration {
                                                        TenantProvider tenantProvider) {
 
         MultiTenantEventStore multiTenantEventStore = MultiTenantEventStore.builder()
-                .tenantSegmentFactory(tenantEventSegmentFactory)
-                .targetTenantResolver(targetTenantResolver)
-                .build();
+                                                                           .tenantSegmentFactory(
+                                                                                   tenantEventSegmentFactory)
+                                                                           .targetTenantResolver(targetTenantResolver)
+                                                                           .build();
 
         tenantProvider.subscribe(multiTenantEventStore);
 
@@ -93,5 +94,21 @@ public class MultiTenancyAutoConfiguration {
     @Bean
     public MultiTenantEventProcessingModule multiTenantEventProcessingModule(TenantProvider tenantProvider) {
         return new MultiTenantEventProcessingModule(tenantProvider);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "axon.multitenant.use-metadata-helper", matchIfMissing = true)
+    public TargetTenantResolver<Message<?>> targetTenantResolver() {
+        return (message, tenants) ->
+                TenantDescriptor.tenantWithId(
+                        (String) message.getMetaData()
+                                        .getOrDefault(DEFAULT_TENANT_CORRELATION_KEY, "unknownTenant")
+                );
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "axon.multitenant.use-metadata-helper", matchIfMissing = true)
+    public CorrelationDataProvider tenantCorrelationProvider() {
+        return new TenantCorrelationProvider(DEFAULT_TENANT_CORRELATION_KEY);
     }
 }
