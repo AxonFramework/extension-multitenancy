@@ -204,7 +204,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     }
 
     @Override
-    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
+    public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         tenantSegments.computeIfAbsent(tenantDescriptor, tenant -> {
             QueryUpdateEmitter tenantSegment = tenantSegmentFactory.apply(tenant);
 

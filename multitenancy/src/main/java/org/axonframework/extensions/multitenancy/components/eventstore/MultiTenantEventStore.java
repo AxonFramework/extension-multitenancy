@@ -116,16 +116,17 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     }
 
     @Override
-    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
+    public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
             EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
 
             dispatchInterceptors.forEach(dispatchInterceptor ->
-                    dispatchInterceptorsRegistration.add(tenantSegment.registerDispatchInterceptor(dispatchInterceptor)));
+                                                 dispatchInterceptorsRegistration.add(tenantSegment.registerDispatchInterceptor(
+                                                         dispatchInterceptor)));
 
             messageProcessors.forEach(processor ->
-                    subscribeRegistrations.putIfAbsent(tenantDescriptor,
-                            tenantSegment.subscribe(processor)));
+                                              subscribeRegistrations.putIfAbsent(tenantDescriptor,
+                                                                                 tenantSegment.subscribe(processor)));
 
             return tenantSegment;
         });

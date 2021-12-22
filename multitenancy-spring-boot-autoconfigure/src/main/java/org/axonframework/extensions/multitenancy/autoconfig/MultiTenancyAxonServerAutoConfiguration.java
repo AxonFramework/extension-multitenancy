@@ -81,12 +81,10 @@ public class MultiTenancyAxonServerAutoConfiguration {
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
     public TenantProvider tenantProvider(@Value("${axon.axonserver.contexts:}") String contexts,
                                          TenantConnectPredicate tenantConnectPredicate,
-                                         AxonServerConnectionManager axonServerConnectionManager,
-                                         AxonServerConfiguration axonServerConfiguration) {
+                                         AxonServerConnectionManager axonServerConnectionManager) {
         return new AxonServerTenantProvider(contexts,
                                             tenantConnectPredicate,
-                                            axonServerConnectionManager,
-                axonServerConfiguration);
+                                            axonServerConnectionManager);
     }
 
     @Bean

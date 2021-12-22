@@ -39,25 +39,26 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
 
     private final TenantConnectPredicate tenantFilter = tenantDescriptor -> true;
 
-    private TenantProvider tenantsProvider = null; //todo () -> Collections.singletonList(TenantDescriptor.tenantWithId("default")); //invoked first
+    private TenantProvider tenantsProvider = null;
     private Function<Configuration, TenantCommandSegmentFactory> tenantCommandSegmentFactory =
             config -> tenantDescriptor -> SimpleCommandBus.builder()
-                    .duplicateCommandHandlerResolver(
-                            config.getComponent(DuplicateCommandHandlerResolver.class,
-                                    LoggingDuplicateCommandHandlerResolver::instance))
-                    .messageMonitor(config.messageMonitor(CommandBus.class, "commandBus"))
-                    .transactionManager(config.getComponent(TransactionManager.class, NoTransactionManager::instance))
-                    .build();
+                                                          .duplicateCommandHandlerResolver(
+                                                                  config.getComponent(DuplicateCommandHandlerResolver.class,
+                                                                                      LoggingDuplicateCommandHandlerResolver::instance))
+                                                          .messageMonitor(config.messageMonitor(CommandBus.class,
+                                                                                                "commandBus"))
+                                                          .transactionManager(config.getComponent(TransactionManager.class,
+                                                                                                  NoTransactionManager::instance))
+                                                          .build();
 
     private Function<Configuration, TenantEventSegmentFactory> tenantEventSegmentFactory =
-            config -> tenantDescriptor -> null; //todo set default event store
+            config -> tenantDescriptor -> null;
 
     private Function<Configuration, TenantQuerySegmentFactory> tenantQuerySegmentFactory =
             config -> tenantDescriptor -> SimpleQueryBus.builder()
                     .queryUpdateEmitter(SimpleQueryUpdateEmitter.builder().build())
                     .messageMonitor(config.messageMonitor(QueryBus.class, "queryBus"))
                     .transactionManager(config.getComponent(TransactionManager.class, NoTransactionManager::instance))
-                    //.errorHandler(e->e) todo ?
                     .build();
 
     private Function<Configuration, TargetTenantResolver<? super Message<?>>> targetTenantResolver =
@@ -72,8 +73,8 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantsProvider));
 
         configurer.getModuleConfiguration(MultiTenantConnectorConfigurerModule.class)
-                .registerTenantsProvider(null) //todo create simple tenant provider, hardcodded values
-                .registerTargetTenantResolver(targetTenantResolver);
+                  .registerTenantsProvider(null)
+                  .registerTargetTenantResolver(targetTenantResolver);
 
         configurer.registerComponent(TenantCommandSegmentFactory.class, tenantCommandSegmentFactory);
         configurer.registerComponent(TenantQuerySegmentFactory.class, tenantQuerySegmentFactory);

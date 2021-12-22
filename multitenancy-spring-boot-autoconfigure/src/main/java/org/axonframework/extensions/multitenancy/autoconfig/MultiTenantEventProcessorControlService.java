@@ -60,7 +60,7 @@ public class MultiTenantEventProcessorControlService extends EventProcessorContr
     }
 
     @Override
-    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
+    public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         if (axonServerConnectionManager != null && eventProcessingConfiguration != null) {
             eventProcessingConfiguration.eventProcessors()
                                         .forEach(

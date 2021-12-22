@@ -9,6 +9,6 @@ public interface MultiTenantAwareComponent {
 
     Registration registerTenant(TenantDescriptor tenantDescriptor);
 
-    Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor);
+    Registration registerAndStartTenant(TenantDescriptor tenantDescriptor);
 
 }

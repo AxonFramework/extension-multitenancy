@@ -1,6 +1,8 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
-import org.axonframework.axonserver.connector.AxonServerConfiguration;
+import io.axoniq.axonserver.connector.ResultStream;
+import io.axoniq.axonserver.grpc.admin.ContextOverview;
+import io.axoniq.axonserver.grpc.admin.ContextUpdate;
 import org.axonframework.axonserver.connector.AxonServerConnectionManager;
 import org.axonframework.common.Registration;
 import org.axonframework.common.StringUtils;
@@ -8,20 +10,14 @@ import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComp
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.client.RestTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -29,63 +25,29 @@ import java.util.stream.Collectors;
  *
  * @author Stefan Dragisic
  */
-public class AxonServerTenantProvider implements TenantProvider { //todo AS fix roles
+public class AxonServerTenantProvider implements TenantProvider {
+
+    private static final Logger logger = LoggerFactory.getLogger(AxonServerTenantProvider.class);
 
     private final List<MultiTenantAwareComponent> tenantAwareComponents = new CopyOnWriteArrayList<>();
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private int scrapeInitialDelay = 5;
-    private int scrapeInterval = 5;
+
     private final List<TenantDescriptor> tenantDescriptors;
-    private String preDefinedContexts;
+    private final String preDefinedContexts;
     private final TenantConnectPredicate tenantConnectPredicate;
     private final AxonServerConnectionManager axonServerConnectionManager;
-    private final AxonServerConfiguration axonServerConfiguration;
     private ConcurrentHashMap<TenantDescriptor, List<Registration>> registrationMap = new ConcurrentHashMap<>();
 
-    {
-        if (!StringUtils.nonEmptyOrNull(preDefinedContexts)) {
-            scheduler.scheduleAtFixedRate(this::doUpdate,
-                    scrapeInitialDelay, scrapeInterval, TimeUnit.SECONDS);
-        }
-    }
+    private final String ADMIN_CTX = "_admin";
 
     public AxonServerTenantProvider(String preDefinedContexts,
                                     TenantConnectPredicate tenantConnectPredicate,
-                                    AxonServerConnectionManager axonServerConnectionManager,
-                                    AxonServerConfiguration axonServerConfiguration) {
+                                    AxonServerConnectionManager axonServerConnectionManager) {
         this.preDefinedContexts = preDefinedContexts;
         this.tenantConnectPredicate = tenantConnectPredicate;
         this.axonServerConnectionManager = axonServerConnectionManager;
-        this.axonServerConfiguration = axonServerConfiguration;
         this.tenantDescriptors = getInitialTenants();
-    }
 
-    public AxonServerTenantProvider(String preDefinedContexts,
-                                    TenantConnectPredicate tenantConnectPredicate,
-                                    AxonServerConnectionManager axonServerConnectionManager,
-                                    AxonServerConfiguration axonServerConfiguration,
-                                    int scrapeInitialDelay,
-                                    int scrapeInterval) {
-        this(preDefinedContexts, tenantConnectPredicate, axonServerConnectionManager, axonServerConfiguration);
-        this.scrapeInitialDelay = scrapeInitialDelay;
-        this.scrapeInterval = scrapeInterval;
-    }
-
-    private void doUpdate() {
-        List<TenantDescriptor> toRemoveTenants = new ArrayList<>(tenantDescriptors);
-        List<TenantDescriptor> toAddTenants = new ArrayList<>(getTenantsAPI());
-
-        toRemoveTenants.removeAll(getTenantsAPI());
-        toAddTenants.removeAll(tenantDescriptors);
-
-        toAddTenants.stream()
-                .filter(tenantConnectPredicate)
-                .forEach(this::addTenant);
-
-        toRemoveTenants
-                .forEach(this::removeTenant);
-
+        subscribeToUpdates();
     }
 
     public List<TenantDescriptor> getInitialTenants() {
@@ -93,13 +55,53 @@ public class AxonServerTenantProvider implements TenantProvider { //todo AS fix 
 
         if (StringUtils.nonEmptyOrNull(preDefinedContexts) && !preDefinedContexts.startsWith("$")) {
             initialTenants = Arrays.stream(preDefinedContexts.split(","))
-                    .map(TenantDescriptor::tenantWithId)
-                    .collect(Collectors.toList());
+                                   .map(TenantDescriptor::tenantWithId)
+                                   .collect(Collectors.toList());
         } else {
             initialTenants = getTenantsAPI();
         }
 
         return initialTenants;
+    }
+
+    private void subscribeToUpdates() {
+        ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
+                .getConnection(ADMIN_CTX)
+                .adminChannel()
+                .subscribeToContextUpdates();
+
+        contextUpdatesStream.onAvailable(() -> {
+            try {
+                ContextUpdate contextUpdate = contextUpdatesStream.nextIfAvailable();
+                if (contextUpdate != null) {
+                    switch (contextUpdate.getType()) {
+                        case CREATED:
+                            handleContextCreated(contextUpdate);
+                            break;
+                        case DELETED:
+                            removeTenant(TenantDescriptor.tenantWithId(contextUpdate.getContext()));
+                    }
+                }
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+            }
+        });
+    }
+
+    private void handleContextCreated(ContextUpdate contextUpdate) {
+        try {
+            TenantDescriptor newTenant = toTenantDescriptor(axonServerConnectionManager.getConnection(
+                                                                                               ADMIN_CTX)
+                                                                                       .adminChannel()
+                                                                                       .getContextOverview(
+                                                                                               contextUpdate.getContext())
+                                                                                       .get());
+            if (tenantConnectPredicate.test(newTenant)) {
+                addTenant(newTenant);
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+        }
     }
 
     @Override
@@ -109,15 +111,20 @@ public class AxonServerTenantProvider implements TenantProvider { //todo AS fix 
 
 
     private List<TenantDescriptor> getTenantsAPI() {
-        //todo, move to bean
-        return Objects.requireNonNull(restTemplate.exchange("http://" + axonServerConfiguration.routingServers().get(0).getHostName() + ":8024/v1/public/context",
-                        HttpMethod.GET,
-                        null,
-                        new ParameterizedTypeReference<List<ContextObject>>() {
-                        }).getBody()).stream()
-                .map(context -> new TenantDescriptor(context.getContext(), context.getMetaData(), context.getReplicationGroup()))
-                .filter(tenantConnectPredicate)
-                .collect(Collectors.toList());
+        return axonServerConnectionManager.getConnection(ADMIN_CTX)
+                                          .adminChannel()
+                                          .getAllContexts()
+                                          .join()
+                                          .stream()
+                                          .map(this::toTenantDescriptor)
+                                          .filter(tenantConnectPredicate)
+                                          .collect(Collectors.toList());
+    }
+
+    private TenantDescriptor toTenantDescriptor(ContextOverview context) {
+        return new TenantDescriptor(context.getName(),
+                                    context.getMetaDataMap(),
+                                    context.getReplicationGroup().getName());
     }
 
     protected void addTenant(TenantDescriptor tenantDescriptor) {
@@ -125,13 +132,14 @@ public class AxonServerTenantProvider implements TenantProvider { //todo AS fix 
         tenantAwareComponents
                 .forEach(bus -> registrationMap
                         .computeIfAbsent(tenantDescriptor, t -> new CopyOnWriteArrayList<>())
-                        .add(bus.registerTenantAndSubscribe(tenantDescriptor)));
+                        .add(bus.registerAndStartTenant(tenantDescriptor)));
     }
 
     protected void removeTenant(TenantDescriptor tenantDescriptor) {
-        tenantDescriptors.remove(tenantDescriptor);
-        registrationMap.remove(tenantDescriptor).forEach(Registration::cancel);
-        axonServerConnectionManager.disconnect(tenantDescriptor.tenantId());
+        if (tenantDescriptors.remove(tenantDescriptor)) {
+            registrationMap.remove(tenantDescriptor).forEach(Registration::cancel);
+            axonServerConnectionManager.disconnect(tenantDescriptor.tenantId());
+        }
     }
 
     @Override
@@ -144,7 +152,6 @@ public class AxonServerTenantProvider implements TenantProvider { //todo AS fix 
                         .add(bus.registerTenant(tenantDescriptor)));
 
         return () -> {
-            scheduler.shutdown();
             registrationMap.forEach((tenant, registrationList) -> {
                 registrationList.forEach(Registration::cancel);
                 tenantAwareComponents.removeIf(t -> true);

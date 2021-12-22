@@ -9,7 +9,6 @@ import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
-import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryResponseMessage;
@@ -142,17 +141,18 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
     }
 
     @Override
-    public Registration registerTenantAndSubscribe(TenantDescriptor tenantDescriptor) {
+    public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         tenantSegments.computeIfAbsent(tenantDescriptor, tenant -> {
             QueryBus tenantSegment = tenantSegmentFactory.apply(tenant);
 
             dispatchInterceptors.forEach(handlerInterceptor ->
-                    dispatchInterceptorsRegistration
-                            .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                            .add(tenantSegment.registerDispatchInterceptor(handlerInterceptor)));
+                                                 dispatchInterceptorsRegistration
+                                                         .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                                                         .add(tenantSegment.registerDispatchInterceptor(
+                                                                 handlerInterceptor)));
 
             handlerInterceptors.forEach(handlerInterceptor ->
-                    handlerInterceptorsRegistration
+                                                handlerInterceptorsRegistration
                             .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                             .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
 
@@ -193,8 +193,8 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
     @Override
     public QueryUpdateEmitter queryUpdateEmitter() {
-        return resolveTenant((QueryMessage<?, ?>) CurrentUnitOfWork.get().getMessage())
-                .queryUpdateEmitter(); //todo throw an error
+        throw new UnsupportedOperationException("MultiTenantQueryBus does not have query update emitter. "
+                                                        + "Use queryUpdateEmitter(TenantDescriptor tenantDescriptor) instead.");
     }
 
     public QueryUpdateEmitter queryUpdateEmitter(TenantDescriptor tenantDescriptor) {
