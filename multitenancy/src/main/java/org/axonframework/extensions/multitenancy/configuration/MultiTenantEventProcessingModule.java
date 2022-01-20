@@ -12,6 +12,7 @@ import org.axonframework.eventhandling.TrackedEventMessage;
 import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
+import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
@@ -74,15 +75,19 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                             : messageSource;
 
                             return SubscribingEventProcessor.builder()
-                                    .name(getName(name, tenantDescriptor))
-                                    .eventHandlerInvoker(eventHandlerInvoker)
-                                    .rollbackConfiguration(super.rollbackConfiguration(name))
-                                    .errorHandler(super.errorHandler(name))
-                                    .messageMonitor(super.messageMonitor(SubscribingEventProcessor.class, name))
-                                    .messageSource(source)
-                                    .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
-                                    .transactionManager(super.transactionManager(name))
-                                    .build();
+                                                            .name(getName(name, tenantDescriptor))
+                                                            .eventHandlerInvoker(eventHandlerInvoker)
+                                                            .rollbackConfiguration(super.rollbackConfiguration(name))
+                                                            .errorHandler(super.errorHandler(name))
+                                                            .messageMonitor(super.messageMonitor(
+                                                                    SubscribingEventProcessor.class,
+                                                                    name))
+                                                            .messageSource(source)
+                                                            .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
+                                                            .transactionManager(new TenantWrappedTransactionManager(
+                                                                    super.transactionManager(name),
+                                                                    tenantDescriptor))
+                                                            .build();
                         })
                 .build();
 
@@ -104,16 +109,18 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                             ? ((MultiTenantEventStore) source).tenantSegment(tenantDescriptor)
                                             : source;
                             return TrackingEventProcessor.builder()
-                                    .name(getName(name, tenantDescriptor))
-                                    .eventHandlerInvoker(eventHandlerInvoker)
-                                    .rollbackConfiguration(super.rollbackConfiguration(name))
-                                    .errorHandler(super.errorHandler(name))
-                                    .messageMonitor(super.messageMonitor(TrackingEventProcessor.class, name))
-                                    .messageSource(messageSource)
-                                    .tokenStore(super.tokenStore(name)) //todo-token store factory
-                                    .transactionManager(super.transactionManager(name))
-                                    .trackingEventProcessorConfiguration(config)
-                                    .build();
+                                                         .name(getName(name, tenantDescriptor))
+                                                         .eventHandlerInvoker(eventHandlerInvoker)
+                                                         .rollbackConfiguration(super.rollbackConfiguration(name))
+                                                         .errorHandler(super.errorHandler(name))
+                                                         .messageMonitor(super.messageMonitor(TrackingEventProcessor.class,
+                                                                                              name))
+                                                         .messageSource(messageSource)
+                                                         .tokenStore(super.tokenStore(name))
+                                                         .transactionManager(new TenantWrappedTransactionManager(super.transactionManager(
+                                                                 name), tenantDescriptor))
+                                                         .trackingEventProcessorConfiguration(config)
+                                                         .build();
                         }
                 )
                 .build();
@@ -143,21 +150,25 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
                             PooledStreamingEventProcessor.Builder builder =
                                     PooledStreamingEventProcessor.builder()
-                                            .name(getName(name, tenantDescriptor))
-                                            .eventHandlerInvoker(eventHandlerInvoker)
-                                            .rollbackConfiguration(super.rollbackConfiguration(name))
-                                            .errorHandler(super.errorHandler(name))
-                                            .messageMonitor(super.messageMonitor(PooledStreamingEventProcessor.class, name))
-                                            .messageSource(source)
-                                            .tokenStore(super.tokenStore(name))
-                                            .transactionManager(super.transactionManager(name))
-                                            .coordinatorExecutor(processorName -> {
+                                                                 .name(getName(name, tenantDescriptor))
+                                                                 .eventHandlerInvoker(eventHandlerInvoker)
+                                                                 .rollbackConfiguration(super.rollbackConfiguration(name))
+                                                                 .errorHandler(super.errorHandler(name))
+                                                                 .messageMonitor(super.messageMonitor(
+                                                                         PooledStreamingEventProcessor.class,
+                                                                         name))
+                                                                 .messageSource(source)
+                                                                 .tokenStore(super.tokenStore(name))
+                                                                 .transactionManager(new TenantWrappedTransactionManager(
+                                                                         super.transactionManager(name),
+                                                                         tenantDescriptor))
+                                                                 .coordinatorExecutor(processorName -> {
                                                 ScheduledExecutorService coordinatorExecutor =
                                                         defaultExecutor("Coordinator[" + processorName + "]");
                                                 config.onShutdown(coordinatorExecutor::shutdown);
                                                 return coordinatorExecutor;
                                             })
-                                            .workerExecutor(processorName -> {
+                                                                 .workerExecutor(processorName -> {
                                                 ScheduledExecutorService workerExecutor =
                                                         defaultExecutor("WorkPackage[" + processorName + "]");
                                                 config.onShutdown(workerExecutor::shutdown);
