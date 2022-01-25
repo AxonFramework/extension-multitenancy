@@ -53,7 +53,7 @@ public class AxonServerTenantProvider implements TenantProvider {
     public List<TenantDescriptor> getInitialTenants() {
         List<TenantDescriptor> initialTenants;
 
-        if (StringUtils.nonEmptyOrNull(preDefinedContexts) && !preDefinedContexts.startsWith("$")) {
+        if (StringUtils.nonEmptyOrNull(preDefinedContexts)) {
             initialTenants = Arrays.stream(preDefinedContexts.split(","))
                                    .map(TenantDescriptor::tenantWithId)
                                    .collect(Collectors.toList());

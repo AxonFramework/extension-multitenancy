@@ -34,7 +34,6 @@ import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.AxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -43,6 +42,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
 
 /**
  * @author Stefan Dragisic
@@ -79,10 +79,10 @@ public class MultiTenancyAxonServerAutoConfiguration {
 
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
-    public TenantProvider tenantProvider(@Value("${axon.axonserver.contexts:}") String contexts,
+    public TenantProvider tenantProvider(Environment env,
                                          TenantConnectPredicate tenantConnectPredicate,
                                          AxonServerConnectionManager axonServerConnectionManager) {
-        return new AxonServerTenantProvider(contexts,
+        return new AxonServerTenantProvider(env.getProperty("axon.axonserver.contexts"),
                                             tenantConnectPredicate,
                                             axonServerConnectionManager);
     }
