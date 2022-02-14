@@ -23,9 +23,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+
+import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 
 /*
@@ -60,24 +63,18 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
 
     @Override
     public void publish(List<? extends EventMessage<?>> events) {
-        EventStore tenantSegment = resolveSegment();
-        if (tenantSegment != null) {
-            tenantSegment.publish(events);
-        } else {
-            resolveTenant(events.get(0))
-                    .publish(events); //todo otherway around
-        } //todo add corelation data provider
+        events.stream().findFirst()
+              .map(this::resolveTenant)
+              .orElseGet(this::resolveSegment)
+              .publish(events);
     }
 
     @Override
     public void publish(EventMessage<?>... events) {
-        EventStore tenantSegment = resolveSegment();
-        if (tenantSegment != null) {
-            tenantSegment.publish(events);
-        } else {
-            resolveTenant(events[0])
-                    .publish(events);
-        }
+        Optional.ofNullable(events[0])
+                .map(this::resolveTenant)
+                .orElseGet(this::resolveSegment)
+                .publish(events);
     }
 
     @Override
@@ -244,7 +241,8 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         }
 
         protected void validate() {
-            // todo
+            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
+            assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
         }
     }
 }

@@ -11,13 +11,11 @@ import org.axonframework.extensions.multitenancy.components.eventstore.MultiTena
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
-import org.axonframework.extensions.multitenancy.configuration.MultiTenantConnectorConfigurerModule;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -28,7 +26,6 @@ import org.springframework.context.annotation.Primary;
  * @author Stefan Dragisic
  */
 @Configuration
-@ConditionalOnClass(MultiTenantConnectorConfigurerModule.class)
 @AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
 public class MultiTenancyAutoConfiguration {
 
