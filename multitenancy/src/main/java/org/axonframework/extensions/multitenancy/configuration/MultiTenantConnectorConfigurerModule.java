@@ -72,9 +72,11 @@ public class MultiTenantConnectorConfigurerModule implements ConfigurerModule, M
     public void configureModule(Configurer configurer) {
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantsProvider));
 
-        configurer.getModuleConfiguration(MultiTenantConnectorConfigurerModule.class)
-                  .registerTenantsProvider(null)
-                  .registerTargetTenantResolver(targetTenantResolver);
+//        configurer.getModuleConfiguration(MultiTenantConnectorConfigurerModule.class)
+//                  .registerTenantsProvider(null)
+        //      .registerTargetTenantResolver(targetTenantResolver);
+
+        //todo exclude this non srping booot config for now
 
         configurer.registerComponent(TenantCommandSegmentFactory.class, tenantCommandSegmentFactory);
         configurer.registerComponent(TenantQuerySegmentFactory.class, tenantQuerySegmentFactory);

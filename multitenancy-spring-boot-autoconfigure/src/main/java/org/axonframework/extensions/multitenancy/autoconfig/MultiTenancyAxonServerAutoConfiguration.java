@@ -7,7 +7,7 @@ import org.axonframework.axonserver.connector.command.AxonServerCommandBus;
 import org.axonframework.axonserver.connector.command.CommandLoadFactorProvider;
 import org.axonframework.axonserver.connector.command.CommandPriorityCalculator;
 import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore;
-import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
+import org.axonframework.axonserver.connector.processor.EventProcessorControlService;
 import org.axonframework.axonserver.connector.query.AxonServerQueryBus;
 import org.axonframework.axonserver.connector.query.QueryPriorityCalculator;
 import org.axonframework.commandhandling.CommandBus;
@@ -54,28 +54,6 @@ import org.springframework.core.env.Environment;
 @ComponentScan(excludeFilters = {
         @ComponentScan.Filter(type = FilterType.REGEX, pattern = "org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration.class")})
 public class MultiTenancyAxonServerAutoConfiguration {
-
-//    @Bean
-//    public ConfigurerModule eventProcessorInfoConfiguration( AxonServerConnectionManager axonServerConnectionManager) {
-//        return new ConfigurerModule() {
-//            @Override
-//            public int order() {
-//                return 100;
-//            }
-//
-//            @Override
-//            public void configureModule(Configurer configurer) {
-//                configurer.registerComponent(
-//                        EventProcessorControlService.class,
-//                        c -> new MultiTenantEventProcessorControlService(
-//                                axonServerConnectionManager,
-//                                c.eventProcessingConfiguration(),
-//                                c.getComponent(AxonServerConfiguration.class)
-//                        )
-//                );
-//            }
-//        };
-//    }
 
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
@@ -206,22 +184,11 @@ public class MultiTenancyAxonServerAutoConfiguration {
     }
 
     @Bean
-    public EventProcessorInfoConfiguration processorInfoConfiguration(
-            EventProcessingConfiguration eventProcessingConfiguration,
-            AxonServerConnectionManager connectionManager,
-            AxonServerConfiguration configuration) {
-        return new EventProcessorInfoConfiguration(c -> new MultiTenantEventProcessorControlService(
-                connectionManager,
-                c.eventProcessingConfiguration(),
-                c.getComponent(AxonServerConfiguration.class)));
+    public EventProcessorControlService eventProcessorControlService(AxonServerConnectionManager connectionManager,
+                                                                     EventProcessingConfiguration eventProcessingConfiguration,
+                                                                     AxonServerConfiguration axonServerConfiguration) {
+        return new MultiTenantEventProcessorControlService(connectionManager,
+                                                           eventProcessingConfiguration,
+                                                           axonServerConfiguration);
     }
-
-//    @Bean
-//    public EventProcessorControlService eventProcessorControlService(AxonServerConnectionManager connectionManager,
-//                                                                     EventProcessingConfiguration eventProcessingConfiguration,
-//                                                                     AxonServerConfiguration axonServerConfiguration) {
-//        return new MultiTenantEventProcessorControlService(connectionManager,
-//                                                           eventProcessingConfiguration,
-//                                                           axonServerConfiguration);
-//    }
 }
