@@ -31,6 +31,9 @@ import javax.sql.DataSource;
 /**
  * Configuration for the MultiTenantDataSourceManager. Works in conjunction with the {@link
  * TenantWrappedTransactionManager} which is used to add tenant to transaction context.
+ * <p>
+ * Used for multi-tenant JPA support.
+ * <p>
  *
  * @author Stefan Dragisic
  */
@@ -59,6 +62,14 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         this.tenantDataSourceResolver = tenantDataSourceResolver;
     }
 
+    /**
+     * Dynamically chooses a DataSource for the given tenant, based on message from {@link
+     * org.axonframework.messaging.unitofwork.UnitOfWork} or from transaction provided by {@link
+     * TenantWrappedTransactionManager}
+     *
+     * @param tenantProvider
+     * @return
+     */
     @Primary
     @Bean
     public DataSource tenantDataSource(TenantProvider tenantProvider) {
@@ -107,8 +118,6 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
                                                  .username(dataSourceProperties.getUsername())
                                                  .password(dataSourceProperties.getPassword())
                                                  .build();
-
-        // Check that new connection is 'live'. If not - throw exception
         try (Connection c = dataSource.getConnection()) {
             tenantDataSources.put(tenant, dataSource);
             multiTenantDataSource.afterPropertiesSet();

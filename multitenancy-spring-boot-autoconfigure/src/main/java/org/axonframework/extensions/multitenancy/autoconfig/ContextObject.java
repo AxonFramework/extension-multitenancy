@@ -3,10 +3,10 @@ package org.axonframework.extensions.multitenancy.autoconfig;
 import java.util.Map;
 
 /**
+ * DTO for the context object retrived from Axon Server
+ *
  * @author Stefan Dragisic
  */
-
-
 public class ContextObject {
 
     private String context;

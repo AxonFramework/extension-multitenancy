@@ -13,6 +13,9 @@ import org.axonframework.lifecycle.Phase;
 import org.axonframework.lifecycle.StartHandler;
 
 /**
+ * Multi-tenant implementation of {@link EventProcessorControlService}. Enables event processor control for multi-tenant
+ * environment in Axon Server dashboard.
+ *
  * @author Stefan Dragisic
  */
 public class MultiTenantEventProcessorControlService extends EventProcessorControlService

@@ -23,6 +23,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
 /**
+ * Configures Axon Server as implementation for multi-tenant components like CommandBus, QueryBus and EventStore.
+ *
  * @author Stefan Dragisic
  */
 @Configuration

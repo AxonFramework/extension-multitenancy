@@ -45,6 +45,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 
 /**
+ * Auto-configuration for AxonServer, that configures abstract tenant-aware AxonServer components and factories.
+ *
  * @author Stefan Dragisic
  */
 @Configuration
