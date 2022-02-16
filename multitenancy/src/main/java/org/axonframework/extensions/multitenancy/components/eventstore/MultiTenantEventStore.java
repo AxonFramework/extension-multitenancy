@@ -31,9 +31,12 @@ import java.util.function.Consumer;
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 
-/*
-@author Steven van Beelen
-@author Stefan Dragisic
+/**
+ * Multi tenant implementation of the {@link EventStore} that delegates to a single {@link EventStore} instance.
+ * <p>
+ *
+ * @author Stefan Dragisic
+ * @author Steven van Beelen
  */
 
 public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent {
@@ -204,8 +207,8 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     }
 
     /**
-     * @param tenantDescriptor
-     * @return
+     * @param tenantDescriptor the tenant descriptor to resolve the segment.
+     * @return Returns registered tenant segment for given {@link TenantDescriptor}.
      */
     public EventStore tenantSegment(TenantDescriptor tenantDescriptor) {
         return tenantSegments.get(tenantDescriptor);
@@ -217,18 +220,22 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         public TargetTenantResolver<Message<?>> targetTenantResolver;
 
         /**
-         * @param tenantSegmentFactory
-         * @return
+         * Sets the {@link TenantEventSegmentFactory} used to build {@link EventStore} segment for given {@link TenantDescriptor}.
+         *
+         * @param tenantSegmentFactory tenant aware segment factory
+         * @return the current Builder instance, for fluent interfacing
          */
         public Builder tenantSegmentFactory(TenantEventSegmentFactory tenantSegmentFactory) {
-            BuilderUtils.assertNonNull(tenantSegmentFactory, "");
+            BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantEventSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
 
         /**
-         * @param targetTenantResolver
-         * @return
+         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message} message
+         *
+         * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
+         * @return the current Builder instance, for fluent interfacing
          */
         public Builder targetTenantResolver(TargetTenantResolver<Message<?>> targetTenantResolver) {
             BuilderUtils.assertNonNull(targetTenantResolver, "");

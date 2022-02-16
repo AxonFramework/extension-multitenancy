@@ -6,6 +6,8 @@ import org.axonframework.queryhandling.QueryUpdateEmitter;
 import java.util.function.Function;
 
 /**
+ * Factory for creating {@link QueryUpdateEmitter} instances that are scoped to a specific {@link TenantDescriptor}.
+ *
  * @author Stefan Dragisic
  */
 public interface TenantQueryUpdateEmitterSegmentFactory extends Function<TenantDescriptor, QueryUpdateEmitter> {

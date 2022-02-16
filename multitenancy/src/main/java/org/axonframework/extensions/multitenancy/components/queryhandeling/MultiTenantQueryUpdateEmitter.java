@@ -26,6 +26,9 @@ import java.util.function.Predicate;
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 /**
+ * Implementation of {@link QueryUpdateEmitter} that emits updates to a specific tenant.
+ * <p>
+ *
  * @author Stefan Dragisic
  */
 public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent {
@@ -229,20 +232,24 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         public TargetTenantResolver<Message<?>> targetTenantResolver;
 
         /**
-         * @param tenantSegmentFactory
-         * @return
+         * Sets the {@link TenantQueryUpdateEmitterSegmentFactory} used to build {@link QueryUpdateEmitter} segment for given {@link TenantDescriptor}.
+         *
+         * @param tenantSegmentFactory tenant aware segment factory
+         * @return the current Builder instance, for fluent interfacing
          */
         public MultiTenantQueryUpdateEmitter.Builder tenantSegmentFactory(
                 TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory) {
             BuilderUtils.assertNonNull(tenantSegmentFactory,
-                                       "The TenantEventProcessorSegmentFactory is a hard requirement");
+                                       "The TenantQueryUpdateEmitterSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
 
         /**
-         * @param targetTenantResolver
-         * @return
+         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message} message
+         *
+         * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
+         * @return the current Builder instance, for fluent interfacing
          */
         public MultiTenantQueryUpdateEmitter.Builder targetTenantResolver(
                 TargetTenantResolver<Message<?>> targetTenantResolver) {
@@ -257,7 +264,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
         protected void validate() {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory, "The TenantQueryUpdateEmitterSegmentFactory is a hard requirement");
         }
     }
 }

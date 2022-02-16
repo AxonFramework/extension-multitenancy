@@ -10,6 +10,7 @@ import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComp
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
@@ -23,10 +24,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 
-/*
-@author Allard Buijze
-@author Steven van Beelen
-@author Stefan Dragisic
+/**
+ * Implementation of a {@link CommandBus} that is aware of multiple tenant instances of a CommandBus. Each CommandBus
+ * instance is considered a "tenant".
+ * <p/>
+ * The MultiTenantCommandBus relies on a {@link TargetTenantResolver} to dispatch commands via resolved tenant segment
+ * of the CommandBus. {@link TenantCommandSegmentFactory} is as factory to create the tenant segment.
+ *
+ * @author Stefan Dragisic
+ * @author Steven van Beelen
  */
 
 public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareComponent {
@@ -183,8 +189,11 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
         public TargetTenantResolver<CommandMessage<?>> targetTenantResolver;
 
         /**
-         * @param tenantSegmentFactory
-         * @return
+         * Sets the {@link TenantCommandSegmentFactory} used to build {@link CommandBus} segment for given {@link
+         * TenantDescriptor}.
+         *
+         * @param tenantSegmentFactory tenant aware segment factory
+         * @return the current Builder instance, for fluent interfacing
          */
         public Builder tenantSegmentFactory(TenantCommandSegmentFactory tenantSegmentFactory) {
             BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
@@ -193,10 +202,13 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
         }
 
         /**
-         * @param targetTenantResolver
-         * @return
+         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message}
+         * message
+         *
+         * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
+         * @return the current Builder instance, for fluent interfacing
          */
-        public Builder targetTenantResolver(TargetTenantResolver targetTenantResolver) {
+        public Builder targetTenantResolver(TargetTenantResolver<CommandMessage<?>> targetTenantResolver) {
             BuilderUtils.assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;

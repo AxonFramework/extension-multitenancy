@@ -5,14 +5,22 @@ import org.axonframework.common.Registration;
 import java.util.List;
 
 /**
- * TenantProvider monitors for tenant changes, manages tenants and {@link MultiTenantAwareComponent}
+ * Registers new and manages currently registered tenants and {@link MultiTenantAwareComponent} components. If
+ * configured monitors tenants changes and updates the {@link MultiTenantAwareComponent} components accordingly.
+ * <p>
  *
  * @author Stefan Dragisic
  */
 public interface TenantProvider {
 
+    /**
+     * @return the list of currently registered tenants.
+     */
     List<TenantDescriptor> getTenants();
 
-    Registration subscribe(MultiTenantAwareComponent bus);
-
+    /**
+     * @param component to be subscribed {@link MultiTenantAwareComponent} for tenant changes.
+     * @return the registration for the given component.
+     */
+    Registration subscribe(MultiTenantAwareComponent component);
 }

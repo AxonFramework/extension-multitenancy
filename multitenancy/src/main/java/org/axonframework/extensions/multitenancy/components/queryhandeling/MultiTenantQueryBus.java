@@ -6,6 +6,7 @@ import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComp
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
@@ -31,11 +32,16 @@ import java.util.stream.Stream;
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 
-/*
-@author Steven van Beelen
-@author Stefan Dragisic
+/**
+ * Implementation of a {@link QueryBus} that is aware of multiple tenant instances of a QueryBus. Each QueryBus instance
+ * is considered a "tenant".
+ * <p/>
+ * The MultiTenantQueryBus relies on a {@link TargetTenantResolver} to dispatch queries via resolved tenant segment of
+ * the QueryBus. {@link TenantQuerySegmentFactory} is as factory to create the tenant segment.
+ *
+ * @author Stefan Dragisic
+ * @author Steven van Beelen
  */
-
 public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent {
 
     private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
@@ -197,9 +203,13 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
                                                         + "Use queryUpdateEmitter(TenantDescriptor tenantDescriptor) instead.");
     }
 
+    /**
+     * @param tenantDescriptor for which to get query update emitter
+     * @return a query update emitter for the given tenant.
+     */
     public QueryUpdateEmitter queryUpdateEmitter(TenantDescriptor tenantDescriptor) {
         return tenantSegments.get(tenantDescriptor)
-                .queryUpdateEmitter();
+                             .queryUpdateEmitter();
     }
 
     public static class Builder {
@@ -208,18 +218,23 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
         public TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver;
 
         /**
-         * @param tenantSegmentFactory
-         * @return
+         * Sets the {@link TenantQuerySegmentFactory} used to build {@link QueryBus} segment for given {@link
+         * TenantDescriptor}.
+         *
+         * @param tenantSegmentFactory tenant aware segment factory
+         * @return the current Builder instance, for fluent interfacing
          */
         public Builder tenantSegmentFactory(TenantQuerySegmentFactory tenantSegmentFactory) {
-            BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantQuerySegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
 
         /**
-         * @param targetTenantResolver
-         * @return
+         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message} message
+         *
+         * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
+         * @return the current Builder instance, for fluent interfacing
          */
         public Builder targetTenantResolver(TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver) {
             BuilderUtils.assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
@@ -233,7 +248,7 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
         protected void validate() {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory, "The TenantQuerySegmentFactory is a hard requirement");
         }
     }
 }

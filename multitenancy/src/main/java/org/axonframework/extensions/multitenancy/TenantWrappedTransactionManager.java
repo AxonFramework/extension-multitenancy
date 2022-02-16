@@ -7,7 +7,8 @@ import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import java.util.function.Supplier;
 
 /**
- * Wrapper around transaction manager that adds the current tenant to the transaction context.
+ * Wrapper around transaction manager that adds the current tenant to the transaction context. Used in certain cases to
+ * determine the tenant of the current transaction.
  *
  * @author Stefan Dragisic
  */
