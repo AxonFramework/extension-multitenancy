@@ -28,6 +28,7 @@ import org.springframework.context.annotation.Primary;
  * @author Stefan Dragisic
  */
 @Configuration
+@ConditionalOnProperty(value = "axon.multi-tenancy.enabled", matchIfMissing = true)
 @AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
 public class MultiTenancyAutoConfiguration {
 
@@ -96,7 +97,7 @@ public class MultiTenancyAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "axon.multitenant.use-metadata-helper", matchIfMissing = true)
+    @ConditionalOnProperty(name = "axon.multi-tenancy.use-metadata-helper", matchIfMissing = true)
     public TargetTenantResolver<Message<?>> targetTenantResolver() {
         return (message, tenants) ->
                 TenantDescriptor.tenantWithId(
@@ -106,7 +107,7 @@ public class MultiTenancyAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "axon.multitenant.use-metadata-helper", matchIfMissing = true)
+    @ConditionalOnProperty(name = "axon.multi-tenancy.use-metadata-helper", matchIfMissing = true)
     public CorrelationDataProvider tenantCorrelationProvider() {
         return new TenantCorrelationProvider(DEFAULT_TENANT_CORRELATION_KEY);
     }

@@ -51,7 +51,7 @@ import org.springframework.core.env.Environment;
  */
 @Configuration
 @ConditionalOnClass(AxonServerConfiguration.class)
-@ConditionalOnProperty(name = "axon.axonserver.enabled", matchIfMissing = true)
+@ConditionalOnProperty(value = {"axon.axonserver.enabled", "axon.multi-tenancy.enabled"}, matchIfMissing = true)
 @AutoConfigureAfter(AxonServerAutoConfiguration.class)
 @ComponentScan(excludeFilters = {
         @ComponentScan.Filter(type = FilterType.REGEX, pattern = "org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration.class")})

@@ -35,9 +35,8 @@ public class AxonServerTenantProvider implements TenantProvider {
     private final String preDefinedContexts;
     private final TenantConnectPredicate tenantConnectPredicate;
     private final AxonServerConnectionManager axonServerConnectionManager;
-    private ConcurrentHashMap<TenantDescriptor, List<Registration>> registrationMap = new ConcurrentHashMap<>();
-
     private final String ADMIN_CTX = "_admin";
+    private ConcurrentHashMap<TenantDescriptor, List<Registration>> registrationMap = new ConcurrentHashMap<>();
 
     public AxonServerTenantProvider(String preDefinedContexts,
                                     TenantConnectPredicate tenantConnectPredicate,
@@ -51,41 +50,49 @@ public class AxonServerTenantProvider implements TenantProvider {
     }
 
     public List<TenantDescriptor> getInitialTenants() {
-        List<TenantDescriptor> initialTenants;
-
-        if (StringUtils.nonEmptyOrNull(preDefinedContexts)) {
-            initialTenants = Arrays.stream(preDefinedContexts.split(","))
-                                   .map(TenantDescriptor::tenantWithId)
-                                   .collect(Collectors.toList());
-        } else {
-            initialTenants = getTenantsAPI();
+        List<TenantDescriptor> initialTenants = Collections.emptyList();
+        try {
+            if (StringUtils.nonEmptyOrNull(preDefinedContexts)) {
+                initialTenants = Arrays.stream(preDefinedContexts.split(","))
+                                       .map(TenantDescriptor::tenantWithId)
+                                       .collect(Collectors.toList());
+            } else {
+                initialTenants = getTenantsAPI();
+            }
+        } catch (Exception e) {
+            logger.error("Error while getting initial tenants", e);
         }
-
         return initialTenants;
     }
 
     private void subscribeToUpdates() {
-        ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
-                .getConnection(ADMIN_CTX)
-                .adminChannel()
-                .subscribeToContextUpdates();
+        try {
 
-        contextUpdatesStream.onAvailable(() -> {
-            try {
-                ContextUpdate contextUpdate = contextUpdatesStream.nextIfAvailable();
-                if (contextUpdate != null) {
-                    switch (contextUpdate.getType()) {
-                        case CREATED:
-                            handleContextCreated(contextUpdate);
-                            break;
-                        case DELETED:
-                            removeTenant(TenantDescriptor.tenantWithId(contextUpdate.getContext()));
+
+            ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
+                    .getConnection(ADMIN_CTX)
+                    .adminChannel()
+                    .subscribeToContextUpdates();
+
+            contextUpdatesStream.onAvailable(() -> {
+                try {
+                    ContextUpdate contextUpdate = contextUpdatesStream.nextIfAvailable();
+                    if (contextUpdate != null) {
+                        switch (contextUpdate.getType()) {
+                            case CREATED:
+                                handleContextCreated(contextUpdate);
+                                break;
+                            case DELETED:
+                                removeTenant(TenantDescriptor.tenantWithId(contextUpdate.getContext()));
+                        }
                     }
+                } catch (Exception e) {
+                    logger.error(e.getMessage(), e);
                 }
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-            }
-        });
+            });
+        } catch (Exception e) {
+            logger.error("Error while subscribing to context updates", e);
+        }
     }
 
     private void handleContextCreated(ContextUpdate contextUpdate) {
@@ -161,6 +168,4 @@ public class AxonServerTenantProvider implements TenantProvider {
             return true;
         };
     }
-
-
 }
