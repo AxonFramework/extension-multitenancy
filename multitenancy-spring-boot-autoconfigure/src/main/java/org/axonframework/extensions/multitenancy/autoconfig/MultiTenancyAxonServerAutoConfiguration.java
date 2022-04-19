@@ -14,7 +14,6 @@ import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
-import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
@@ -31,7 +30,7 @@ import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.axonframework.queryhandling.SimpleQueryBus;
 import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 import org.axonframework.serialization.Serializer;
-import org.axonframework.spring.config.AxonConfiguration;
+import org.axonframework.spring.config.SpringAxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -97,7 +96,7 @@ public class MultiTenancyAxonServerAutoConfiguration {
     public TenantQuerySegmentFactory tenantAxonServerQuerySegmentFactory(
             AxonServerConnectionManager axonServerConnectionManager,
             AxonServerConfiguration axonServerConfiguration,
-            AxonConfiguration axonConfiguration,
+            SpringAxonConfiguration axonConfiguration,
             TransactionManager txManager,
             @Qualifier("messageSerializer") Serializer messageSerializer,
             Serializer genericSerializer,
@@ -108,14 +107,15 @@ public class MultiTenancyAxonServerAutoConfiguration {
         return tenantDescriptor -> {
             SimpleQueryBus simpleQueryBus =
                     SimpleQueryBus.builder()
-                                  .messageMonitor(axonConfiguration.messageMonitor(QueryBus.class,
-                                                                                   "queryBus@" + tenantDescriptor))
+                                  .messageMonitor(axonConfiguration.getObject().messageMonitor(QueryBus.class,
+                                                                                               "queryBus@"
+                                                                                                       + tenantDescriptor))
                                   .transactionManager(txManager)
                                   .queryUpdateEmitter(multiTenantQueryUpdateEmitter)
                                   .errorHandler(queryInvocationErrorHandler)
                                   .build();
             simpleQueryBus.registerHandlerInterceptor(
-                    new CorrelationDataInterceptor<>(axonConfiguration.correlationDataProviders())
+                    new CorrelationDataInterceptor<>(axonConfiguration.getObject().correlationDataProviders())
             );
 
             return AxonServerQueryBus.builder()
@@ -156,43 +156,45 @@ public class MultiTenancyAxonServerAutoConfiguration {
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.query.AxonServerQueryBus")
     public TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory(
-            AxonConfiguration axonConfiguration) {
+            SpringAxonConfiguration axonConfiguration) {
         return tenantDescriptor -> SimpleQueryUpdateEmitter.builder()
-                                                           .updateMessageMonitor(axonConfiguration.messageMonitor(
-                                                                   QueryUpdateEmitter.class,
-                                                                   "queryUpdateEmitter@" + tenantDescriptor))
+                                                           .updateMessageMonitor(axonConfiguration.getObject()
+                                                                                                  .messageMonitor(
+                                                                                                          QueryUpdateEmitter.class,
+                                                                                                          "queryUpdateEmitter@"
+                                                                                                                  + tenantDescriptor))
                                                            .build();
     }
 
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
     public TenantEventSegmentFactory tenantEventSegmentFactory(AxonServerConfiguration axonServerConfiguration,
-                                                               AxonConfiguration configuration,
+                                                               SpringAxonConfiguration configuration,
                                                                AxonServerConnectionManager axonServerConnectionManager,
                                                                Serializer snapshotSerializer,
                                                                @Qualifier("eventSerializer") Serializer eventSerializer) {
 
         return tenant -> AxonServerEventStore.builder()
-                .messageMonitor(configuration
-                                        .messageMonitor(AxonServerEventStore.class, "eventStore@" + tenant))
-                .configuration(axonServerConfiguration)
-                .platformConnectionManager(axonServerConnectionManager)
-                .snapshotSerializer(snapshotSerializer)
-                .eventSerializer(eventSerializer)
-                .defaultContext(tenant.tenantId())
-                .snapshotFilter(configuration.snapshotFilter())
-                .upcasterChain(configuration.upcasterChain())
-                .build();
+                                             .messageMonitor(configuration.getObject()
+                                                                          .messageMonitor(AxonServerEventStore.class,
+                                                                                          "eventStore@" + tenant))
+                                             .configuration(axonServerConfiguration)
+                                             .platformConnectionManager(axonServerConnectionManager)
+                                             .snapshotSerializer(snapshotSerializer)
+                                             .eventSerializer(eventSerializer)
+                                             .defaultContext(tenant.tenantId())
+                                             .snapshotFilter(configuration.getObject().snapshotFilter())
+                                             .upcasterChain(configuration.getObject().upcasterChain())
+                                             .build();
     }
 
     @Bean
     public EventProcessorInfoConfiguration processorInfoConfiguration(
-            EventProcessingConfiguration eventProcessingConfiguration,
-            AxonServerConnectionManager connectionManager,
-            AxonServerConfiguration configuration) {
+            AxonServerConnectionManager connectionManager) {
         return new EventProcessorInfoConfiguration(c -> new MultiTenantEventProcessorControlService(
                 connectionManager,
                 c.eventProcessingConfiguration(),
                 c.getComponent(AxonServerConfiguration.class)));
     }
 }
+//todo add streaming query
