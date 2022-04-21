@@ -12,6 +12,7 @@ import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -41,6 +42,7 @@ import javax.sql.DataSource;
 
 @Configuration
 @ConditionalOnProperty(value = "axon.multi-tenancy.enabled", matchIfMissing = true)
+@ConditionalOnBean(name = "tenantDataSourceResolver")
 public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
 
     private static final Logger log = LoggerFactory.getLogger(MultiTenantDataSourceManager.class);
