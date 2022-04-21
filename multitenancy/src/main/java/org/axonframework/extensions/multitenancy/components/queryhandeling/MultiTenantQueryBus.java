@@ -15,9 +15,11 @@ import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryResponseMessage;
 import org.axonframework.queryhandling.QuerySubscription;
 import org.axonframework.queryhandling.QueryUpdateEmitter;
+import org.axonframework.queryhandling.StreamingQueryMessage;
 import org.axonframework.queryhandling.SubscriptionQueryMessage;
 import org.axonframework.queryhandling.SubscriptionQueryResult;
 import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
+import org.reactivestreams.Publisher;
 
 import java.lang.reflect.Type;
 import java.util.Collection;
@@ -81,15 +83,25 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
         return tenantQueryBus.scatterGather(query, timeout, unit);
     }
 
+    @Override
+    public <Q, R> Publisher<QueryResponseMessage<R>> streamingQuery(StreamingQueryMessage<Q, R> query) {
+        QueryBus tenantQueryBus = resolveTenant(query);
+        return tenantQueryBus.streamingQuery(query);
+    }
 
     @Override
-    public <R> Registration subscribe(String queryName, Type responseType, MessageHandler<? super QueryMessage<?, R>> handler) {
+    public <R> Registration subscribe(String queryName, Type responseType,
+                                      MessageHandler<? super QueryMessage<?, R>> handler) {
         handlers.computeIfAbsent(queryName, k -> {
             tenantSegments.forEach((tenant, segment) ->
-                    subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(queryName, responseType, handler)));
+                                           subscribeRegistrations.putIfAbsent(tenant,
+                                                                              segment.subscribe(queryName,
+                                                                                                responseType,
+                                                                                                handler)));
             return new QuerySubscription<>(responseType, handler);
         });
-        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev
+                && acc).orElse(false);
     }
 
     @Override

@@ -197,4 +197,3 @@ public class MultiTenancyAxonServerAutoConfiguration {
                 c.getComponent(AxonServerConfiguration.class)));
     }
 }
-//todo add streaming query
