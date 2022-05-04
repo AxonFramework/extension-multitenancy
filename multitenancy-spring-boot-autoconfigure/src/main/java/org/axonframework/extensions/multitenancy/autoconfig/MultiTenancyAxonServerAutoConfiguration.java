@@ -190,10 +190,15 @@ public class MultiTenancyAxonServerAutoConfiguration {
 
     @Bean
     public EventProcessorInfoConfiguration processorInfoConfiguration(
+            TenantProvider tenantProvider,
             AxonServerConnectionManager connectionManager) {
-        return new EventProcessorInfoConfiguration(c -> new MultiTenantEventProcessorControlService(
-                connectionManager,
-                c.eventProcessingConfiguration(),
-                c.getComponent(AxonServerConfiguration.class)));
+        return new EventProcessorInfoConfiguration(c -> {
+            MultiTenantEventProcessorControlService controlService = new MultiTenantEventProcessorControlService(
+                    connectionManager,
+                    c.eventProcessingConfiguration(),
+                    c.getComponent(AxonServerConfiguration.class));
+            tenantProvider.subscribe(controlService);
+            return controlService;
+        });
     }
 }

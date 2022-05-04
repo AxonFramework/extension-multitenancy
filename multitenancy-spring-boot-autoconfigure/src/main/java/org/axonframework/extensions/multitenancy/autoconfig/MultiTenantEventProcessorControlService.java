@@ -68,6 +68,10 @@ public class MultiTenantEventProcessorControlService extends EventProcessorContr
             eventProcessingConfiguration.eventProcessors()
                                         .forEach(
                                                 (name, processor) -> {
+                                                    if (processor instanceof MultiTenantEventProcessor
+                                                            || !name.contains(tenantDescriptor.tenantId())) {
+                                                        return;
+                                                    }
                                                     ControlChannel ch = axonServerConnectionManager.getConnection(
                                                                                                            tenantDescriptor.tenantId())
                                                                                                    .controlChannel();
