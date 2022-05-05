@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2010-2022. Axon Framework
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.axonframework.extensions.multitenancy.components.commandhandeling;
 
 import org.axonframework.commandhandling.CommandBus;
@@ -84,7 +100,7 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
     public Registration subscribe(String commandName, MessageHandler<? super CommandMessage<?>> handler) {
         handlers.computeIfAbsent(commandName, k -> {
             tenantSegments.forEach((tenant, segment) ->
-                    subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(commandName, handler)));
+                                           subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(commandName, handler)));
             return handler;
         });
         return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
@@ -95,32 +111,32 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
     public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super CommandMessage<?>> dispatchInterceptor) {
         dispatchInterceptors.add(dispatchInterceptor);
         tenantSegments.forEach((tenant, bus) ->
-                dispatchInterceptorsRegistration
-                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                        .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
+                                       dispatchInterceptorsRegistration
+                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                                               .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
 
         return () -> dispatchInterceptorsRegistration.values()
-                .stream()
-                .flatMap(Collection::stream)
-                .map(Registration::cancel)
-                .reduce((prev, acc) -> prev && acc)
-                .orElse(false);
+                                                     .stream()
+                                                     .flatMap(Collection::stream)
+                                                     .map(Registration::cancel)
+                                                     .reduce((prev, acc) -> prev && acc)
+                                                     .orElse(false);
     }
 
     @Override
     public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super CommandMessage<?>> handlerInterceptor) {
         handlerInterceptors.add(handlerInterceptor);
         tenantSegments.forEach((tenant, bus) ->
-                handlerInterceptorsRegistration
-                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                        .add(bus.registerHandlerInterceptor(handlerInterceptor)));
+                                       handlerInterceptorsRegistration
+                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                                               .add(bus.registerHandlerInterceptor(handlerInterceptor)));
 
         return () -> handlerInterceptorsRegistration.values()
-                .stream()
-                .flatMap(Collection::stream)
-                .map(Registration::cancel)
-                .reduce((prev, acc) -> prev && acc)
-                .orElse(false);
+                                                    .stream()
+                                                    .flatMap(Collection::stream)
+                                                    .map(Registration::cancel)
+                                                    .reduce((prev, acc) -> prev && acc)
+                                                    .orElse(false);
     }
 
     @Override
@@ -159,11 +175,11 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
 
             handlerInterceptors.forEach(handlerInterceptor ->
                                                 handlerInterceptorsRegistration
-                            .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                            .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
+                                                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                                                        .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
 
             handlers.forEach((commandName, handler) ->
-                    subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(commandName, handler)));
+                                     subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(commandName, handler)));
 
             return tenantSegment;
         });

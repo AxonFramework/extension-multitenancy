@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2010-2022. Axon Framework
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.axonframework.extensions.multitenancy.configuration;
 
 import org.axonframework.common.AxonThreadFactory;
@@ -54,9 +70,9 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     public Map<String, EventProcessor> eventProcessors() {
         Map<String, EventProcessor> original = super.eventProcessors();
         Map<String, EventProcessor> allProcessors = original.entrySet().stream()
-                .filter(entry -> entry.getValue().getClass().isAssignableFrom(MultiTenantEventProcessor.class))
-                .flatMap(entry -> ((MultiTenantEventProcessor) entry.getValue()).tenantSegments().stream())
-                .collect(Collectors.toMap(EventProcessor::getName, processor -> processor));
+                                                            .filter(entry -> entry.getValue().getClass().isAssignableFrom(MultiTenantEventProcessor.class))
+                                                            .flatMap(entry -> ((MultiTenantEventProcessor) entry.getValue()).tenantSegments().stream())
+                                                            .collect(Collectors.toMap(EventProcessor::getName, processor -> processor));
         allProcessors.putAll(original);
         return allProcessors;
     }
@@ -66,30 +82,30 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                     EventHandlerInvoker eventHandlerInvoker,
                                                     SubscribableMessageSource<? extends EventMessage<?>> messageSource) {
         MultiTenantEventProcessor eventProcessor = MultiTenantEventProcessor.builder()
-                .name(name)
-                .tenantSegmentFactory(
-                        tenantDescriptor -> {
-                            SubscribableMessageSource<? extends EventMessage<?>> source =
-                                    messageSource instanceof MultiTenantEventStore
-                                            ? ((MultiTenantEventStore) messageSource).tenantSegment(tenantDescriptor)
-                                            : messageSource;
+                                                                            .name(name)
+                                                                            .tenantSegmentFactory(
+                                                                                    tenantDescriptor -> {
+                                                                                        SubscribableMessageSource<? extends EventMessage<?>> source =
+                                                                                                messageSource instanceof MultiTenantEventStore
+                                                                                                        ? ((MultiTenantEventStore) messageSource).tenantSegment(tenantDescriptor)
+                                                                                                        : messageSource;
 
-                            return SubscribingEventProcessor.builder()
-                                                            .name(getName(name, tenantDescriptor))
-                                                            .eventHandlerInvoker(eventHandlerInvoker)
-                                                            .rollbackConfiguration(super.rollbackConfiguration(name))
-                                                            .errorHandler(super.errorHandler(name))
-                                                            .messageMonitor(super.messageMonitor(
-                                                                    SubscribingEventProcessor.class,
-                                                                    name))
-                                                            .messageSource(source)
-                                                            .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
-                                                            .transactionManager(new TenantWrappedTransactionManager(
-                                                                    super.transactionManager(name),
-                                                                    tenantDescriptor))
-                                                            .build();
-                        })
-                .build();
+                                                                                        return SubscribingEventProcessor.builder()
+                                                                                                                        .name(getName(name, tenantDescriptor))
+                                                                                                                        .eventHandlerInvoker(eventHandlerInvoker)
+                                                                                                                        .rollbackConfiguration(super.rollbackConfiguration(name))
+                                                                                                                        .errorHandler(super.errorHandler(name))
+                                                                                                                        .messageMonitor(super.messageMonitor(
+                                                                                                                                SubscribingEventProcessor.class,
+                                                                                                                                name))
+                                                                                                                        .messageSource(source)
+                                                                                                                        .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
+                                                                                                                        .transactionManager(new TenantWrappedTransactionManager(
+                                                                                                                                super.transactionManager(name),
+                                                                                                                                tenantDescriptor))
+                                                                                                                        .build();
+                                                                                    })
+                                                                            .build();
 
         tenantProvider.subscribe(eventProcessor);
         return eventProcessor;
@@ -101,29 +117,29 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                  TrackingEventProcessorConfiguration config,
                                                  StreamableMessageSource<TrackedEventMessage<?>> source) {
         MultiTenantEventProcessor eventProcessor = MultiTenantEventProcessor.builder()
-                .name(name)
-                .tenantSegmentFactory(
-                        tenantDescriptor -> {
-                            StreamableMessageSource<TrackedEventMessage<?>> messageSource =
-                                    source instanceof MultiTenantEventStore
-                                            ? ((MultiTenantEventStore) source).tenantSegment(tenantDescriptor)
-                                            : source;
-                            return TrackingEventProcessor.builder()
-                                                         .name(getName(name, tenantDescriptor))
-                                                         .eventHandlerInvoker(eventHandlerInvoker)
-                                                         .rollbackConfiguration(super.rollbackConfiguration(name))
-                                                         .errorHandler(super.errorHandler(name))
-                                                         .messageMonitor(super.messageMonitor(TrackingEventProcessor.class,
-                                                                                              name))
-                                                         .messageSource(messageSource)
-                                                         .tokenStore(super.tokenStore(name))
-                                                         .transactionManager(new TenantWrappedTransactionManager(super.transactionManager(
-                                                                 name), tenantDescriptor))
-                                                         .trackingEventProcessorConfiguration(config)
-                                                         .build();
-                        }
-                )
-                .build();
+                                                                            .name(name)
+                                                                            .tenantSegmentFactory(
+                                                                                    tenantDescriptor -> {
+                                                                                        StreamableMessageSource<TrackedEventMessage<?>> messageSource =
+                                                                                                source instanceof MultiTenantEventStore
+                                                                                                        ? ((MultiTenantEventStore) source).tenantSegment(tenantDescriptor)
+                                                                                                        : source;
+                                                                                        return TrackingEventProcessor.builder()
+                                                                                                                     .name(getName(name, tenantDescriptor))
+                                                                                                                     .eventHandlerInvoker(eventHandlerInvoker)
+                                                                                                                     .rollbackConfiguration(super.rollbackConfiguration(name))
+                                                                                                                     .errorHandler(super.errorHandler(name))
+                                                                                                                     .messageMonitor(super.messageMonitor(TrackingEventProcessor.class,
+                                                                                                                                                          name))
+                                                                                                                     .messageSource(messageSource)
+                                                                                                                     .tokenStore(super.tokenStore(name))
+                                                                                                                     .transactionManager(new TenantWrappedTransactionManager(super.transactionManager(
+                                                                                                                             name), tenantDescriptor))
+                                                                                                                     .trackingEventProcessorConfiguration(config)
+                                                                                                                     .build();
+                                                                                    }
+                                                                            )
+                                                                            .build();
 
         tenantProvider.subscribe(eventProcessor);
 
@@ -140,47 +156,47 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     ) {
 
         MultiTenantEventProcessor eventProcessor = MultiTenantEventProcessor.builder()
-                .name(name)
-                .tenantSegmentFactory(
-                        tenantDescriptor -> {
-                            StreamableMessageSource<TrackedEventMessage<?>> source =
-                                    messageSource instanceof MultiTenantEventStore
-                                            ? ((MultiTenantEventStore) messageSource).tenantSegment(tenantDescriptor)
-                                            : messageSource;
+                                                                            .name(name)
+                                                                            .tenantSegmentFactory(
+                                                                                    tenantDescriptor -> {
+                                                                                        StreamableMessageSource<TrackedEventMessage<?>> source =
+                                                                                                messageSource instanceof MultiTenantEventStore
+                                                                                                        ? ((MultiTenantEventStore) messageSource).tenantSegment(tenantDescriptor)
+                                                                                                        : messageSource;
 
-                            PooledStreamingEventProcessor.Builder builder =
-                                    PooledStreamingEventProcessor.builder()
-                                                                 .name(getName(name, tenantDescriptor))
-                                                                 .eventHandlerInvoker(eventHandlerInvoker)
-                                                                 .rollbackConfiguration(super.rollbackConfiguration(name))
-                                                                 .errorHandler(super.errorHandler(name))
-                                                                 .messageMonitor(super.messageMonitor(
-                                                                         PooledStreamingEventProcessor.class,
-                                                                         name))
-                                                                 .messageSource(source)
-                                                                 .tokenStore(super.tokenStore(name))
-                                                                 .transactionManager(new TenantWrappedTransactionManager(
-                                                                         super.transactionManager(name),
-                                                                         tenantDescriptor))
-                                                                 .coordinatorExecutor(processorName -> {
-                                                ScheduledExecutorService coordinatorExecutor =
-                                                        defaultExecutor("Coordinator[" + processorName + "]");
-                                                config.onShutdown(coordinatorExecutor::shutdown);
-                                                return coordinatorExecutor;
-                                            })
-                                                                 .workerExecutor(processorName -> {
-                                                ScheduledExecutorService workerExecutor =
-                                                        defaultExecutor("WorkPackage[" + processorName + "]");
-                                                config.onShutdown(workerExecutor::shutdown);
-                                                return workerExecutor;
-                                            });
-                            return defaultPooledStreamingProcessorConfiguration.andThen(psepConfigs.getOrDefault(name, PooledStreamingProcessorConfiguration.noOp()))
-                                    .andThen(processorConfiguration)
-                                    .apply(config, builder)
-                                    .build();
-                        }
-                )
-                .build();
+                                                                                        PooledStreamingEventProcessor.Builder builder =
+                                                                                                PooledStreamingEventProcessor.builder()
+                                                                                                                             .name(getName(name, tenantDescriptor))
+                                                                                                                             .eventHandlerInvoker(eventHandlerInvoker)
+                                                                                                                             .rollbackConfiguration(super.rollbackConfiguration(name))
+                                                                                                                             .errorHandler(super.errorHandler(name))
+                                                                                                                             .messageMonitor(super.messageMonitor(
+                                                                                                                                     PooledStreamingEventProcessor.class,
+                                                                                                                                     name))
+                                                                                                                             .messageSource(source)
+                                                                                                                             .tokenStore(super.tokenStore(name))
+                                                                                                                             .transactionManager(new TenantWrappedTransactionManager(
+                                                                                                                                     super.transactionManager(name),
+                                                                                                                                     tenantDescriptor))
+                                                                                                                             .coordinatorExecutor(processorName -> {
+                                                                                                                                 ScheduledExecutorService coordinatorExecutor =
+                                                                                                                                         defaultExecutor("Coordinator[" + processorName + "]");
+                                                                                                                                 config.onShutdown(coordinatorExecutor::shutdown);
+                                                                                                                                 return coordinatorExecutor;
+                                                                                                                             })
+                                                                                                                             .workerExecutor(processorName -> {
+                                                                                                                                 ScheduledExecutorService workerExecutor =
+                                                                                                                                         defaultExecutor("WorkPackage[" + processorName + "]");
+                                                                                                                                 config.onShutdown(workerExecutor::shutdown);
+                                                                                                                                 return workerExecutor;
+                                                                                                                             });
+                                                                                        return defaultPooledStreamingProcessorConfiguration.andThen(psepConfigs.getOrDefault(name, PooledStreamingProcessorConfiguration.noOp()))
+                                                                                                                                           .andThen(processorConfiguration)
+                                                                                                                                           .apply(config, builder)
+                                                                                                                                           .build();
+                                                                                    }
+                                                                            )
+                                                                            .build();
 
         tenantProvider.subscribe(eventProcessor);
         return eventProcessor;

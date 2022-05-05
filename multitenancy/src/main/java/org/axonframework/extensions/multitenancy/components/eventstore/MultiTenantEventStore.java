@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2010-2022. Axon Framework
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import org.axonframework.common.BuilderUtils;
@@ -85,7 +101,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         messageProcessors.add(messageProcessor);
 
         tenantSegments.forEach((tenant, segment) ->
-                subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(messageProcessor)));
+                                       subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(messageProcessor)));
 
         return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
     }
@@ -94,7 +110,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super EventMessage<?>> dispatchInterceptor) {
         dispatchInterceptors.add(dispatchInterceptor);
         tenantSegments.forEach((tenant, bus) ->
-                dispatchInterceptorsRegistration.add(bus.registerDispatchInterceptor(dispatchInterceptor)));
+                                       dispatchInterceptorsRegistration.add(bus.registerDispatchInterceptor(dispatchInterceptor)));
 
         return () -> dispatchInterceptorsRegistration.stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
     }
@@ -163,7 +179,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
 
     public DomainEventStream readEvents(String aggregateIdentifier, TenantDescriptor tenantDescriptor) {
         return tenantSegments.get(tenantDescriptor)
-                .readEvents(aggregateIdentifier);
+                             .readEvents(aggregateIdentifier);
     }
 
     @Override
