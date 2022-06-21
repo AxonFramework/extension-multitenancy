@@ -168,6 +168,3 @@ class MultiTenantCommandBusTest {
         assertTrue(registration.cancel());
     }
 }
-
-//todo test TargetTenantResolver
-//todo test TenantCommandSegmentFactory
