@@ -32,8 +32,10 @@ import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -110,33 +112,38 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
     @Override
     public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super CommandMessage<?>> dispatchInterceptor) {
         dispatchInterceptors.add(dispatchInterceptor);
+        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
         tenantSegments.forEach((tenant, bus) ->
-                                       dispatchInterceptorsRegistration
+                                       newRegistrations
                                                .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
 
-        return () -> dispatchInterceptorsRegistration.values()
-                                                     .stream()
-                                                     .flatMap(Collection::stream)
-                                                     .map(Registration::cancel)
-                                                     .reduce((prev, acc) -> prev && acc)
-                                                     .orElse(false);
-    }
+        dispatchInterceptorsRegistration.putAll(newRegistrations);
 
+        return () -> newRegistrations.values().stream()
+                                     .flatMap(Collection::stream)
+                                     .filter(Objects::nonNull)
+                                     .map(Registration::cancel)
+                                     .reduce((prev, acc) -> prev && acc)
+                                     .orElse(false);
+    }
     @Override
     public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super CommandMessage<?>> handlerInterceptor) {
         handlerInterceptors.add(handlerInterceptor);
+        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
         tenantSegments.forEach((tenant, bus) ->
-                                       handlerInterceptorsRegistration
+                                       newRegistrations
                                                .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                .add(bus.registerHandlerInterceptor(handlerInterceptor)));
 
-        return () -> handlerInterceptorsRegistration.values()
-                                                    .stream()
-                                                    .flatMap(Collection::stream)
-                                                    .map(Registration::cancel)
-                                                    .reduce((prev, acc) -> prev && acc)
-                                                    .orElse(false);
+        handlerInterceptorsRegistration.putAll(newRegistrations);
+
+        return () -> newRegistrations.values()
+                                     .stream()
+                                     .flatMap(Collection::stream)
+                                     .map(Registration::cancel)
+                                     .reduce((prev, acc) -> prev && acc)
+                                     .orElse(false);
     }
 
     @Override
@@ -152,12 +159,19 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
 
     private CommandBus unregisterTenant(TenantDescriptor tenantDescriptor) {
         List<Registration> registrations = handlerInterceptorsRegistration.remove(tenantDescriptor);
-        if (registrations != null) registrations.forEach(Registration::cancel);
+        if (registrations != null) {
+            registrations.forEach(Registration::cancel);
+        }
 
         registrations = dispatchInterceptorsRegistration.remove(tenantDescriptor);
-        if (registrations != null) registrations.forEach(Registration::cancel);
+        if (registrations != null) {
+            registrations.forEach(Registration::cancel);
+        }
 
-        subscribeRegistrations.remove(tenantDescriptor).cancel();
+        Registration removed = subscribeRegistrations.remove(tenantDescriptor);
+        if (removed != null) {
+            removed.cancel();
+        }
 
         return tenantSegments.remove(tenantDescriptor);
     }
