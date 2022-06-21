@@ -30,6 +30,7 @@ import org.axonframework.messaging.MessageHandlerInterceptor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -186,17 +187,20 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
     public Registration registerHandlerInterceptor(
             MessageHandlerInterceptor<? super EventMessage<?>> handlerInterceptor) {
         handlerInterceptors.add(handlerInterceptor);
+        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
         tenantSegments.forEach((tenant, bus) ->
-                                       handlerInterceptorsRegistration
+                                       newRegistrations
                                                .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                .add(bus.registerHandlerInterceptor(handlerInterceptor)));
 
-        return () -> handlerInterceptorsRegistration.values()
-                                                    .stream()
-                                                    .flatMap(Collection::stream)
-                                                    .map(Registration::cancel)
-                                                    .reduce((prev, acc) -> prev && acc)
-                                                    .orElse(false);
+        handlerInterceptorsRegistration.putAll(newRegistrations);
+
+        return () -> newRegistrations.values()
+                                     .stream()
+                                     .flatMap(Collection::stream)
+                                     .map(Registration::cancel)
+                                     .reduce((prev, acc) -> prev && acc)
+                                     .orElse(false);
     }
 
     /**
