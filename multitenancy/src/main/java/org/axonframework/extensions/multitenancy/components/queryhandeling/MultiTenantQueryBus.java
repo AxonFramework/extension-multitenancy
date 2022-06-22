@@ -131,8 +131,8 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
                                                .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
 
-        handlerInterceptorsRegistration.putAll(newRegistrations);
 
+        dispatchInterceptorsRegistration.putAll(newRegistrations);
         return () -> newRegistrations.values()
                                      .stream()
                                      .flatMap(Collection::stream)
@@ -151,7 +151,7 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
                                                .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                .add(bus.registerHandlerInterceptor(handlerInterceptor)));
 
-        dispatchInterceptorsRegistration.putAll(newRegistrations);
+        handlerInterceptorsRegistration.putAll(newRegistrations);
 
         return () -> newRegistrations.values().stream()
                                      .flatMap(Collection::stream)

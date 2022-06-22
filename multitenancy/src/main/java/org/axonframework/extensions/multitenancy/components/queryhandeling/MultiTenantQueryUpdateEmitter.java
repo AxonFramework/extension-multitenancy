@@ -32,6 +32,7 @@ import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
 import org.axonframework.queryhandling.UpdateHandlerRegistration;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,8 +57,6 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     private final Map<TenantDescriptor, List<UpdateHandlerRegistration<?>>> updateHandlersRegistration = new ConcurrentHashMap<>();
 
-    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
-
     private final TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<Message<?>> targetTenantResolver;
 
@@ -76,17 +75,20 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     public Registration registerDispatchInterceptor(
             MessageDispatchInterceptor<? super SubscriptionQueryUpdateMessage<?>> dispatchInterceptor) {
         dispatchInterceptors.add(dispatchInterceptor);
+        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
         tenantSegments.forEach((tenant, bus) ->
-                                       dispatchInterceptorsRegistration
+                                       newRegistrations
                                                .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
 
-        return () -> dispatchInterceptorsRegistration.values()
-                                                     .stream()
-                                                     .flatMap(Collection::stream)
-                                                     .map(Registration::cancel)
-                                                     .reduce((prev, acc) -> prev && acc)
-                                                     .orElse(false);
+        dispatchInterceptorsRegistration.putAll(newRegistrations);
+
+        return () -> newRegistrations.values()
+                                     .stream()
+                                     .flatMap(Collection::stream)
+                                     .map(Registration::cancel)
+                                     .reduce((prev, acc) -> prev && acc)
+                                     .orElse(false);
     }
 
     @Override
@@ -98,7 +100,12 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     @Override
     public <U> void emit(Predicate<SubscriptionQueryMessage<?, ?, U>> filter, U update) {
-        Message<?> message = CurrentUnitOfWork.get().getMessage();
+        Message<?> message;
+        if (update instanceof Message) {
+            message = (Message<?>) update;
+        } else {
+            message = CurrentUnitOfWork.get().getMessage();
+        }
         if (message != null) {
             QueryUpdateEmitter tenantEmitter = resolveTenant(message);
             tenantEmitter.emit(filter, update);
@@ -115,7 +122,12 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     @Override
     public <Q, U> void emit(Class<Q> queryType, Predicate<? super Q> filter, U update) {
-        Message<?> message = CurrentUnitOfWork.get().getMessage();
+        Message<?> message;
+        if (update instanceof Message) {
+            message = (Message<?>) update;
+        } else {
+            message = CurrentUnitOfWork.get().getMessage();
+        }
         if (message != null) {
             QueryUpdateEmitter tenantEmitter = resolveTenant(message);
             tenantEmitter.emit(queryType, filter, update);
@@ -171,7 +183,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         updateHandlersRegistration
                 .computeIfAbsent(targetTenantResolver.resolveTenant(query, tenantSegments.keySet()),
                                  t -> new CopyOnWriteArrayList<>())
-                .add(queryUpdateEmitter.registerUpdateHandler(query, updateBufferSize));
+                .add(updateHandlerRegistration);
 
         return updateHandlerRegistration;
     }
@@ -192,13 +204,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
-        QueryUpdateEmitter tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
-        tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
-
-        return () -> {
-            QueryUpdateEmitter delegate = unregisterTenant(tenantDescriptor);
-            return delegate != null;
-        };
+        return registerAndStartTenant(tenantDescriptor);
     }
 
 
@@ -218,7 +224,6 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
             registrations.forEach(Registration::cancel);
         }
 
-        subscribeRegistrations.remove(tenantDescriptor).cancel();
         return tenantSegments.remove(tenantDescriptor);
     }
 
@@ -227,11 +232,11 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         tenantSegments.computeIfAbsent(tenantDescriptor, tenant -> {
             QueryUpdateEmitter tenantSegment = tenantSegmentFactory.apply(tenant);
 
-            dispatchInterceptors.forEach(handlerInterceptor ->
+            dispatchInterceptors.forEach(dispatchInterceptor ->
                                                  dispatchInterceptorsRegistration
                                                          .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                          .add(tenantSegment.registerDispatchInterceptor(
-                                                                 handlerInterceptor)));
+                                                                 dispatchInterceptor)));
 
             return tenantSegment;
         });
