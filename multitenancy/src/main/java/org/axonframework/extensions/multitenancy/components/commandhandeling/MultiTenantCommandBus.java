@@ -181,11 +181,11 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
         tenantSegments.computeIfAbsent(tenantDescriptor, tenant -> {
             CommandBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
 
-            dispatchInterceptors.forEach(handlerInterceptor ->
+            dispatchInterceptors.forEach(dispatchInterceptor ->
                                                  dispatchInterceptorsRegistration
                                                          .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                          .add(tenantSegment.registerDispatchInterceptor(
-                                                                 handlerInterceptor)));
+                                                                 dispatchInterceptor)));
 
             handlerInterceptors.forEach(handlerInterceptor ->
                                                 handlerInterceptorsRegistration

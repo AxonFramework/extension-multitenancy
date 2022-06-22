@@ -36,6 +36,8 @@ import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,7 +63,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     private final List<Consumer<List<? extends EventMessage<?>>>> messageProcessors = new CopyOnWriteArrayList<>();
 
     private final List<MessageDispatchInterceptor<? super EventMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
-    private final List<Registration> dispatchInterceptorsRegistration = new CopyOnWriteArrayList<>();
+    private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
 
     private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
 
@@ -109,10 +111,20 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     @Override
     public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super EventMessage<?>> dispatchInterceptor) {
         dispatchInterceptors.add(dispatchInterceptor);
+        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
         tenantSegments.forEach((tenant, bus) ->
-                                       dispatchInterceptorsRegistration.add(bus.registerDispatchInterceptor(dispatchInterceptor)));
+                                       newRegistrations
+                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                                               .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
 
-        return () -> dispatchInterceptorsRegistration.stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+        dispatchInterceptorsRegistration.putAll(newRegistrations);
+
+        return () -> newRegistrations.values().stream()
+                                     .flatMap(Collection::stream)
+                                     .filter(Objects::nonNull)
+                                     .map(Registration::cancel)
+                                     .reduce((prev, acc) -> prev && acc)
+                                     .orElse(false);
     }
 
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
@@ -137,8 +149,11 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
             EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
 
             dispatchInterceptors.forEach(dispatchInterceptor ->
-                                                 dispatchInterceptorsRegistration.add(tenantSegment.registerDispatchInterceptor(
-                                                         dispatchInterceptor)));
+                                                 dispatchInterceptorsRegistration
+                                                         .computeIfAbsent(tenantDescriptor,
+                                                                          t -> new CopyOnWriteArrayList<>())
+                                                         .add(tenantSegment.registerDispatchInterceptor(
+                                                                 dispatchInterceptor)));
 
             messageProcessors.forEach(processor ->
                                               subscribeRegistrations.putIfAbsent(tenantDescriptor,
@@ -186,6 +201,11 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     public void storeSnapshot(DomainEventMessage<?> snapshot) {
         resolveSegment()
                 .storeSnapshot(snapshot);
+    }
+
+    public void storeSnapshot(DomainEventMessage<?> snapshot, TenantDescriptor tenantDescriptor) {
+        tenantSegments.get(tenantDescriptor)
+                      .storeSnapshot(snapshot);
     }
 
     @Override
