@@ -28,12 +28,4 @@ import java.util.function.Function;
  */
 public interface TenantQuerySegmentFactory extends Function<TenantDescriptor, QueryBus> {
 
-    /**
-     * Creates a new {@link QueryBus} instance for the given {@link TenantDescriptor}.
-     * @param tenantDescriptor the {@link TenantDescriptor} for which the {@link QueryBus} should be created
-     * @return the {@link QueryBus} instance
-     */
-    default QueryBus buildTenantSegment(TenantDescriptor tenantDescriptor) {
-        return apply(tenantDescriptor);
-    }
 }

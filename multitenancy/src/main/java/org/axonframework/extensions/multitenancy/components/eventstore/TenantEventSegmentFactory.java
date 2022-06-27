@@ -29,12 +29,4 @@ import java.util.function.Function;
  */
 public interface TenantEventSegmentFactory extends Function<TenantDescriptor, EventStore> {
 
-    /**
-     * Creates a new {@link EventStore} instance for the given {@link TenantDescriptor}.
-     * @param tenantDescriptor the {@link TenantDescriptor} for which the {@link EventStore} should be created
-     * @return the {@link EventStore} instance
-     */
-    default EventStore buildTenantSegment(TenantDescriptor tenantDescriptor) {
-        return apply(tenantDescriptor);
-    }
 }
