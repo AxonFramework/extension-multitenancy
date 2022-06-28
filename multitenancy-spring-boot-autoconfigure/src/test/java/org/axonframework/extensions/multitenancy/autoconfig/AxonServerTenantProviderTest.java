@@ -172,11 +172,6 @@ class AxonServerTenantProviderTest {
         assertTrue(removed.get());
     }
 
-    //todo no initial tenants, only predicate
-
-    //de-register subscribe
-
-
     private static class StubResultStream<T> implements ResultStream<T> {
 
         private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(5);
