@@ -29,12 +29,16 @@ import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+import javax.annotation.PostConstruct;
 
 /**
  * Axon Server implementation of {@link TenantProvider}
@@ -47,7 +51,7 @@ public class AxonServerTenantProvider implements TenantProvider {
 
     private final List<MultiTenantAwareComponent> tenantAwareComponents = new CopyOnWriteArrayList<>();
 
-    private final List<TenantDescriptor> tenantDescriptors;
+    private final Set<TenantDescriptor> tenantDescriptors = new HashSet<>();
     private final String preDefinedContexts;
     private final TenantConnectPredicate tenantConnectPredicate;
     private final AxonServerConnectionManager axonServerConnectionManager;
@@ -60,9 +64,14 @@ public class AxonServerTenantProvider implements TenantProvider {
         this.preDefinedContexts = preDefinedContexts;
         this.tenantConnectPredicate = tenantConnectPredicate;
         this.axonServerConnectionManager = axonServerConnectionManager;
-        this.tenantDescriptors = getInitialTenants();
+    }
 
-        subscribeToUpdates();
+    @PostConstruct
+    public void start() {
+        tenantDescriptors.addAll(getInitialTenants());
+        if (preDefinedContexts.isEmpty()) {
+            subscribeToUpdates();
+        }
     }
 
     public List<TenantDescriptor> getInitialTenants() {
@@ -70,6 +79,7 @@ public class AxonServerTenantProvider implements TenantProvider {
         try {
             if (StringUtils.nonEmptyOrNull(preDefinedContexts)) {
                 initialTenants = Arrays.stream(preDefinedContexts.split(","))
+                                       .map(String::trim)
                                        .map(TenantDescriptor::tenantWithId)
                                        .collect(Collectors.toList());
             } else {
@@ -83,8 +93,6 @@ public class AxonServerTenantProvider implements TenantProvider {
 
     private void subscribeToUpdates() {
         try {
-
-
             ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
                     .getConnection(ADMIN_CTX)
                     .adminChannel()
@@ -119,7 +127,7 @@ public class AxonServerTenantProvider implements TenantProvider {
                                                                                        .getContextOverview(
                                                                                                contextUpdate.getContext())
                                                                                        .get());
-            if (tenantConnectPredicate.test(newTenant)) {
+            if (tenantConnectPredicate.test(newTenant) && !tenantDescriptors.contains(newTenant)) {
                 addTenant(newTenant);
             }
         } catch (Exception e) {
@@ -129,7 +137,7 @@ public class AxonServerTenantProvider implements TenantProvider {
 
     @Override
     public List<TenantDescriptor> getTenants() {
-        return Collections.unmodifiableList(tenantDescriptors);
+        return new ArrayList<>(tenantDescriptors);
     }
 
 
@@ -159,8 +167,11 @@ public class AxonServerTenantProvider implements TenantProvider {
     }
 
     protected void removeTenant(TenantDescriptor tenantDescriptor) {
-        if (tenantDescriptors.remove(tenantDescriptor)) {
-            registrationMap.remove(tenantDescriptor).forEach(Registration::cancel);
+        if (tenantDescriptors.contains(tenantDescriptor) && tenantDescriptors.remove(tenantDescriptor)) {
+            List<Registration> registrations = registrationMap.remove(tenantDescriptor);
+            if (registrations != null && !registrations.isEmpty()) {
+                registrations.forEach(Registration::cancel);
+            }
             axonServerConnectionManager.disconnect(tenantDescriptor.tenantId());
         }
     }
