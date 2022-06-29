@@ -38,6 +38,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import static org.axonframework.extensions.multitenancy.autoconfig.TenantConfiguration.TENANT_CORRELATION_KEY;
+
 /**
  * Configures Axon Server as implementation for multi-tenant components like CommandBus, QueryBus and EventStore.
  *
@@ -47,8 +49,6 @@ import org.springframework.context.annotation.Primary;
 @ConditionalOnProperty(value = "axon.multi-tenancy.enabled", matchIfMissing = true)
 @AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
 public class MultiTenancyAutoConfiguration {
-
-    private static final String DEFAULT_TENANT_CORRELATION_KEY = "tenantId";
 
     @Bean
     @ConditionalOnMissingBean
@@ -118,13 +118,13 @@ public class MultiTenancyAutoConfiguration {
         return (message, tenants) ->
                 TenantDescriptor.tenantWithId(
                         (String) message.getMetaData()
-                                        .getOrDefault(DEFAULT_TENANT_CORRELATION_KEY, "unknownTenant")
+                                        .getOrDefault(TENANT_CORRELATION_KEY, "unknownTenant")
                 );
     }
 
     @Bean
     @ConditionalOnProperty(name = "axon.multi-tenancy.use-metadata-helper", matchIfMissing = true)
     public CorrelationDataProvider tenantCorrelationProvider() {
-        return new TenantCorrelationProvider(DEFAULT_TENANT_CORRELATION_KEY);
+        return new TenantCorrelationProvider(TENANT_CORRELATION_KEY);
     }
 }

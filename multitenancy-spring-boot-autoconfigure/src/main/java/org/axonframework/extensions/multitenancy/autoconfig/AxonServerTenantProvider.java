@@ -69,7 +69,7 @@ public class AxonServerTenantProvider implements TenantProvider {
     @PostConstruct
     public void start() {
         tenantDescriptors.addAll(getInitialTenants());
-        if (preDefinedContexts.isEmpty()) {
+        if (preDefinedContexts == null || preDefinedContexts.isEmpty()) {
             subscribeToUpdates();
         }
     }
