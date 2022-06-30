@@ -74,7 +74,7 @@ class MultiTenantDataSourceManagerTest {
                     ));
 
     @Test
-    public void testResolveWithoutUnitOfWork() {
+    public void testResolveDefaultDataSource() {
         DataSourceProperties dataSourceProperties = mock(DataSourceProperties.class);
         Function<TenantDescriptor, DataSourceProperties> tenantDataSourceResolver =
                 (tenant) -> dataSourceProperties;
@@ -120,8 +120,66 @@ class MultiTenantDataSourceManagerTest {
                 });
     }
 
-    //verify tenantProvider.subscriber
-    //test CurrentUnitOfWork is started
-    //with bean tenantDataSourceResolver
-    //without tenantDataSourceResolver
+    //todo complete
+    //@Test
+    public void testResolveTenantDataSource() {
+        Function<TenantDescriptor, DataSourceProperties> tenantDataSourceResolver =
+                (tenant) -> {
+                    DataSourceProperties tenantDataSourceProperties = mock(DataSourceProperties.class);
+                    when(tenantDataSourceProperties.getDriverClassName()).thenReturn(
+                            "org.springframework.jdbc.datasource.DriverManagerDataSource");
+                    when(tenantDataSourceProperties.getUrl()).thenReturn(tenant.tenantId() + "-url");
+                    when(tenantDataSourceProperties.getUsername()).thenReturn(tenant.tenantId() + "-username");
+                    when(tenantDataSourceProperties.getPassword()).thenReturn(tenant.tenantId() + "-password");
+                    return tenantDataSourceProperties;
+                };
+
+        DataSourceProperties defaultDataSourceProperties = mock(DataSourceProperties.class);
+        when(defaultDataSourceProperties.getDriverClassName()).thenReturn(
+                "org.springframework.jdbc.datasource.DriverManagerDataSource");
+        when(defaultDataSourceProperties.getUrl()).thenReturn("default-url");
+        when(defaultDataSourceProperties.getUsername()).thenReturn("default-username");
+        when(defaultDataSourceProperties.getPassword()).thenReturn("default-password");
+
+        DriverManagerDataSource expectedDataSource = new DriverManagerDataSource();
+        expectedDataSource.setDriverClassName(defaultDataSourceProperties.getDriverClassName());
+        expectedDataSource.setUrl(defaultDataSourceProperties.getUrl());
+        expectedDataSource.setUsername(defaultDataSourceProperties.getUsername());
+        expectedDataSource.setPassword(defaultDataSourceProperties.getPassword());
+
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        when(tenantProvider.subscribe(any())).thenReturn(() -> true);
+
+        this.contextRunner
+                .withAllowBeanDefinitionOverriding(true)
+                .withBean(TenantProvider.class, () -> tenantProvider)
+                .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
+                .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
+                .run(context -> {
+                    assertThat(context).getBean("multiTenantDataSourceManager")
+                                       .returns(MultiTenantDataSourceManager.class, bean -> {
+                                           MultiTenantDataSourceManager multiTenantDataSourceManager = ((MultiTenantDataSourceManager) bean);
+
+                                           verify(tenantProvider).subscribe(multiTenantDataSourceManager);
+
+                                           multiTenantDataSourceManager.registerTenant(TenantDescriptor.tenantWithId(
+                                                   "tenant-1"));
+                                           multiTenantDataSourceManager.registerAndStartTenant(TenantDescriptor.tenantWithId(
+                                                   "tenant-2"));
+                                           multiTenantDataSourceManager.removeTenant(TenantDescriptor.tenantWithId(
+                                                   "tenant-1"));
+
+                                           DriverManagerDataSource actualDataSource = (DriverManagerDataSource) ((MultiTenantDataSourceManager) bean).getMultiTenantDataSource()
+                                                                                                                                                     .getResolvedDefaultDataSource();
+                                           assertEquals(expectedDataSource.getUrl(), actualDataSource.getUrl());
+                                           assertEquals(expectedDataSource.getUsername(),
+                                                        actualDataSource.getUsername());
+                                           assertEquals(expectedDataSource.getPassword(),
+                                                        actualDataSource.getPassword());
+
+
+                                           return MultiTenantDataSourceManager.class;
+                                       });
+                });
+    }
 }

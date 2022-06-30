@@ -113,7 +113,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         return multiTenantDataSource;
     }
 
-    public void register(TenantDescriptor tenant) {
+    private void register(TenantDescriptor tenant) {
         if (tenantIsAbsent(tenant)) {
             if (tenantDataSourceResolver != null) {
                 DataSourceProperties dataSourceProperties;
@@ -131,7 +131,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         log.debug("[d] Tenant '{}' set as current.", tenant);
     }
 
-    public void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
+    private void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
         DataSource dataSource = DataSourceBuilder.create()
                                                  .driverClassName(dataSourceProperties.getDriverClassName())
                                                  .url(dataSourceProperties.getUrl())
