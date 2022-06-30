@@ -17,6 +17,7 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.springboot.autoconfig.AxonAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration;
@@ -33,6 +34,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.EnableMBeanExport;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jmx.support.RegistrationPolicy;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
@@ -41,6 +43,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -70,36 +73,55 @@ class MultiTenantDataSourceManagerTest {
                             MultiTenantDataSourceManager.class
                     ));
 
-    @BeforeEach
-    void setUp() {
-    }
-
     @Test
-    public void test() {
+    public void testResolveWithoutUnitOfWork() {
         DataSourceProperties dataSourceProperties = mock(DataSourceProperties.class);
         Function<TenantDescriptor, DataSourceProperties> tenantDataSourceResolver =
                 (tenant) -> dataSourceProperties;
 
-        DataSourceProperties properties = mock(DataSourceProperties.class);
-        when(properties.getDriverClassName()).thenReturn("org.springframework.jdbc.datasource.DriverManagerDataSource");
-        when(properties.getUrl()).thenReturn("url");
-        when(properties.getUrl()).thenReturn("userName");
-        when(properties.getUrl()).thenReturn("password");
+        DataSourceProperties defaultDataSourceProperties = mock(DataSourceProperties.class);
+        when(defaultDataSourceProperties.getDriverClassName()).thenReturn(
+                "org.springframework.jdbc.datasource.DriverManagerDataSource");
+        when(defaultDataSourceProperties.getUrl()).thenReturn("default-url");
+        when(defaultDataSourceProperties.getUsername()).thenReturn("default-username");
+        when(defaultDataSourceProperties.getPassword()).thenReturn("default-password");
+
+        DriverManagerDataSource expectedDataSource = new DriverManagerDataSource();
+        expectedDataSource.setDriverClassName(defaultDataSourceProperties.getDriverClassName());
+        expectedDataSource.setUrl(defaultDataSourceProperties.getUrl());
+        expectedDataSource.setUsername(defaultDataSourceProperties.getUsername());
+        expectedDataSource.setPassword(defaultDataSourceProperties.getPassword());
+
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        when(tenantProvider.subscribe(any())).thenReturn(() -> true);
 
         this.contextRunner
+                .withAllowBeanDefinitionOverriding(true)
+                .withBean(TenantProvider.class, () -> tenantProvider)
                 .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
-                .withBean("properties", DataSourceProperties.class, () -> properties)
+                .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
                 .run(context -> {
                     assertThat(context).getBean("multiTenantDataSourceManager")
                                        .returns(MultiTenantDataSourceManager.class, bean -> {
                                            MultiTenantDataSourceManager multiTenantDataSourceManager = ((MultiTenantDataSourceManager) bean);
 
-                                           //verify tenantProvider.subscriber
-                                           //test CurrentUnitOfWork is started
+                                           verify(tenantProvider).subscribe(multiTenantDataSourceManager);
+
+                                           DriverManagerDataSource actualDataSource = (DriverManagerDataSource) ((MultiTenantDataSourceManager) bean).getMultiTenantDataSource()
+                                                                                                                                                     .getResolvedDefaultDataSource();
+                                           assertEquals(expectedDataSource.getUrl(), actualDataSource.getUrl());
+                                           assertEquals(expectedDataSource.getUsername(),
+                                                        actualDataSource.getUsername());
+                                           assertEquals(expectedDataSource.getPassword(),
+                                                        actualDataSource.getPassword());
+
                                            return MultiTenantDataSourceManager.class;
                                        });
                 });
     }
 
+    //verify tenantProvider.subscriber
+    //test CurrentUnitOfWork is started
     //with bean tenantDataSourceResolver
+    //without tenantDataSourceResolver
 }

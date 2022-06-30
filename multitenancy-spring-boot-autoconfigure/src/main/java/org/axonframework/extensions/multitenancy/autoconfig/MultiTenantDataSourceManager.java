@@ -138,7 +138,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
                                                  .username(dataSourceProperties.getUsername())
                                                  .password(dataSourceProperties.getPassword())
                                                  .build();
-        try (Connection c = dataSource.getConnection()) {
+        try (Connection ignored = dataSource.getConnection()) {
             tenantDataSources.put(tenant, dataSource);
             multiTenantDataSource.afterPropertiesSet();
             log.debug("[d] Tenant '{}' added.", tenant);
@@ -155,6 +155,10 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
 
     public boolean tenantIsAbsent(TenantDescriptor tenant) {
         return !tenantDataSources.containsKey(tenant);
+    }
+
+    public AbstractRoutingDataSource getMultiTenantDataSource() {
+        return multiTenantDataSource;
     }
 
     private DataSource defaultDataSource() {
