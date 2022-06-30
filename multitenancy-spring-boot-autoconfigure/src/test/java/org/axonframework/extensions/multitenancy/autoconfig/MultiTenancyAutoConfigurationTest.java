@@ -65,7 +65,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ContextConfiguration
 @EnableAutoConfiguration
 @EnableMBeanExport(registration = RegistrationPolicy.IGNORE_EXISTING)
-@TestPropertySource(properties = {"axon.axonserver.contexts=default"})
+@TestPropertySource(properties = {"axon.axonserver.contexts=tenant-1,tenant-2"})
 class MultiTenancyAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
