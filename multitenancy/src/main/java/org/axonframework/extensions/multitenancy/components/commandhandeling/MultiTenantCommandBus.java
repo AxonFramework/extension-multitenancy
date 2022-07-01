@@ -23,6 +23,8 @@ import org.axonframework.commandhandling.GenericCommandResultMessage;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.MultiTenantDispatchInterceptorSupport;
+import org.axonframework.extensions.multitenancy.components.MultiTenantHandlerInterceptorSupport;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -31,11 +33,8 @@ import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
 
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -53,22 +52,20 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * @author Steven van Beelen
  */
 
-public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareComponent {
+public class MultiTenantCommandBus
+        implements
+        MultiTenantDispatchInterceptorSupport<CommandMessage<?>, CommandBus>,
+        MultiTenantHandlerInterceptorSupport<CommandMessage<?>, CommandBus>, CommandBus, MultiTenantAwareComponent {
 
     private final Map<TenantDescriptor, CommandBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, MessageHandler<? super CommandMessage<?>>> handlers = new ConcurrentHashMap<>();
-
-    private final List<MessageDispatchInterceptor<? super CommandMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
-    private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
-
-    private final List<MessageHandlerInterceptor<? super CommandMessage<?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
-    private final Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
-
     private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
-
     private final TenantCommandSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<CommandMessage<?>> targetTenantResolver;
-
+    List<MessageDispatchInterceptor<? super CommandMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
+    Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
+    List<MessageHandlerInterceptor<? super CommandMessage<?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
+    Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
 
     public MultiTenantCommandBus(Builder builder) {
         builder.validate();
@@ -102,48 +99,18 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
     public Registration subscribe(String commandName, MessageHandler<? super CommandMessage<?>> handler) {
         handlers.computeIfAbsent(commandName, k -> {
             tenantSegments.forEach((tenant, segment) ->
-                                           subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(commandName, handler)));
+                                           subscribeRegistrations.putIfAbsent(tenant,
+                                                                              segment.subscribe(commandName, handler)));
             return handler;
         });
-        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev
+                && acc).orElse(false);
     }
 
 
     @Override
-    public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super CommandMessage<?>> dispatchInterceptor) {
-        dispatchInterceptors.add(dispatchInterceptor);
-        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
-        tenantSegments.forEach((tenant, bus) ->
-                                       newRegistrations
-                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                                               .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
-
-        dispatchInterceptorsRegistration.putAll(newRegistrations);
-
-        return () -> newRegistrations.values().stream()
-                                     .flatMap(Collection::stream)
-                                     .filter(Objects::nonNull)
-                                     .map(Registration::cancel)
-                                     .reduce((prev, acc) -> prev && acc)
-                                     .orElse(false);
-    }
-    @Override
-    public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super CommandMessage<?>> handlerInterceptor) {
-        handlerInterceptors.add(handlerInterceptor);
-        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
-        tenantSegments.forEach((tenant, bus) ->
-                                       newRegistrations
-                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                                               .add(bus.registerHandlerInterceptor(handlerInterceptor)));
-
-        handlerInterceptorsRegistration.putAll(newRegistrations);
-
-        return () -> newRegistrations.values()
-                                     .stream()
-                                     .flatMap(Collection::stream)
-                                     .map(Registration::cancel)
-                                     .reduce((prev, acc) -> prev && acc)
-                                     .orElse(false);
+    public Map<TenantDescriptor, CommandBus> tenantSegments() {
+        return tenantSegments;
     }
 
     @Override
@@ -193,7 +160,8 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
                                                         .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
 
             handlers.forEach((commandName, handler) ->
-                                     subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(commandName, handler)));
+                                     subscribeRegistrations.putIfAbsent(tenantDescriptor,
+                                                                        tenantSegment.subscribe(commandName, handler)));
 
             return tenantSegment;
         });
@@ -213,6 +181,26 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
         return tenantCommandBus;
     }
 
+    @Override
+    public List<MessageDispatchInterceptor<? super CommandMessage<?>>> getDispatchInterceptors() {
+        return dispatchInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getDispatchInterceptorsRegistration() {
+        return dispatchInterceptorsRegistration;
+    }
+
+    @Override
+    public List<MessageHandlerInterceptor<? super CommandMessage<?>>> getHandlerInterceptors() {
+        return handlerInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getHandlerInterceptorsRegistration() {
+        return handlerInterceptorsRegistration;
+    }
+
     public static class Builder {
 
         public TenantCommandSegmentFactory tenantSegmentFactory;
@@ -226,7 +214,8 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
          * @return the current Builder instance, for fluent interfacing
          */
         public Builder tenantSegmentFactory(TenantCommandSegmentFactory tenantSegmentFactory) {
-            BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            BuilderUtils.assertNonNull(tenantSegmentFactory,
+                                       "The TenantEventProcessorSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }

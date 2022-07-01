@@ -21,6 +21,7 @@ import org.axonframework.common.Registration;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.EventProcessor;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.MultiTenantHandlerInterceptorSupport;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.lifecycle.Phase;
 import org.axonframework.lifecycle.ShutdownHandler;
@@ -28,9 +29,7 @@ import org.axonframework.lifecycle.StartHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,9 +44,11 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  */
-public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwareComponent {
+public class MultiTenantEventProcessor
+        implements MultiTenantHandlerInterceptorSupport<EventMessage<?>, EventProcessor>, EventProcessor,
+        MultiTenantAwareComponent {
 
-    private final Map<TenantDescriptor, EventProcessor> tenantEventProcessors = new ConcurrentHashMap<>();
+    private final Map<TenantDescriptor, EventProcessor> tenantEventProcessorsSegments = new ConcurrentHashMap<>();
     private final List<MessageHandlerInterceptor<? super EventMessage<?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
     private final Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
     private final String name;
@@ -100,6 +101,11 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
         return name;
     }
 
+    @Override
+    public Map<TenantDescriptor, EventProcessor> tenantSegments() {
+        return tenantEventProcessorsSegments;
+    }
+
     /**
      * Return the list of already registered {@link MessageHandlerInterceptor}s for this event processor. To register a
      * new interceptor use {@link EventProcessor#registerHandlerInterceptor(MessageHandlerInterceptor)}
@@ -108,7 +114,12 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
      */
     @Override
     public List<MessageHandlerInterceptor<? super EventMessage<?>>> getHandlerInterceptors() {
-        return Collections.unmodifiableList(handlerInterceptors);
+        return handlerInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getHandlerInterceptorsRegistration() {
+        return handlerInterceptorsRegistration;
     }
 
     /**
@@ -118,7 +129,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
     @StartHandler(phase = Phase.INBOUND_EVENT_CONNECTORS)
     public void start() {
         started = true;
-        tenantEventProcessors.values().forEach(EventProcessor::start);
+        tenantEventProcessorsSegments.values().forEach(EventProcessor::start);
     }
 
     /**
@@ -128,7 +139,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
     @ShutdownHandler(phase = Phase.INBOUND_EVENT_CONNECTORS)
     public void shutDown() {
         started = false;
-        tenantEventProcessors.values().forEach(EventProcessor::shutDown);
+        tenantEventProcessorsSegments.values().forEach(EventProcessor::shutDown);
     }
 
     /**
@@ -150,7 +161,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
      * @return {@code true} when running, otherwise {@code false}
      */
     public boolean isRunning(TenantDescriptor tenantDescriptor) {
-        return tenantEventProcessors.get(tenantDescriptor).isRunning();
+        return tenantEventProcessorsSegments.get(tenantDescriptor).isRunning();
     }
 
     /**
@@ -173,34 +184,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
      * @return {@code true} when paused due to an error, otherwise {@code false}
      */
     public boolean isError(TenantDescriptor tenantDescriptor) {
-        return tenantEventProcessors.get(tenantDescriptor).isError();
-    }
-
-    /**
-     * Register the given {@code handlerInterceptor}. After registration, the interceptor will be invoked for each
-     * handled Message on the messaging component that it was registered to, prior to invoking the message's handler.
-     *
-     * @param handlerInterceptor The interceptor to register
-     * @return a Registration, which may be used to remove the unregister the interceptor
-     */
-    @Override
-    public Registration registerHandlerInterceptor(
-            MessageHandlerInterceptor<? super EventMessage<?>> handlerInterceptor) {
-        handlerInterceptors.add(handlerInterceptor);
-        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
-        tenantEventProcessors.forEach((tenant, bus) ->
-                                              newRegistrations
-                                                      .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                                                      .add(bus.registerHandlerInterceptor(handlerInterceptor)));
-
-        handlerInterceptorsRegistration.putAll(newRegistrations);
-
-        return () -> newRegistrations.values()
-                                     .stream()
-                                     .flatMap(Collection::stream)
-                                     .map(Registration::cancel)
-                                     .reduce((prev, acc) -> prev && acc)
-                                     .orElse(false);
+        return tenantEventProcessorsSegments.get(tenantDescriptor).isError();
     }
 
     /**
@@ -216,7 +200,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
             throw new IllegalStateException("Cannot register tenant after processor has been started");
         }
         EventProcessor tenantSegment = tenantEventProcessorSegmentFactory.apply(tenantDescriptor);
-        tenantEventProcessors.putIfAbsent(tenantDescriptor, tenantSegment);
+        tenantEventProcessorsSegments.putIfAbsent(tenantDescriptor, tenantSegment);
 
         return () -> stopAndRemoveTenant(tenantDescriptor);
     }
@@ -229,7 +213,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
      */
     @Override
     public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
-        tenantEventProcessors.computeIfAbsent(tenantDescriptor, tenant -> {
+        tenantEventProcessorsSegments.computeIfAbsent(tenantDescriptor, tenant -> {
             EventProcessor tenantSegment = tenantEventProcessorSegmentFactory.apply(tenant);
 
             handlerInterceptors.forEach(handlerInterceptor ->
@@ -257,7 +241,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
         if (registrations != null) {
             registrations.forEach(Registration::cancel);
         }
-        EventProcessor delegate = tenantEventProcessors.remove(tenantDescriptor);
+        EventProcessor delegate = tenantEventProcessorsSegments.remove(tenantDescriptor);
         if (delegate != null) {
             delegate.shutDown();
             return true;
@@ -271,7 +255,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
      * @return list of tenants event processors
      */
     public List<EventProcessor> tenantEventProcessors() {
-        return Collections.unmodifiableList(new ArrayList<>(tenantEventProcessors.values()));
+        return Collections.unmodifiableList(new ArrayList<>(tenantEventProcessorsSegments.values()));
     }
 
 
