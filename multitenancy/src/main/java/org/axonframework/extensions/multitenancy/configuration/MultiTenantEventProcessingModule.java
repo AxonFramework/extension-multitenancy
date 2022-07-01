@@ -70,8 +70,11 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     public Map<String, EventProcessor> eventProcessors() {
         Map<String, EventProcessor> original = super.eventProcessors();
         Map<String, EventProcessor> allProcessors = original.entrySet().stream()
-                                                            .filter(entry -> entry.getValue().getClass().isAssignableFrom(MultiTenantEventProcessor.class))
-                                                            .flatMap(entry -> ((MultiTenantEventProcessor) entry.getValue()).tenantSegments().stream())
+                                                            .filter(entry -> entry.getValue().getClass()
+                                                                                  .isAssignableFrom(
+                                                                                          MultiTenantEventProcessor.class))
+                                                            .flatMap(entry -> ((MultiTenantEventProcessor) entry.getValue()).tenantEventProcessors()
+                                                                                                                            .stream())
                                                             .collect(Collectors.toMap(EventProcessor::getName, processor -> processor));
         allProcessors.putAll(original);
         return allProcessors;

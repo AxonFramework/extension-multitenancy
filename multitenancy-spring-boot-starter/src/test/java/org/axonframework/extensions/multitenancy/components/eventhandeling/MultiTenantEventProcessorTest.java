@@ -58,7 +58,7 @@ class MultiTenantEventProcessorTest {
     @Test
     public void registerTenant() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
-        assertTrue(testSubject.tenantSegments().contains(fixtureSegment1));
+        assertTrue(testSubject.tenantEventProcessors().contains(fixtureSegment1));
     }
 
     @Test
@@ -66,7 +66,7 @@ class MultiTenantEventProcessorTest {
         doNothing().when(fixtureSegment1).start();
         testSubject.registerHandlerInterceptor((unitOfWork, interceptorChain) -> interceptorChain.proceed());
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
-        assertTrue(testSubject.tenantSegments().contains(fixtureSegment1));
+        assertTrue(testSubject.tenantEventProcessors().contains(fixtureSegment1));
         verify(fixtureSegment1, times(1)).start();
     }
 
@@ -77,7 +77,7 @@ class MultiTenantEventProcessorTest {
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerHandlerInterceptor((unitOfWork, interceptorChain) -> interceptorChain.proceed());
         testSubject.stopAndRemoveTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
-        assertTrue(testSubject.tenantSegments().isEmpty());
+        assertTrue(testSubject.tenantEventProcessors().isEmpty());
         verify(fixtureSegment1, times(1)).shutDown();
     }
 
@@ -95,7 +95,7 @@ class MultiTenantEventProcessorTest {
     public void startAndShutDown() {
         when(fixtureSegment1.isRunning()).thenReturn(true);
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
-        assertTrue(testSubject.tenantSegments().contains(fixtureSegment1));
+        assertTrue(testSubject.tenantEventProcessors().contains(fixtureSegment1));
         testSubject.start();
         assertTrue(testSubject.isRunning());
         assertTrue(testSubject.isRunning(TenantDescriptor.tenantWithId("fixtureTenant1")));

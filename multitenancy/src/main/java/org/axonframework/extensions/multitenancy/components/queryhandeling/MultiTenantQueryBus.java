@@ -26,6 +26,7 @@ import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
+import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryResponseMessage;
@@ -244,8 +245,8 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
     @Override
     public QueryUpdateEmitter queryUpdateEmitter() {
-        throw new UnsupportedOperationException("MultiTenantQueryBus does not have query update emitter. "
-                                                        + "Use queryUpdateEmitter(TenantDescriptor tenantDescriptor) instead.");
+        return resolveTenant((QueryMessage<?, ?>) CurrentUnitOfWork.get().getMessage())
+                .queryUpdateEmitter();
     }
 
     /**
