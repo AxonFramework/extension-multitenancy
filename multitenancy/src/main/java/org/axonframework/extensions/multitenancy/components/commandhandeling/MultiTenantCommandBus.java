@@ -54,8 +54,9 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 public class MultiTenantCommandBus
         implements
+        CommandBus, MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<CommandMessage<?>, CommandBus>,
-        MultiTenantHandlerInterceptorSupport<CommandMessage<?>, CommandBus>, CommandBus, MultiTenantAwareComponent {
+        MultiTenantHandlerInterceptorSupport<CommandMessage<?>, CommandBus> {
 
     private final Map<TenantDescriptor, CommandBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, MessageHandler<? super CommandMessage<?>>> handlers = new ConcurrentHashMap<>();

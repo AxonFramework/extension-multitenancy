@@ -19,6 +19,7 @@ package org.axonframework.extensions.multitenancy.components.queryhandeling;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.MultiTenantDispatchInterceptorSupport;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -31,8 +32,6 @@ import org.axonframework.queryhandling.SubscriptionQueryMessage;
 import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
 import org.axonframework.queryhandling.UpdateHandlerRegistration;
 
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,7 +47,8 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  */
-public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent {
+public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent,
+        MultiTenantDispatchInterceptorSupport<SubscriptionQueryUpdateMessage<?>, QueryUpdateEmitter> {
 
     private final Map<TenantDescriptor, QueryUpdateEmitter> tenantSegments = new ConcurrentHashMap<>();
 
@@ -69,26 +69,6 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     public static MultiTenantQueryUpdateEmitter.Builder builder() {
         return new MultiTenantQueryUpdateEmitter.Builder();
-    }
-
-    @Override
-    public Registration registerDispatchInterceptor(
-            MessageDispatchInterceptor<? super SubscriptionQueryUpdateMessage<?>> dispatchInterceptor) {
-        dispatchInterceptors.add(dispatchInterceptor);
-        Map<TenantDescriptor, List<Registration>> newRegistrations = new HashMap<>();
-        tenantSegments.forEach((tenant, bus) ->
-                                       newRegistrations
-                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                                               .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
-
-        dispatchInterceptorsRegistration.putAll(newRegistrations);
-
-        return () -> newRegistrations.values()
-                                     .stream()
-                                     .flatMap(Collection::stream)
-                                     .map(Registration::cancel)
-                                     .reduce((prev, acc) -> prev && acc)
-                                     .orElse(false);
     }
 
     @Override
@@ -245,6 +225,21 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
             QueryUpdateEmitter delegate = unregisterTenant(tenantDescriptor);
             return delegate != null;
         };
+    }
+
+    @Override
+    public Map<TenantDescriptor, QueryUpdateEmitter> tenantSegments() {
+        return tenantSegments;
+    }
+
+    @Override
+    public List<MessageDispatchInterceptor<? super SubscriptionQueryUpdateMessage<?>>> getDispatchInterceptors() {
+        return dispatchInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getDispatchInterceptorsRegistration() {
+        return dispatchInterceptorsRegistration;
     }
 
     public static class Builder {
