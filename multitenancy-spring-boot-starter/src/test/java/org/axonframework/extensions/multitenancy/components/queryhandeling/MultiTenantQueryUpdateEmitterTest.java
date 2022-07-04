@@ -105,35 +105,6 @@ class MultiTenantQueryUpdateEmitterTest {
     }
 
     @Test
-    public void registerUpdateHandler() {
-        testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
-        testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
-
-        UpdateHandlerRegistration mockRegistration = mock(UpdateHandlerRegistration.class);
-        doNothing().when(mockRegistration).complete();
-        when(fixtureSegment1.queryUpdateHandlerRegistered(any())).thenReturn(true);
-
-        when(fixtureSegment2.registerUpdateHandler(any(), anyInt())).thenReturn(mockRegistration);
-
-        SubscriptionQueryMessage<String, String, String> testSubscriptionQueryMessage =
-                new GenericSubscriptionQueryMessage<>("TEST_QUERY",
-                                                      ResponseTypes.instanceOf(String.class),
-                                                      ResponseTypes.instanceOf(String.class));
-
-        UpdateHandlerRegistration<Object> updateHandlerRegistration = testSubject.registerUpdateHandler(
-                testSubscriptionQueryMessage,
-                10);
-
-        assertTrue(testSubject.queryUpdateHandlerRegistered(testSubscriptionQueryMessage));
-        verify(fixtureSegment2).registerUpdateHandler(testSubscriptionQueryMessage, 10);
-        verify(fixtureSegment1, times(0)).registerUpdateHandler(any(), anyInt());
-
-        updateHandlerRegistration.complete();
-        verify(mockRegistration, times(1)).complete();
-    }
-
-
-    @Test
     public void unknownTenant() {
         SubscriptionQueryMessage<?, ?, ?> msg = mock(SubscriptionQueryMessage.class);
 

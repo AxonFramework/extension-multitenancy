@@ -83,32 +83,6 @@ class MultiTenancyAutoConfigurationTest {
                     ));
 
     @Test
-    void testMultiTenancyAxonServerAutoConfiguration() {
-        this.contextRunner
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
-                .run(context -> {
-                    assertThat(context).getBean("tenantProvider")
-                                       .isExactlyInstanceOf(AxonServerTenantProvider.class);
-                    assertThat(context).getBean("tenantAxonServerCommandSegmentFactory")
-                                       .isInstanceOf(TenantCommandSegmentFactory.class);
-                    assertThat(context).getBean("tenantAxonServerQuerySegmentFactory")
-                                       .isInstanceOf(TenantQuerySegmentFactory.class);
-                    assertThat(context).getBean("multiTenantQueryUpdateEmitter")
-                                       .isExactlyInstanceOf(MultiTenantQueryUpdateEmitter.class);
-                    assertThat(context).getBean("tenantQueryUpdateEmitterSegmentFactory")
-                                       .isInstanceOf(TenantQueryUpdateEmitterSegmentFactory.class);
-                    assertThat(context).getBean("tenantEventSegmentFactory")
-                                       .isInstanceOf(TenantEventSegmentFactory.class);
-                    assertThat(context).getBean("processorInfoConfiguration")
-                                       .returns(EventProcessorInfoConfiguration.class, ep -> {
-                                           Component<EventProcessorControlService> eventProcessorControlService = ((EventProcessorInfoConfiguration) ep).getEventProcessorControlService();
-                                           assertTrue(eventProcessorControlService.get() instanceof MultiTenantEventProcessorControlService);
-                                           return EventProcessorInfoConfiguration.class;
-                                       });
-                });
-    }
-
-    @Test
     void multiTenancyAutoConfiguration() {
         this.contextRunner
                 .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
