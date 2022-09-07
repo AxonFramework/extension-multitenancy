@@ -6,6 +6,7 @@ import java.util.Map;
  * DTO for the context object retrived from Axon Server
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class ContextObject {
 

@@ -10,6 +10,7 @@ import java.util.List;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantProvider {
 

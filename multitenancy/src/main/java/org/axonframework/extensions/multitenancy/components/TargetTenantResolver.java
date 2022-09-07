@@ -11,6 +11,7 @@ import java.util.function.BiFunction;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TargetTenantResolver<M extends Message<?>> extends BiFunction<M, Collection<TenantDescriptor>, TenantDescriptor> {
 

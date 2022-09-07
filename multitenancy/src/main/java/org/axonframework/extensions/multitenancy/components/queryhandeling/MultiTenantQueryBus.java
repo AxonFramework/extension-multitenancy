@@ -43,6 +43,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
+ * @since 4.6.0
  */
 public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent {
 

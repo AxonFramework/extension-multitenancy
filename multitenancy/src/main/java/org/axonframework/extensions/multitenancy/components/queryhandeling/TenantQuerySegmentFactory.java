@@ -9,6 +9,7 @@ import java.util.function.Function;
  * Factory for creating {@link QueryBus} instances for a given {@link TenantDescriptor}.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantQuerySegmentFactory extends Function<TenantDescriptor, QueryBus> {
 

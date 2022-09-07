@@ -17,6 +17,7 @@ import org.axonframework.lifecycle.StartHandler;
  * environment in Axon Server dashboard.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantEventProcessorControlService extends EventProcessorControlService
         implements MultiTenantAwareComponent {

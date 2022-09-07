@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 /**
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantEventProcessingModule extends EventProcessingModule {
 

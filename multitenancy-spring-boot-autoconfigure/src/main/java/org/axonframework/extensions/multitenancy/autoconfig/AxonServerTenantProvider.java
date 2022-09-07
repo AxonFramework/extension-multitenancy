@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
  * Axon Server implementation of {@link TenantProvider}
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class AxonServerTenantProvider implements TenantProvider {
 

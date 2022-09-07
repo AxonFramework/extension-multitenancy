@@ -8,6 +8,7 @@ import java.util.function.Predicate;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantConnectPredicate extends Predicate<TenantDescriptor> {
 

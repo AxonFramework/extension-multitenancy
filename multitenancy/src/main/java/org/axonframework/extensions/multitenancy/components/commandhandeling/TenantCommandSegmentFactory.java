@@ -11,6 +11,7 @@ import java.util.function.Function;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantCommandSegmentFactory extends Function<TenantDescriptor, CommandBus> {
 

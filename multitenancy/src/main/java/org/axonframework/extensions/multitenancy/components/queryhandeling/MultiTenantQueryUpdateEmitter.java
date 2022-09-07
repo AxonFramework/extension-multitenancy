@@ -30,6 +30,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent {
 

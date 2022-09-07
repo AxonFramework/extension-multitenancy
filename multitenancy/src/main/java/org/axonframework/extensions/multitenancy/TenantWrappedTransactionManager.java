@@ -11,6 +11,7 @@ import java.util.function.Supplier;
  * determine the tenant of the current transaction.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantWrappedTransactionManager implements TransactionManager {
 

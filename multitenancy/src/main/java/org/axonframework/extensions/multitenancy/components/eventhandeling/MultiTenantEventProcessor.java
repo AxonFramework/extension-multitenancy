@@ -27,6 +27,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * forwards corresponding actions to the correct tenant.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwareComponent {
 

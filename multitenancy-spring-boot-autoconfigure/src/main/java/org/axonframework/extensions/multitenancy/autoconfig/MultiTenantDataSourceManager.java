@@ -38,6 +38,7 @@ import javax.sql.DataSource;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 
 @Configuration

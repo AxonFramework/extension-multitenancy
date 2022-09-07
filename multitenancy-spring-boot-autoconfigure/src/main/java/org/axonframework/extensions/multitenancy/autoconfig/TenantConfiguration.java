@@ -6,6 +6,7 @@ package org.axonframework.extensions.multitenancy.autoconfig;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantConfiguration {
     public static final String TENANT_CORRELATION_KEY = "tenantId";

@@ -11,6 +11,7 @@ import java.util.Map;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantCorrelationProvider implements CorrelationDataProvider {
 

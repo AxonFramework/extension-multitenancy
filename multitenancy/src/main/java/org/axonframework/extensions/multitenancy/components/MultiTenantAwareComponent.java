@@ -7,6 +7,7 @@ import org.axonframework.common.Registration;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface MultiTenantAwareComponent {
 
