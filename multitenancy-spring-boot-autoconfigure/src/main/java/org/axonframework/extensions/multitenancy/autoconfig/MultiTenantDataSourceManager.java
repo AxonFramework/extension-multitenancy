@@ -1,5 +1,6 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
@@ -94,29 +95,37 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         multiTenantDataSource.afterPropertiesSet();
 
         tenantProvider.subscribe(this);
-
         return multiTenantDataSource;
     }
 
-    public void register(TenantDescriptor tenant) {
-        if (tenantIsAbsent(tenant)) {
+    /**
+     * Registers a tenantDescriptor data source if the tenantDescriptor data source has not already been registered, using the {@link TenantDescriptor}
+     * @param tenantDescriptor the descriptor of the tenant
+     */
+    public void register(TenantDescriptor tenantDescriptor) {
+        if (tenantIsAbsent(tenantDescriptor)) {
             if (tenantDataSourceResolver != null) {
                 DataSourceProperties dataSourceProperties;
                 try {
-                    dataSourceProperties = tenantDataSourceResolver.apply(tenant);
-                    log.debug("[d] Datasource properties resolved for tenant ID '{}'", tenant);
+                    dataSourceProperties = tenantDataSourceResolver.apply(tenantDescriptor);
+                    log.debug("[d] Datasource properties resolved for tenantDescriptor ID '{}'", tenantDescriptor.tenantId());
                 } catch (Exception e) {
-                    throw new NoSuchTenantException("Could not resolve the tenant!");
+                    throw new NoSuchTenantException("Could not resolve the tenantDescriptor!");
                 }
 
-                addTenant(tenant, dataSourceProperties);
+                addTenant(tenantDescriptor, dataSourceProperties);
             }
         }
 
-        log.debug("[d] Tenant '{}' set as current.", tenant);
+        log.debug("[d] Tenant '{}' set as current.", tenantDescriptor);
     }
 
-    public void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
+    /**
+     * Registers a dataSource for a tenantDescriptor and logs an error when an exception is thrown
+     * @param tenantDescriptor the descriptor of the tenant
+     * @param dataSourceProperties the properties for the datasource that needs to be registered
+     */
+    public void addTenant(TenantDescriptor tenantDescriptor, DataSourceProperties dataSourceProperties) {
         DataSource dataSource = DataSourceBuilder.create()
                                                  .driverClassName(dataSourceProperties.getDriverClassName())
                                                  .url(dataSourceProperties.getUrl())
@@ -124,22 +133,32 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
                                                  .password(dataSourceProperties.getPassword())
                                                  .build();
         try (Connection c = dataSource.getConnection()) {
-            tenantDataSources.put(tenant, dataSource);
+            tenantDataSources.put(tenantDescriptor, dataSource);
             multiTenantDataSource.afterPropertiesSet();
-            log.debug("[d] Tenant '{}' added.", tenant);
+            log.debug("[d] Tenant '{}' added.", tenantDescriptor);
         } catch (SQLException t) {
-            log.error("[d] Could not add tenant '{}'", tenant, t);
+            log.error("[d] Could not add tenantDescriptor '{}'", tenantDescriptor, t);
         }
     }
 
-    public DataSource removeTenant(TenantDescriptor tenant) {
-        Object removedDataSource = tenantDataSources.remove(tenant);
+    /**
+     * Unregisters the tenants dataSource
+     * @param tenantDescriptor the descriptor of the tenant
+     * @return the DataSource that was removed
+     */
+    public DataSource removeTenant(TenantDescriptor tenantDescriptor) {
+        Object removedDataSource = tenantDataSources.remove(tenantDescriptor);
         multiTenantDataSource.afterPropertiesSet();
         return (DataSource) removedDataSource;
     }
 
-    public boolean tenantIsAbsent(TenantDescriptor tenant) {
-        return !tenantDataSources.containsKey(tenant);
+    /**
+     * Checks if the tenant datasource is not registered
+     * @param tenantDescriptor
+     * @return true is the tenant datasource is not registered
+     */
+    public boolean tenantIsAbsent(TenantDescriptor tenantDescriptor) {
+        return !tenantDataSources.containsKey(tenantDescriptor);
     }
 
     private DataSource defaultDataSource() {
@@ -151,12 +170,25 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         return defaultDataSource;
     }
 
+    /**
+     * Registers the given {@code tenantDescriptor}.
+     *
+     * @param tenantDescriptor The tenantDescriptor to register
+     * @return a Registration, which may be used to unregister the tenantDescriptor datasource
+     */
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         register(tenantDescriptor);
         return () -> removeTenant(tenantDescriptor) != null;
     }
 
+
+    /**
+     * Registers and starts the given {@code tenantDescriptor}.
+     *
+     * @param tenantDescriptor The tenantDescriptor to register
+     * @return a Registration, which may be used to unregister the tenantDescriptor datasource
+     */
     @Override
     public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         return registerTenant(tenantDescriptor);

@@ -186,7 +186,7 @@ public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwa
 
     /**
      * Register the given {@code tenant} as a local segment. Tenants can be only registered prior to starting the
-     * processor. To register and start a tenant durring runtime, use {@link #registerAndStartTenant(TenantDescriptor)}
+     * processor. To register and start a tenant during runtime, use {@link #registerAndStartTenant(TenantDescriptor)}
      *
      * @param tenantDescriptor The tenant to register
      * @return a Registration, which may be used to remove the tenant
