@@ -14,6 +14,7 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -24,34 +25,20 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>axon-multitenancy</artifactId>
+    <artifactId>multitenancy-spring-boot-starter</artifactId>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-
-        <axon.version>4.6.0-SNAPSHOT</axon.version>
-        <junit.jupiter.version>5.7.2</junit.jupiter.version>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
     </properties>
+
 
     <dependencies>
         <dependency>
-            <groupId>org.axonframework</groupId>
-            <artifactId>axon-messaging</artifactId>
-            <scope>provided</scope>
-            <version>${axon.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.axonframework</groupId>
-            <artifactId>axon-configuration</artifactId>
-            <scope>provided</scope>
-            <version>${axon.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.jupiter.version}</version>
-            <scope>compile</scope>
+            <artifactId>axon-multitenancy-parent</artifactId>
+            <groupId>org.axonframework.extensions.multitenancy</groupId>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
+
 </project>
