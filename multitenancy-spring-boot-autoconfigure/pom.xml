@@ -35,7 +35,7 @@
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <spring.web.version>5.3.9</spring.web.version>
+        <spring.web.version>5.3.22</spring.web.version>
     </properties>
 
     <dependencies>
