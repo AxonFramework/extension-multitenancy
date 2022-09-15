@@ -49,8 +49,8 @@
 
     <dependencies>
         <dependency>
-            <artifactId>axon-multitenancy-parent</artifactId>
             <groupId>org.axonframework.extensions.multitenancy</groupId>
+            <artifactId>multitenancy-spring-boot-autoconfigure</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
