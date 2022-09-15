@@ -14,20 +14,18 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starters</artifactId>
         <version>2.2.13.RELEASE</version>
-        <relativePath/>
+        <relativePath />
     </parent>
 
     <groupId>org.axonframework.extensions.multitenancy</groupId>
     <artifactId>multitenancy-spring-boot-starter</artifactId>
-    <version>4.6.0-SNAPSHOT</version>
+    <version>4.6.0</version>
 
     <name>Spring Boot Starter module for Axon Framework Multi-Tenancy Extension</name>
 
@@ -156,6 +154,6 @@
         <connection>scm:git:git://github.com/AxonFramework/extension-multitenancy.git</connection>
         <developerConnection>scm:git:git@github.com:AxonFramework/extension-multitenancy.git</developerConnection>
         <url>https://github.com/AxonFramework/extension-multitenancy</url>
-        <tag>HEAD</tag>
+        <tag>axon-multitenancy-4.6.0</tag>
     </scm>
 </project>
