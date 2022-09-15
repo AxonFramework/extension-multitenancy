@@ -14,13 +14,14 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <parent>
         <artifactId>axon-multitenancy-parent</artifactId>
         <groupId>org.axonframework.extensions.multitenancy</groupId>
         <version>4.6.1-SNAPSHOT</version>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
     <artifactId>multitenancy-spring-boot-autoconfigure</artifactId>
 
@@ -31,9 +32,8 @@
     </description>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
         <spring.web.version>5.3.23</spring.web.version>
+        <assertj.core.version>3.23.1</assertj.core.version>
     </properties>
 
     <dependencies>
@@ -42,56 +42,41 @@
             <artifactId>axon-multitenancy</artifactId>
             <version>${project.version}</version>
         </dependency>
-
+        <!-- Axon -->
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-messaging</artifactId>
-            <version>${axon.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-configuration</artifactId>
-            <version>${axon.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-server-connector</artifactId>
-            <version>${axon.version}</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-spring</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-spring-boot-autoconfigure</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Spring -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
             <version>${spring.boot.version}</version>
             <optional>true</optional>
         </dependency>
-
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-web</artifactId>
             <version>${spring.web.version}</version>
             <optional>true</optional>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-test-autoconfigure</artifactId>
-            <version>${spring.boot.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.axonframework</groupId>
-            <artifactId>axon-spring</artifactId>
-            <version>${axon.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.axonframework</groupId>
-            <artifactId>axon-spring-boot-autoconfigure</artifactId>
-            <version>${axon.version}</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
@@ -99,10 +84,10 @@
             <version>${spring.web.version}</version>
             <scope>compile</scope>
         </dependency>
+        <!-- Test -->
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>${mockito.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -113,7 +98,7 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
-            <version>3.23.1</version>
+            <version>${assertj.core.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -122,6 +107,11 @@
             <version>${spring.boot.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-test-autoconfigure</artifactId>
+            <version>${spring.boot.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
-
 </project>

@@ -28,6 +28,7 @@
     <version>4.6.1-SNAPSHOT</version>
 
     <name>Spring Boot Starter module for Axon Framework Multi-Tenancy Extension</name>
+    <description>Spring Boot Starter module for the Multi-Tenancy Extension of Axon Framework</description>
 
     <organization>
         <name>AxonIQ B.V.</name>
