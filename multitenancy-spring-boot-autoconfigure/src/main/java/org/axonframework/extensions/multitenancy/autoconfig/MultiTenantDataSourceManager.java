@@ -117,42 +117,42 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
      * Registers a tenantDescriptor data source if the tenantDescriptor data source has not already been registered, using the {@link TenantDescriptor}
      * @param tenantDescriptor the descriptor of the tenant
      */
-    public void register(TenantDescriptor tenantDescriptor) {
-        if (tenantIsAbsent(tenantDescriptor)) {
+    private void register(TenantDescriptor tenant) {
+        if (tenantIsAbsent(tenant)) {
             if (tenantDataSourceResolver != null) {
                 DataSourceProperties dataSourceProperties;
                 try {
-                    dataSourceProperties = tenantDataSourceResolver.apply(tenantDescriptor);
-                    log.debug("[d] Datasource properties resolved for tenantDescriptor ID '{}'", tenantDescriptor.tenantId());
+                    dataSourceProperties = tenantDataSourceResolver.apply(tenant);
+                    log.debug("[d] Datasource properties resolved for tenant descriptor [{}]", tenant);
                 } catch (Exception e) {
-                    throw new NoSuchTenantException("Could not resolve the tenantDescriptor!");
+                    throw new NoSuchTenantException("Could not resolve the tenant!");
                 }
 
-                addTenant(tenantDescriptor, dataSourceProperties);
+                addTenant(tenant, dataSourceProperties);
             }
         }
 
-        log.debug("[d] Tenant '{}' set as current.", tenantDescriptor);
+        log.debug("[d] Tenant [{}] set as current.", tenant);
     }
 
     /**
      * Registers a dataSource for a tenantDescriptor and logs an error when an exception is thrown
-     * @param tenantDescriptor the descriptor of the tenant
+     * @param tenant the descriptor of the tenant
      * @param dataSourceProperties the properties for the datasource that needs to be registered
      */
-    public void addTenant(TenantDescriptor tenantDescriptor, DataSourceProperties dataSourceProperties) {
+    private void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
         DataSource dataSource = DataSourceBuilder.create()
                                                  .driverClassName(dataSourceProperties.getDriverClassName())
                                                  .url(dataSourceProperties.getUrl())
                                                  .username(dataSourceProperties.getUsername())
                                                  .password(dataSourceProperties.getPassword())
                                                  .build();
-        try (Connection c = dataSource.getConnection()) {
-            tenantDataSources.put(tenantDescriptor, dataSource);
+        try (Connection ignored = dataSource.getConnection()) {
+            tenantDataSources.put(tenant, dataSource);
             multiTenantDataSource.afterPropertiesSet();
-            log.debug("[d] Tenant '{}' added.", tenantDescriptor);
+            log.debug("[d] Tenant '{}' added.", tenant);
         } catch (SQLException t) {
-            log.error("[d] Could not add tenantDescriptor '{}'", tenantDescriptor, t);
+            log.error("[d] Could not add tenant '{}'", tenant, t);
         }
     }
 
@@ -174,6 +174,10 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
      */
     public boolean tenantIsAbsent(TenantDescriptor tenantDescriptor) {
         return !tenantDataSources.containsKey(tenantDescriptor);
+    }
+
+    public AbstractRoutingDataSource getMultiTenantDataSource() {
+        return multiTenantDataSource;
     }
 
     private DataSource defaultDataSource() {

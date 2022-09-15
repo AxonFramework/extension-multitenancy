@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.axonframework.extensions.multitenancy.autoconfig;
 
-import io.axoniq.axonserver.connector.ResultStream;
 import io.axoniq.axonserver.grpc.admin.ContextOverview;
 import io.axoniq.axonserver.grpc.admin.ContextUpdate;
 import org.axonframework.axonserver.connector.AxonServerConnectionManager;
@@ -40,14 +40,13 @@ import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
 
 /**
- * Axon Server implementation of {@link TenantProvider}
+ * Axon Cloud implementation of {@link TenantProvider}
  *
  * @author Stefan Dragisic
- * @since 4.6.0
  */
-public class AxonServerTenantProvider implements TenantProvider {
+public class CloudTenantProvider implements TenantProvider {
 
-    private static final Logger logger = LoggerFactory.getLogger(AxonServerTenantProvider.class);
+    private static final Logger logger = LoggerFactory.getLogger(CloudTenantProvider.class);
 
     private final List<MultiTenantAwareComponent> tenantAwareComponents = new CopyOnWriteArrayList<>();
 
@@ -55,12 +54,12 @@ public class AxonServerTenantProvider implements TenantProvider {
     private final String preDefinedContexts;
     private final TenantConnectPredicate tenantConnectPredicate;
     private final AxonServerConnectionManager axonServerConnectionManager;
-    private final String ADMIN_CTX = "_admin";
     private ConcurrentHashMap<TenantDescriptor, List<Registration>> registrationMap = new ConcurrentHashMap<>();
 
-    public AxonServerTenantProvider(String preDefinedContexts,
-                                    TenantConnectPredicate tenantConnectPredicate,
-                                    AxonServerConnectionManager axonServerConnectionManager) {
+    public CloudTenantProvider(String preDefinedContexts,
+                               TenantConnectPredicate tenantConnectPredicate,
+                               //restTemplate
+                               AxonServerConnectionManager axonServerConnectionManager) {
         this.preDefinedContexts = preDefinedContexts;
         this.tenantConnectPredicate = tenantConnectPredicate;
         this.axonServerConnectionManager = axonServerConnectionManager;
@@ -92,41 +91,43 @@ public class AxonServerTenantProvider implements TenantProvider {
     }
 
     private void subscribeToUpdates() {
-        try {
-            ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
-                    .getConnection(ADMIN_CTX)
-                    .adminChannel()
-                    .subscribeToContextUpdates();
+        //how to subscribe from java to SSE, server sent events (/api/space/{spaceId}/context/updates)
+ //      try {
+            //call -> /api/space/{spaceId}/context/updates
+            //get space id from context name, split by @ second part is spaceId
+//            ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
+//                    .getConnection(ADMIN_CTX)
+//                    .adminChannel()
+//                    .subscribeToContextUpdates();
 
-            contextUpdatesStream.onAvailable(() -> {
-                try {
-                    ContextUpdate contextUpdate = contextUpdatesStream.nextIfAvailable();
-                    if (contextUpdate != null) {
-                        switch (contextUpdate.getType()) {
-                            case CREATED:
-                                handleContextCreated(contextUpdate);
-                                break;
-                            case DELETED:
-                                removeTenant(TenantDescriptor.tenantWithId(contextUpdate.getContext()));
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
-                }
-            });
-        } catch (Exception e) {
-            logger.error("Error while subscribing to context updates", e);
-        }
+
+//            contextUpdatesStream.onAvailable(() -> {
+
+        //     THIS PART IS THE SAME no need to change
+//                try {
+//                    ContextUpdate contextUpdate = contextUpdatesStream.nextIfAvailable();
+//                    if (contextUpdate != null) {
+//                        switch (contextUpdate.getType()) {
+//                            case CREATED:
+//                                handleContextCreated(contextUpdate);
+//                                break;
+//                            case DELETED:
+//                                removeTenant(TenantDescriptor.tenantWithId(contextUpdate.getContext()));
+//                        }
+//                    }
+//                } catch (Exception e) {
+//                    logger.error(e.getMessage(), e);
+//                }
+//            });
+//        } catch (Exception e) {
+//            logger.error("Error while subscribing to context updates", e);
+//        }
     }
 
     private void handleContextCreated(ContextUpdate contextUpdate) {
         try {
-            TenantDescriptor newTenant = toTenantDescriptor(axonServerConnectionManager.getConnection(
-                                                                                               ADMIN_CTX)
-                                                                                       .adminChannel()
-                                                                                       .getContextOverview(
-                                                                                               contextUpdate.getContext())
-                                                                                       .get());
+            ContextOverview contextOverview = null; //call /api/space/{spaceId}/context/{id}
+            TenantDescriptor newTenant = toTenantDescriptor(contextOverview);
             if (tenantConnectPredicate.test(newTenant) && !tenantDescriptors.contains(newTenant)) {
                 addTenant(newTenant);
             }
@@ -142,20 +143,40 @@ public class AxonServerTenantProvider implements TenantProvider {
 
 
     private List<TenantDescriptor> getTenantsAPI() {
-        return axonServerConnectionManager.getConnection(ADMIN_CTX)
-                                          .adminChannel()
-                                          .getAllContexts()
-                                          .join()
-                                          .stream()
-                                          .map(this::toTenantDescriptor)
-                                          .filter(tenantConnectPredicate)
-                                          .collect(Collectors.toList());
+        //call rest endpoint /api/space/{spaceId}/context and return list of TenantDescriptors
+
+        //this you will not need
+//        return axonServerConnectionManager.getConnection(ADMIN_CTX)
+//                                          .adminChannel()
+//                                          .getAllContexts()
+//                                          .join()
+//                                          .stream()
+
+        //this you will need
+//                                          .map(this::toTenantDescriptor)
+//                                          .filter(tenantConnectPredicate)
+//                                          .collect(Collectors.toList());
+        return null;
     }
 
     private TenantDescriptor toTenantDescriptor(ContextOverview context) {
+
+        //put to meta data ->
+//        "contextId": "string",
+//                "contextName": "string",
+//                "spaceId": "string",
+//                "type": "string",
+//                "free": true,
+//                "contextStatus": "string",
+//                "region": "string",
+//                "creationTime": "2022-07-15T10:16:37.710Z",
+//                "scheduledCleanupTime": "2022-07-15T10:16:37.710Z",
+//                "clusterId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+//                "contextClusterType": "string"
+
         return new TenantDescriptor(context.getName(),
-                                    context.getMetaDataMap(),
-                                    context.getReplicationGroup().getName());
+                                    context.getMetaDataMap(), // <---------
+                                    "");
     }
 
     protected void addTenant(TenantDescriptor tenantDescriptor) {

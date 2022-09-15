@@ -18,6 +18,7 @@ package org.axonframework.extensions.multitenancy.components.queryhandeling;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.MultiTenantDispatchInterceptorSupport;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -30,7 +31,6 @@ import org.axonframework.queryhandling.SubscriptionQueryMessage;
 import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
 import org.axonframework.queryhandling.UpdateHandlerRegistration;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,7 +47,8 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * @author Stefan Dragisic
  * @since 4.6.0
  */
-public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent {
+public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent,
+        MultiTenantDispatchInterceptorSupport<SubscriptionQueryUpdateMessage<?>, QueryUpdateEmitter> {
 
     private final Map<TenantDescriptor, QueryUpdateEmitter> tenantSegments = new ConcurrentHashMap<>();
 
@@ -55,8 +56,6 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
 
     private final Map<TenantDescriptor, List<UpdateHandlerRegistration<?>>> updateHandlersRegistration = new ConcurrentHashMap<>();
-
-    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
 
     private final TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<Message<?>> targetTenantResolver;
@@ -73,23 +72,6 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     }
 
     @Override
-    public Registration registerDispatchInterceptor(
-            MessageDispatchInterceptor<? super SubscriptionQueryUpdateMessage<?>> dispatchInterceptor) {
-        dispatchInterceptors.add(dispatchInterceptor);
-        tenantSegments.forEach((tenant, bus) ->
-                                       dispatchInterceptorsRegistration
-                                               .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                                               .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
-
-        return () -> dispatchInterceptorsRegistration.values()
-                                                     .stream()
-                                                     .flatMap(Collection::stream)
-                                                     .map(Registration::cancel)
-                                                     .reduce((prev, acc) -> prev && acc)
-                                                     .orElse(false);
-    }
-
-    @Override
     public <U> void emit(Predicate<SubscriptionQueryMessage<?, ?, U>> filter,
                          SubscriptionQueryUpdateMessage<U> update) {
         QueryUpdateEmitter tenantEmitter = resolveTenant(update);
@@ -98,7 +80,12 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     @Override
     public <U> void emit(Predicate<SubscriptionQueryMessage<?, ?, U>> filter, U update) {
-        Message<?> message = CurrentUnitOfWork.get().getMessage();
+        Message<?> message;
+        if (update instanceof Message) {
+            message = (Message<?>) update;
+        } else {
+            message = CurrentUnitOfWork.get().getMessage();
+        }
         if (message != null) {
             QueryUpdateEmitter tenantEmitter = resolveTenant(message);
             tenantEmitter.emit(filter, update);
@@ -115,7 +102,12 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     @Override
     public <Q, U> void emit(Class<Q> queryType, Predicate<? super Q> filter, U update) {
-        Message<?> message = CurrentUnitOfWork.get().getMessage();
+        Message<?> message;
+        if (update instanceof Message) {
+            message = (Message<?>) update;
+        } else {
+            message = CurrentUnitOfWork.get().getMessage();
+        }
         if (message != null) {
             QueryUpdateEmitter tenantEmitter = resolveTenant(message);
             tenantEmitter.emit(queryType, filter, update);
@@ -171,7 +163,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         updateHandlersRegistration
                 .computeIfAbsent(targetTenantResolver.resolveTenant(query, tenantSegments.keySet()),
                                  t -> new CopyOnWriteArrayList<>())
-                .add(queryUpdateEmitter.registerUpdateHandler(query, updateBufferSize));
+                .add(updateHandlerRegistration);
 
         return updateHandlerRegistration;
     }
@@ -192,13 +184,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
 
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
-        QueryUpdateEmitter tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
-        tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
-
-        return () -> {
-            QueryUpdateEmitter delegate = unregisterTenant(tenantDescriptor);
-            return delegate != null;
-        };
+        return registerAndStartTenant(tenantDescriptor);
     }
 
 
@@ -218,7 +204,6 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
             registrations.forEach(Registration::cancel);
         }
 
-        subscribeRegistrations.remove(tenantDescriptor).cancel();
         return tenantSegments.remove(tenantDescriptor);
     }
 
@@ -227,11 +212,11 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         tenantSegments.computeIfAbsent(tenantDescriptor, tenant -> {
             QueryUpdateEmitter tenantSegment = tenantSegmentFactory.apply(tenant);
 
-            dispatchInterceptors.forEach(handlerInterceptor ->
+            dispatchInterceptors.forEach(dispatchInterceptor ->
                                                  dispatchInterceptorsRegistration
                                                          .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
                                                          .add(tenantSegment.registerDispatchInterceptor(
-                                                                 handlerInterceptor)));
+                                                                 dispatchInterceptor)));
 
             return tenantSegment;
         });
@@ -240,6 +225,21 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
             QueryUpdateEmitter delegate = unregisterTenant(tenantDescriptor);
             return delegate != null;
         };
+    }
+
+    @Override
+    public Map<TenantDescriptor, QueryUpdateEmitter> tenantSegments() {
+        return tenantSegments;
+    }
+
+    @Override
+    public List<MessageDispatchInterceptor<? super SubscriptionQueryUpdateMessage<?>>> getDispatchInterceptors() {
+        return dispatchInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getDispatchInterceptorsRegistration() {
+        return dispatchInterceptorsRegistration;
     }
 
     public static class Builder {

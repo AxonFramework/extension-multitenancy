@@ -18,6 +18,8 @@ package org.axonframework.extensions.multitenancy.components.queryhandeling;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.components.MultiTenantDispatchInterceptorSupport;
+import org.axonframework.extensions.multitenancy.components.MultiTenantHandlerInterceptorSupport;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -25,6 +27,7 @@ import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
+import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryResponseMessage;
@@ -37,7 +40,6 @@ import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
 import org.reactivestreams.Publisher;
 
 import java.lang.reflect.Type;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -60,7 +62,9 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * @author Steven van Beelen
  * @since 4.6.0
  */
-public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent {
+public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
+        MultiTenantDispatchInterceptorSupport<QueryMessage<?, ?>, QueryBus>,
+        MultiTenantHandlerInterceptorSupport<QueryMessage<?, ?>, QueryBus> {
 
     private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, QuerySubscription<?>> handlers = new ConcurrentHashMap<>();
@@ -121,38 +125,6 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
     }
 
     @Override
-    public Registration registerDispatchInterceptor(MessageDispatchInterceptor<? super QueryMessage<?, ?>> dispatchInterceptor) {
-        dispatchInterceptors.add(dispatchInterceptor);
-        tenantSegments.forEach((tenant, bus) ->
-                dispatchInterceptorsRegistration
-                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                        .add(bus.registerDispatchInterceptor(dispatchInterceptor)));
-
-        return () -> dispatchInterceptorsRegistration.values()
-                .stream()
-                .flatMap(Collection::stream)
-                .map(Registration::cancel)
-                .reduce((prev, acc) -> prev && acc)
-                .orElse(false);
-    }
-
-    @Override
-    public Registration registerHandlerInterceptor(MessageHandlerInterceptor<? super QueryMessage<?, ?>> handlerInterceptor) {
-        handlerInterceptors.add(handlerInterceptor);
-        tenantSegments.forEach((tenant, bus) ->
-                handlerInterceptorsRegistration
-                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                        .add(bus.registerHandlerInterceptor(handlerInterceptor)));
-
-        return () -> handlerInterceptorsRegistration.values()
-                .stream()
-                .flatMap(Collection::stream)
-                .map(Registration::cancel)
-                .reduce((prev, acc) -> prev && acc)
-                .orElse(false);
-    }
-
-    @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         QueryBus tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
         tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
@@ -165,12 +137,20 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
     public QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {
         List<Registration> registrations = handlerInterceptorsRegistration.remove(tenantDescriptor);
-        if (registrations != null) registrations.forEach(Registration::cancel);
+        if (registrations != null) {
+            registrations.forEach(Registration::cancel);
+        }
 
         registrations = dispatchInterceptorsRegistration.remove(tenantDescriptor);
-        if (registrations != null) registrations.forEach(Registration::cancel);
+        if (registrations != null) {
+            registrations.forEach(Registration::cancel);
+        }
 
-        subscribeRegistrations.remove(tenantDescriptor).cancel();
+        Registration removed = subscribeRegistrations.remove(tenantDescriptor);
+        if (removed != null) {
+            removed.cancel();
+        }
+
         return tenantSegments.remove(tenantDescriptor);
     }
 
@@ -187,13 +167,13 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
             handlerInterceptors.forEach(handlerInterceptor ->
                                                 handlerInterceptorsRegistration
-                            .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
-                            .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
+                                                        .computeIfAbsent(tenant, t -> new CopyOnWriteArrayList<>())
+                                                        .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
 
             handlers.forEach((queryName, querySubscription) ->
-                    subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(queryName,
-                            querySubscription.getResponseType(),
-                            querySubscription.getQueryHandler())));
+                                     subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(queryName,
+                                                                                                                  querySubscription.getResponseType(),
+                                                                                                                  querySubscription.getQueryHandler())));
 
             return tenantSegment;
         });
@@ -227,8 +207,8 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
     @Override
     public QueryUpdateEmitter queryUpdateEmitter() {
-        throw new UnsupportedOperationException("MultiTenantQueryBus does not have query update emitter. "
-                                                        + "Use queryUpdateEmitter(TenantDescriptor tenantDescriptor) instead.");
+        return resolveTenant((QueryMessage<?, ?>) CurrentUnitOfWork.get().getMessage())
+                .queryUpdateEmitter();
     }
 
     /**
@@ -238,6 +218,31 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
     public QueryUpdateEmitter queryUpdateEmitter(TenantDescriptor tenantDescriptor) {
         return tenantSegments.get(tenantDescriptor)
                              .queryUpdateEmitter();
+    }
+
+    @Override
+    public Map<TenantDescriptor, QueryBus> tenantSegments() {
+        return tenantSegments;
+    }
+
+    @Override
+    public List<MessageHandlerInterceptor<? super QueryMessage<?, ?>>> getHandlerInterceptors() {
+        return handlerInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getHandlerInterceptorsRegistration() {
+        return handlerInterceptorsRegistration;
+    }
+
+    @Override
+    public List<MessageDispatchInterceptor<? super QueryMessage<?, ?>>> getDispatchInterceptors() {
+        return dispatchInterceptors;
+    }
+
+    @Override
+    public Map<TenantDescriptor, List<Registration>> getDispatchInterceptorsRegistration() {
+        return dispatchInterceptorsRegistration;
     }
 
     public static class Builder {

@@ -94,16 +94,16 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                                                              AxonServerConnectionManager connectionManager) {
 
         return tenantDescriptor -> AxonServerCommandBus.builder()
-                .localSegment(localSegment)
-                .serializer(messageSerializer)
-                .routingStrategy(routingStrategy)
-                .priorityCalculator(priorityCalculator)
-                .loadFactorProvider(loadFactorProvider)
-                .targetContextResolver(targetContextResolver)
-                .axonServerConnectionManager(connectionManager)
-                .configuration(axonServerConfiguration)
-                .defaultContext(tenantDescriptor.tenantId())
-                .build();
+                                                       .localSegment(localSegment)
+                                                       .serializer(messageSerializer)
+                                                       .routingStrategy(routingStrategy)
+                                                       .priorityCalculator(priorityCalculator)
+                                                       .loadFactorProvider(loadFactorProvider)
+                                                       .targetContextResolver(targetContextResolver)
+                                                       .axonServerConnectionManager(connectionManager)
+                                                       .configuration(axonServerConfiguration)
+                                                       .defaultContext(tenantDescriptor.tenantId())
+                                                       .build();
     }
 
 
@@ -206,10 +206,15 @@ public class MultiTenancyAxonServerAutoConfiguration {
 
     @Bean
     public EventProcessorInfoConfiguration processorInfoConfiguration(
+            TenantProvider tenantProvider,
             AxonServerConnectionManager connectionManager) {
-        return new EventProcessorInfoConfiguration(c -> new MultiTenantEventProcessorControlService(
-                connectionManager,
-                c.eventProcessingConfiguration(),
-                c.getComponent(AxonServerConfiguration.class)));
+        return new EventProcessorInfoConfiguration(c -> {
+            MultiTenantEventProcessorControlService controlService = new MultiTenantEventProcessorControlService(
+                    connectionManager,
+                    c.eventProcessingConfiguration(),
+                    c.getComponent(AxonServerConfiguration.class));
+            tenantProvider.subscribe(controlService);
+            return controlService;
+        });
     }
 }

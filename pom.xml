@@ -35,12 +35,12 @@
         systems.
     </description>
 
-    <inceptionYear>2020</inceptionYear>
+    <inceptionYear>2022</inceptionYear>
     <url>https://axoniq.io/</url>
     <licenses>
         <license>
             <name>Apache 2.0</name>
-            <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
     </licenses>
     <issueManagement>
@@ -58,7 +58,7 @@
 
         <slf4j.version>1.7.28</slf4j.version>
         <log4j.version>2.13.0</log4j.version>
-        <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
+        <jacoco-maven-plugin.version>0.8.8</jacoco-maven-plugin.version>
 
         <junit.jupiter.version>5.9.0</junit.jupiter.version>
         <mockito.version>4.8.0</mockito.version>
@@ -367,35 +367,8 @@
 
     <developers>
         <developer>
-            <name>Allard Buijze</name>
-            <email>allard.buijze@axoniq.io</email>
-            <organization>AxonIQ</organization>
-            <organizationUrl>https://axoniq.io</organizationUrl>
-            <roles>
-                <role>Project Owner</role>
-            </roles>
-        </developer>
-        <developer>
             <name>Stefan Dragisic</name>
             <email>stefan.dragisic@axoniq.io</email>
-            <organization>AxonIQ</organization>
-            <organizationUrl>https://axoniq.io</organizationUrl>
-            <roles>
-                <role>Committer</role>
-            </roles>
-        </developer>
-        <developer>
-            <name>Milan Savic</name>
-            <email>milan.savic@axoniq.io</email>
-            <organization>AxonIQ</organization>
-            <organizationUrl>https://axoniq.io</organizationUrl>
-            <roles>
-                <role>Committer</role>
-            </roles>
-        </developer>
-        <developer>
-            <name>Sara Pellegrini</name>
-            <email>sara.pellegrini@axoniq.io</email>
             <organization>AxonIQ</organization>
             <organizationUrl>https://axoniq.io</organizationUrl>
             <roles>

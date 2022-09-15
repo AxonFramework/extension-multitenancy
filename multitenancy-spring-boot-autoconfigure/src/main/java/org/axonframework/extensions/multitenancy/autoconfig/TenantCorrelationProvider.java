@@ -23,7 +23,6 @@ import java.util.Map;
 
 /**
  * Default implementation of {@link CorrelationDataProvider} that provides the tenant identifier as a correlation.
- * <p>
  *
  * @author Stefan Dragisic
  * @since 4.6.0

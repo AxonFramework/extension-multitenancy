@@ -22,7 +22,6 @@ import java.util.List;
 /**
  * Registers new and manages currently registered tenants and {@link MultiTenantAwareComponent} components. If
  * configured monitors tenants changes and updates the {@link MultiTenantAwareComponent} components accordingly.
- * <p>
  *
  * @author Stefan Dragisic
  * @since 4.6.0

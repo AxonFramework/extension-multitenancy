@@ -60,7 +60,7 @@ public class MultiTenantEventProcessorControlService extends EventProcessorContr
                                                     if (processor instanceof MultiTenantEventProcessor) {
                                                         return;
                                                     }
-                                                    String ctx = name.substring(name.lastIndexOf("@") + 1);
+                                                    String ctx = name.substring(name.indexOf("@") + 1);
                                                     ControlChannel ch = axonServerConnectionManager.getConnection(ctx)
                                                                                                    .controlChannel();
                                                     ch.registerEventProcessor(name,
@@ -84,6 +84,10 @@ public class MultiTenantEventProcessorControlService extends EventProcessorContr
             eventProcessingConfiguration.eventProcessors()
                                         .forEach(
                                                 (name, processor) -> {
+                                                    if (processor instanceof MultiTenantEventProcessor
+                                                            || !name.contains(tenantDescriptor.tenantId())) {
+                                                        return;
+                                                    }
                                                     ControlChannel ch = axonServerConnectionManager.getConnection(
                                                                                                            tenantDescriptor.tenantId())
                                                                                                    .controlChannel();
