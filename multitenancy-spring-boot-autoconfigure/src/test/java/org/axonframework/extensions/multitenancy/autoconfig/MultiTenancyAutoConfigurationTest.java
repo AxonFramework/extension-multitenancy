@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,6 @@
 
 package org.axonframework.extensions.multitenancy.autoconfig;
 
-import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
-import org.axonframework.axonserver.connector.processor.EventProcessorControlService;
-import org.axonframework.config.Component;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -29,13 +26,13 @@ import org.axonframework.extensions.multitenancy.components.eventstore.TenantEve
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
-import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
 import org.axonframework.springboot.autoconfig.AxonAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration;
+import org.axonframework.springboot.autoconfig.AxonTracingAutoConfiguration;
 import org.axonframework.springboot.autoconfig.EventProcessingAutoConfiguration;
 import org.axonframework.springboot.autoconfig.InfraConfiguration;
 import org.axonframework.springboot.autoconfig.NoOpTransactionAutoConfiguration;
@@ -58,9 +55,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
+ * Test class validating the Multi-Tenancy auto-configuration.
+ *
  * @author Stefan Dragisic
  */
-
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration
 @EnableAutoConfiguration
@@ -79,51 +77,50 @@ class MultiTenancyAutoConfigurationTest {
                             NoOpTransactionAutoConfiguration.class,
                             ObjectMapperAutoConfiguration.class,
                             TransactionAutoConfiguration.class,
-                            XStreamAutoConfiguration.class
+                            XStreamAutoConfiguration.class,
+                            AxonTracingAutoConfiguration.class
                     ));
 
     @Test
     void multiTenancyAutoConfiguration() {
-        this.contextRunner
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
-                .run(context -> {
-                    assertThat(context).getBean("tenantFilterPredicate")
-                                       .isInstanceOf(TenantConnectPredicate.class);
-                    assertThat(context).getBean("targetTenantResolver")
-                                       .isInstanceOf(TargetTenantResolver.class);
-                    assertThat(context).getBean("tenantCorrelationProvider")
-                                       .isInstanceOf(CorrelationDataProvider.class);
-                    assertThat(context).getBean("multiTenantEventProcessingModule")
-                                       .isExactlyInstanceOf(MultiTenantEventProcessingModule.class);
-                    assertThat(context).getBean("multiTenantCommandBus")
-                                       .isExactlyInstanceOf(MultiTenantCommandBus.class);
-                    assertThat(context).getBean("multiTenantQueryBus")
-                                       .isExactlyInstanceOf(MultiTenantQueryBus.class);
-                    assertThat(context).getBean("multiTenantEventStore")
-                                       .isExactlyInstanceOf(MultiTenantEventStore.class);
-                });
+        contextRunner.withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
+                     .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
+                     .run(context -> {
+                         assertThat(context).getBean("tenantFilterPredicate")
+                                            .isInstanceOf(TenantConnectPredicate.class);
+                         assertThat(context).getBean("targetTenantResolver")
+                                            .isInstanceOf(TargetTenantResolver.class);
+                         assertThat(context).getBean("tenantCorrelationProvider")
+                                            .isInstanceOf(CorrelationDataProvider.class);
+                         assertThat(context).getBean("multiTenantEventProcessingModule")
+                                            .isExactlyInstanceOf(MultiTenantEventProcessingModule.class);
+                         assertThat(context).getBean("multiTenantCommandBus")
+                                            .isExactlyInstanceOf(MultiTenantCommandBus.class);
+                         assertThat(context).getBean("multiTenantQueryBus")
+                                            .isExactlyInstanceOf(MultiTenantQueryBus.class);
+                         assertThat(context).getBean("multiTenantEventStore")
+                                            .isExactlyInstanceOf(MultiTenantEventStore.class);
+                     });
     }
 
     @Test
     void multiTenancyDisabled() {
-        this.contextRunner
-                .withPropertyValues("axon.multi-tenancy.enabled:false")
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
-                .run(context -> {
-                    assertThat(context).doesNotHaveBean(TenantConnectPredicate.class);
-                    assertThat(context).doesNotHaveBean(TargetTenantResolver.class);
-                    assertThat(context).doesNotHaveBean(MultiTenantEventProcessingModule.class);
-                    assertThat(context).doesNotHaveBean(MultiTenantCommandBus.class);
-                    assertThat(context).doesNotHaveBean(MultiTenantEventStore.class);
-                    assertThat(context).doesNotHaveBean(MultiTenantQueryBus.class);
-                    assertThat(context).doesNotHaveBean(AxonServerTenantProvider.class);
-                    assertThat(context).doesNotHaveBean(TenantCommandSegmentFactory.class);
-                    assertThat(context).doesNotHaveBean(TenantQuerySegmentFactory.class);
-                    assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
-                    assertThat(context).doesNotHaveBean(TenantEventSegmentFactory.class);
-                });
+        contextRunner.withPropertyValues("axon.multi-tenancy.enabled:false")
+                     .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
+                     .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
+                     .run(context -> {
+                         assertThat(context).doesNotHaveBean(TenantConnectPredicate.class);
+                         assertThat(context).doesNotHaveBean(TargetTenantResolver.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantEventProcessingModule.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantCommandBus.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantEventStore.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantQueryBus.class);
+                         assertThat(context).doesNotHaveBean(AxonServerTenantProvider.class);
+                         assertThat(context).doesNotHaveBean(TenantCommandSegmentFactory.class);
+                         assertThat(context).doesNotHaveBean(TenantQuerySegmentFactory.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
+                         assertThat(context).doesNotHaveBean(TenantEventSegmentFactory.class);
+                     });
     }
 
     @Test
@@ -133,21 +130,20 @@ class MultiTenancyAutoConfigurationTest {
                         (String) message.getMetaData()
                                         .getOrDefault("USER_CORRELATION_KEY", "unknownTenant")
                 );
-        this.contextRunner
-                .withBean(TargetTenantResolver.class, () -> userResolver)
-                .withPropertyValues("axon.multi-tenancy.use-metadata-helper:false")
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
-                .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
-                .run(context -> {
-                    assertThat(context).doesNotHaveBean("tenantCorrelationProvider");
-                    assertThat(context).getBeanNames(TargetTenantResolver.class)
-                                       .hasSize(1);
-                    assertThat(context).getBean("targetTenantResolver")
-                                       .returns(TargetTenantResolver.class, ttr -> {
-                                           assertEquals(ttr, userResolver);
-                                           return TargetTenantResolver.class;
-                                       });
-                });
+        contextRunner.withBean(TargetTenantResolver.class, () -> userResolver)
+                     .withPropertyValues("axon.multi-tenancy.use-metadata-helper:false")
+                     .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
+                     .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
+                     .run(context -> {
+                         assertThat(context).doesNotHaveBean("tenantCorrelationProvider");
+                         assertThat(context).getBeanNames(TargetTenantResolver.class)
+                                            .hasSize(1);
+                         assertThat(context).getBean("targetTenantResolver")
+                                            .returns(TargetTenantResolver.class, ttr -> {
+                                                assertEquals(ttr, userResolver);
+                                                return TargetTenantResolver.class;
+                                            });
+                     });
     }
 }
 

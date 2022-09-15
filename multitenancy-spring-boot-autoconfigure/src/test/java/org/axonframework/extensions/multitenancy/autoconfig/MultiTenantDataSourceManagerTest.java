@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.springboot.autoconfig.AxonAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration;
+import org.axonframework.springboot.autoconfig.AxonTracingAutoConfiguration;
 import org.axonframework.springboot.autoconfig.EventProcessingAutoConfiguration;
 import org.axonframework.springboot.autoconfig.InfraConfiguration;
 import org.axonframework.springboot.autoconfig.NoOpTransactionAutoConfiguration;
@@ -47,6 +48,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating Multi-Tenancy auto-configuration for the {@code DataSourceManager}.
+ *
  * @author Stefan Dragisic
  */
 @ExtendWith(SpringExtension.class)
@@ -70,11 +73,12 @@ class MultiTenantDataSourceManagerTest {
                             XStreamAutoConfiguration.class,
                             MultiTenancyAxonServerAutoConfiguration.class,
                             MultiTenancyAutoConfiguration.class,
-                            MultiTenantDataSourceManager.class
+                            MultiTenantDataSourceManager.class,
+                            AxonTracingAutoConfiguration.class
                     ));
 
     @Test
-    public void testResolveDefaultDataSource() {
+    void resolveDefaultDataSource() {
         DataSourceProperties dataSourceProperties = mock(DataSourceProperties.class);
         Function<TenantDescriptor, DataSourceProperties> tenantDataSourceResolver =
                 (tenant) -> dataSourceProperties;
@@ -100,23 +104,23 @@ class MultiTenantDataSourceManagerTest {
                 .withBean(TenantProvider.class, () -> tenantProvider)
                 .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
                 .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
-                .run(context -> {
-                    assertThat(context).getBean("multiTenantDataSourceManager")
-                                       .returns(MultiTenantDataSourceManager.class, bean -> {
-                                           MultiTenantDataSourceManager multiTenantDataSourceManager = ((MultiTenantDataSourceManager) bean);
+                .run(context -> assertThat(context)
+                        .getBean("multiTenantDataSourceManager")
+                        .returns(MultiTenantDataSourceManager.class, bean -> {
+                            MultiTenantDataSourceManager multiTenantDataSourceManager = ((MultiTenantDataSourceManager) bean);
 
-                                           verify(tenantProvider).subscribe(multiTenantDataSourceManager);
+                            //noinspection resource
+                            verify(tenantProvider).subscribe(multiTenantDataSourceManager);
 
-                                           DriverManagerDataSource actualDataSource = (DriverManagerDataSource) ((MultiTenantDataSourceManager) bean).getMultiTenantDataSource()
-                                                                                                                                                     .getResolvedDefaultDataSource();
-                                           assertEquals(expectedDataSource.getUrl(), actualDataSource.getUrl());
-                                           assertEquals(expectedDataSource.getUsername(),
-                                                        actualDataSource.getUsername());
-                                           assertEquals(expectedDataSource.getPassword(),
-                                                        actualDataSource.getPassword());
+                            DriverManagerDataSource actualDataSource =
+                                    (DriverManagerDataSource) ((MultiTenantDataSourceManager) bean).getMultiTenantDataSource()
+                                                                                                   .getResolvedDefaultDataSource();
+                            //noinspection ConstantConditions
+                            assertEquals(expectedDataSource.getUrl(), actualDataSource.getUrl());
+                            assertEquals(expectedDataSource.getUsername(), actualDataSource.getUsername());
+                            assertEquals(expectedDataSource.getPassword(), actualDataSource.getPassword());
 
-                                           return MultiTenantDataSourceManager.class;
-                                       });
-                });
+                            return MultiTenantDataSourceManager.class;
+                        }));
     }
 }
