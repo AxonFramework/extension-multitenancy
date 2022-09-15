@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.commandhandeling;
 
 import org.axonframework.commandhandling.CommandBus;
@@ -50,11 +49,10 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
+ * @since 4.6.0
  */
 
-public class MultiTenantCommandBus
-        implements
-        CommandBus, MultiTenantAwareComponent,
+public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<CommandMessage<?>, CommandBus>,
         MultiTenantHandlerInterceptorSupport<CommandMessage<?>, CommandBus> {
 
@@ -63,10 +61,10 @@ public class MultiTenantCommandBus
     private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
     private final TenantCommandSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<CommandMessage<?>> targetTenantResolver;
-    List<MessageDispatchInterceptor<? super CommandMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
-    Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
-    List<MessageHandlerInterceptor<? super CommandMessage<?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
-    Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
+    private final List<MessageDispatchInterceptor<? super CommandMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
+    private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
+    private final List<MessageHandlerInterceptor<? super CommandMessage<?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
+    private final Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
 
     public MultiTenantCommandBus(Builder builder) {
         builder.validate();

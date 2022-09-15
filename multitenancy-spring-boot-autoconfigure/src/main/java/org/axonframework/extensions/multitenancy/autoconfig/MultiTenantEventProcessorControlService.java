@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import io.axoniq.axonserver.connector.control.ControlChannel;
@@ -33,6 +32,7 @@ import org.axonframework.lifecycle.StartHandler;
  * environment in Axon Server dashboard.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantEventProcessorControlService extends EventProcessorControlService
         implements MultiTenantAwareComponent {

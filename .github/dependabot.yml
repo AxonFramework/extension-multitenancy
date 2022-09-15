@@ -1,0 +1,28 @@
+version: 2
+updates:
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 5
+  labels:
+    - "Type: Dependency Upgrade"
+    - "Priority 1: Must"
+    - "Status: In Progress"
+  reviewers:
+    - "schananas" # Main
+    - "gklijs"
+  milestone: 1
+- package-ecosystem: maven
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 5
+  labels:
+    - "Type: Dependency Upgrade"
+    - "Priority 1: Must"
+    - "Status: In Progress"
+  reviewers:
+    - "schananas" # Main
+    - "gklijs"
+  milestone: 1

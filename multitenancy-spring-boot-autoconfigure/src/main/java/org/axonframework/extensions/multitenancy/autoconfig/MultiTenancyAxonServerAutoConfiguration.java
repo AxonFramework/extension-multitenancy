@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.axonserver.connector.AxonServerConfiguration;
@@ -63,6 +62,7 @@ import org.springframework.core.env.Environment;
  * Auto-configuration for AxonServer, that configures abstract tenant-aware AxonServer components and factories.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 @Configuration
 @ConditionalOnClass(AxonServerConfiguration.class)

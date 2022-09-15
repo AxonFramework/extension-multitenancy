@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.configuration;
 
 import org.axonframework.common.AxonThreadFactory;
@@ -44,6 +43,7 @@ import java.util.stream.Collectors;
 
 /**
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantEventProcessingModule extends EventProcessingModule {
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.commandhandeling;
 
 import org.axonframework.commandhandling.CommandBus;
@@ -24,9 +23,9 @@ import java.util.function.Function;
 /**
  * Factory for creating {@link CommandBus} instances that are configured to only receive commands for a specific
  * tenant.
- * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantCommandSegmentFactory extends Function<TenantDescriptor, CommandBus> {
 

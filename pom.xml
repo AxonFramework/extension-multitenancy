@@ -50,18 +50,18 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <axon.version>4.6.0-SNAPSHOT</axon.version>
-        <projectreactor.version>3.4.7</projectreactor.version>
+        <axon.version>4.6.0</axon.version>
+        <projectreactor.version>3.4.23</projectreactor.version>
 
-        <spring.version>5.3.8</spring.version>
-        <spring.boot.version>2.5.2</spring.boot.version>
+        <spring.version>5.3.22</spring.version>
+        <spring.boot.version>2.7.3</spring.boot.version>
 
         <slf4j.version>1.7.28</slf4j.version>
         <log4j.version>2.13.0</log4j.version>
         <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
 
-        <junit.jupiter.version>5.7.2</junit.jupiter.version>
-        <mockito.version>3.11.2</mockito.version>
+        <junit.jupiter.version>5.9.0</junit.jupiter.version>
+        <mockito.version>4.8.0</mockito.version>
     </properties>
 
     <dependencyManagement>
@@ -140,7 +140,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-clean-plugin</artifactId>
-                    <version>3.1.0</version>
+                    <version>3.2.0</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -163,7 +163,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
+                <version>3.10.1</version>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
@@ -224,7 +224,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>3.2.2</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -249,7 +249,7 @@
             <plugin>
                 <!-- just to make sure deployed artifacts are always built (and tested) using JDK 8+ -->
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>1.4.1</version>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
                         <id>enforce-java</id>

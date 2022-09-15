@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.eventhandeling;
 
 import org.axonframework.common.AxonConfigurationException;
@@ -43,6 +42,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * forwards corresponding actions to the correct tenant.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantEventProcessor
         implements MultiTenantHandlerInterceptorSupport<EventMessage<?>, EventProcessor>, EventProcessor,
@@ -189,7 +189,7 @@ public class MultiTenantEventProcessor
 
     /**
      * Register the given {@code tenant} as a local segment. Tenants can be only registered prior to starting the
-     * processor. To register and start a tenant durring runtime, use {@link #registerAndStartTenant(TenantDescriptor)}
+     * processor. To register and start a tenant during runtime, use {@link #registerAndStartTenant(TenantDescriptor)}
      *
      * @param tenantDescriptor The tenant to register
      * @return a Registration, which may be used to remove the tenant

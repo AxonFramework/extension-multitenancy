@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import org.axonframework.eventsourcing.eventstore.EventStore;
@@ -23,9 +22,9 @@ import java.util.function.Function;
 
 /**
  * Factory for creating {@link EventStore} instances for a given {@link TenantDescriptor}.
- * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantEventSegmentFactory extends Function<TenantDescriptor, EventStore> {
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy;
 
 import org.axonframework.common.transaction.Transaction;
@@ -27,6 +26,7 @@ import java.util.function.Supplier;
  * determine the tenant of the current transaction.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantWrappedTransactionManager implements TransactionManager {
 

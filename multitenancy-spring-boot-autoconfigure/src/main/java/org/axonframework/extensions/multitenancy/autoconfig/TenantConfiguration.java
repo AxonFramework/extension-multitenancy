@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 /**
  * Enables static access to default {@code TENANT_CORRELATION_KEY} used to correlate tenant identifiers within {@link
- * org.axonframework.messaging.MetaData}
- * <p>
+ * org.axonframework.messaging.MetaData}.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantConfiguration {
 

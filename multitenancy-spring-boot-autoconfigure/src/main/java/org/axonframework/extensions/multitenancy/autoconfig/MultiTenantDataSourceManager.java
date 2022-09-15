@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
@@ -54,6 +54,7 @@ import javax.sql.DataSource;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 
 @Configuration
@@ -109,17 +110,20 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         multiTenantDataSource.afterPropertiesSet();
 
         tenantProvider.subscribe(this);
-
         return multiTenantDataSource;
     }
 
+    /**
+     * Registers a tenantDescriptor data source if the tenantDescriptor data source has not already been registered, using the {@link TenantDescriptor}
+     * @param tenantDescriptor the descriptor of the tenant
+     */
     private void register(TenantDescriptor tenant) {
         if (tenantIsAbsent(tenant)) {
             if (tenantDataSourceResolver != null) {
                 DataSourceProperties dataSourceProperties;
                 try {
                     dataSourceProperties = tenantDataSourceResolver.apply(tenant);
-                    log.debug("[d] Datasource properties resolved for tenant ID '{}'", tenant);
+                    log.debug("[d] Datasource properties resolved for tenant descriptor [{}]", tenant);
                 } catch (Exception e) {
                     throw new NoSuchTenantException("Could not resolve the tenant!");
                 }
@@ -128,9 +132,14 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
             }
         }
 
-        log.debug("[d] Tenant '{}' set as current.", tenant);
+        log.debug("[d] Tenant [{}] set as current.", tenant);
     }
 
+    /**
+     * Registers a dataSource for a tenantDescriptor and logs an error when an exception is thrown
+     * @param tenant the descriptor of the tenant
+     * @param dataSourceProperties the properties for the datasource that needs to be registered
+     */
     private void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
         DataSource dataSource = DataSourceBuilder.create()
                                                  .driverClassName(dataSourceProperties.getDriverClassName())
@@ -147,14 +156,24 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         }
     }
 
-    public DataSource removeTenant(TenantDescriptor tenant) {
-        Object removedDataSource = tenantDataSources.remove(tenant);
+    /**
+     * Unregisters the tenants dataSource
+     * @param tenantDescriptor the descriptor of the tenant
+     * @return the DataSource that was removed
+     */
+    public DataSource removeTenant(TenantDescriptor tenantDescriptor) {
+        Object removedDataSource = tenantDataSources.remove(tenantDescriptor);
         multiTenantDataSource.afterPropertiesSet();
         return (DataSource) removedDataSource;
     }
 
-    public boolean tenantIsAbsent(TenantDescriptor tenant) {
-        return !tenantDataSources.containsKey(tenant);
+    /**
+     * Checks if the tenant datasource is not registered
+     * @param tenantDescriptor
+     * @return true is the tenant datasource is not registered
+     */
+    public boolean tenantIsAbsent(TenantDescriptor tenantDescriptor) {
+        return !tenantDataSources.containsKey(tenantDescriptor);
     }
 
     public AbstractRoutingDataSource getMultiTenantDataSource() {
@@ -170,12 +189,25 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         return defaultDataSource;
     }
 
+    /**
+     * Registers the given {@code tenantDescriptor}.
+     *
+     * @param tenantDescriptor The tenantDescriptor to register
+     * @return a Registration, which may be used to unregister the tenantDescriptor datasource
+     */
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         register(tenantDescriptor);
         return () -> removeTenant(tenantDescriptor) != null;
     }
 
+
+    /**
+     * Registers and starts the given {@code tenantDescriptor}.
+     *
+     * @param tenantDescriptor The tenantDescriptor to register
+     * @return a Registration, which may be used to unregister the tenantDescriptor datasource
+     */
     @Override
     public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         return registerTenant(tenantDescriptor);

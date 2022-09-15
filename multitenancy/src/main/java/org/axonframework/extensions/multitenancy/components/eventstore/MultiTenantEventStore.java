@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import org.axonframework.common.BuilderUtils;
@@ -54,11 +53,10 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
+ * @since 4.6.0
  */
-
-public class MultiTenantEventStore
-        implements MultiTenantDispatchInterceptorSupport<EventMessage<?>, EventStore>, EventStore,
-        MultiTenantAwareComponent {
+public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent,
+        MultiTenantDispatchInterceptorSupport<EventMessage<?>, EventStore> {
 
     private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
     private final List<Consumer<List<? extends EventMessage<?>>>> messageProcessors = new CopyOnWriteArrayList<>();
@@ -185,7 +183,7 @@ public class MultiTenantEventStore
                 .storeSnapshot(snapshot);
     }
 
-    public void storeSnapshot(DomainEventMessage<?> snapshot, TenantDescriptor tenantDescriptor) {
+    private void storeSnapshot(DomainEventMessage<?> snapshot, TenantDescriptor tenantDescriptor) {
         tenantSegments.get(tenantDescriptor)
                       .storeSnapshot(snapshot);
     }

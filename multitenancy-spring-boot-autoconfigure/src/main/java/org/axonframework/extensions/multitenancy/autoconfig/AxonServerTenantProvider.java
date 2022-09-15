@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import io.axoniq.axonserver.connector.ResultStream;
@@ -44,6 +43,7 @@ import javax.annotation.PostConstruct;
  * Axon Server implementation of {@link TenantProvider}
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class AxonServerTenantProvider implements TenantProvider {
 

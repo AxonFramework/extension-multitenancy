@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.commandhandling.CommandBus;
@@ -44,6 +43,7 @@ import static org.axonframework.extensions.multitenancy.autoconfig.TenantConfigu
  * Configures Axon Server as implementation for multi-tenant components like CommandBus, QueryBus and EventStore.
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 @Configuration
 @ConditionalOnProperty(value = "axon.multi-tenancy.enabled", matchIfMissing = true)

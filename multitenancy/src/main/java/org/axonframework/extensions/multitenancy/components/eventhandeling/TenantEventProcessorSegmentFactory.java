@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.eventhandeling;
 
 import org.axonframework.eventhandling.EventProcessor;
@@ -23,11 +22,10 @@ import java.util.function.Function;
 
 /**
  * Factory for creating {@link EventProcessor} segments for a given {@link TenantDescriptor}.
- * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
-
 public interface TenantEventProcessorSegmentFactory extends Function<TenantDescriptor, EventProcessor> {
 
 }

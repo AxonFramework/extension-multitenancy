@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components;
 
 import java.util.Map;
@@ -24,6 +23,7 @@ import java.util.Objects;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantDescriptor {
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.queryhandeling;
 
 import org.axonframework.common.BuilderUtils;
@@ -46,6 +45,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<SubscriptionQueryUpdateMessage<?>, QueryUpdateEmitter> {

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components;
 
 import org.axonframework.messaging.Message;
@@ -27,6 +26,7 @@ import java.util.function.BiFunction;
  * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TargetTenantResolver<M extends Message<?>> extends BiFunction<M, Collection<TenantDescriptor>, TenantDescriptor> {
 

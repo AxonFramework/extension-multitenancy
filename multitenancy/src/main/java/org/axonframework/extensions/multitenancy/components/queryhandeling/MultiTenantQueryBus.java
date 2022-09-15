@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components.queryhandeling;
 
 import org.axonframework.common.BuilderUtils;
@@ -61,6 +60,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
+ * @since 4.6.0
  */
 public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<QueryMessage<?, ?>, QueryBus>,

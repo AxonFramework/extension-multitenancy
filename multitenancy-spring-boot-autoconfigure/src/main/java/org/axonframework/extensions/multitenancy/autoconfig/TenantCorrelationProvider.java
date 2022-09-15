@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.messaging.Message;
@@ -24,9 +23,9 @@ import java.util.Map;
 
 /**
  * Default implementation of {@link CorrelationDataProvider} that provides the tenant identifier as a correlation.
- * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public class TenantCorrelationProvider implements CorrelationDataProvider {
 

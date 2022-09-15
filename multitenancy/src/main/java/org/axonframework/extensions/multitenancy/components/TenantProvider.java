@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.axonframework.extensions.multitenancy.components;
 
 import org.axonframework.common.Registration;
@@ -23,9 +22,9 @@ import java.util.List;
 /**
  * Registers new and manages currently registered tenants and {@link MultiTenantAwareComponent} components. If
  * configured monitors tenants changes and updates the {@link MultiTenantAwareComponent} components accordingly.
- * <p>
  *
  * @author Stefan Dragisic
+ * @since 4.6.0
  */
 public interface TenantProvider {
 
