@@ -183,7 +183,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
                 .storeSnapshot(snapshot);
     }
 
-    private void storeSnapshot(DomainEventMessage<?> snapshot, TenantDescriptor tenantDescriptor) {
+    public void storeSnapshot(DomainEventMessage<?> snapshot, TenantDescriptor tenantDescriptor) {
         tenantSegments.get(tenantDescriptor)
                       .storeSnapshot(snapshot);
     }
