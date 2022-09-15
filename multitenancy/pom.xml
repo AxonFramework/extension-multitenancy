@@ -24,6 +24,11 @@
 
     <artifactId>axon-multitenancy</artifactId>
 
+    <name>Axon Framework Multi-Tenancy Extension</name>
+    <description>
+        This module provides simplified support to enable multi-tenancy within an Axon Framework based application.
+    </description>
+
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
