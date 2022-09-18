@@ -37,7 +37,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-import static org.axonframework.extensions.multitenancy.autoconfig.TenantConfiguration.TENANT_CORRELATION_KEY;
+import static org.axonframework.extensions.multitenancy.configuration.TenantConfiguration.TENANT_CORRELATION_KEY;
+
 
 /**
  * Configures Axon Server as implementation for multi-tenant components like CommandBus, QueryBus and EventStore.
