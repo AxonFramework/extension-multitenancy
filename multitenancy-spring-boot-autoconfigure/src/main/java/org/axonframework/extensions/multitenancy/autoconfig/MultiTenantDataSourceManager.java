@@ -101,7 +101,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
                     return TenantWrappedTransactionManager.getCurrentTenant();
                 }
                 Message<?> message = CurrentUnitOfWork.get().getMessage();
-                return tenantResolver.resolveTenant(message, tenantDataSources.keySet()).tenantId();
+                return tenantResolver.resolveTenant(message, tenantDataSources.keySet());
             }
         };
         multiTenantDataSource.setTargetDataSources(Collections.unmodifiableMap(tenantDataSources));
