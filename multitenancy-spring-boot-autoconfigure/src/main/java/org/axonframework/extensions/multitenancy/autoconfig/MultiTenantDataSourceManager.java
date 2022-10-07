@@ -115,7 +115,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
 
     /**
      * Registers a tenantDescriptor data source if the tenantDescriptor data source has not already been registered, using the {@link TenantDescriptor}
-     * @param tenantDescriptor the descriptor of the tenant
+     * @param tenant the descriptor of the tenant
      */
     private void register(TenantDescriptor tenant) {
         if (tenantIsAbsent(tenant)) {
