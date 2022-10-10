@@ -101,7 +101,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
                     return TenantWrappedTransactionManager.getCurrentTenant();
                 }
                 Message<?> message = CurrentUnitOfWork.get().getMessage();
-                return tenantResolver.resolveTenant(message, tenantDataSources.keySet()).tenantId();
+                return tenantResolver.resolveTenant(message, tenantDataSources.keySet());
             }
         };
         multiTenantDataSource.setTargetDataSources(Collections.unmodifiableMap(tenantDataSources));
@@ -115,7 +115,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
 
     /**
      * Registers a tenantDescriptor data source if the tenantDescriptor data source has not already been registered, using the {@link TenantDescriptor}
-     * @param tenantDescriptor the descriptor of the tenant
+     * @param tenant the descriptor of the tenant
      */
     private void register(TenantDescriptor tenant) {
         if (tenantIsAbsent(tenant)) {
