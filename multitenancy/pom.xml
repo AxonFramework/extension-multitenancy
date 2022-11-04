@@ -15,27 +15,22 @@
   ~ limitations under the License.
   -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <parent>
         <artifactId>axon-multitenancy-parent</artifactId>
         <groupId>org.axonframework.extensions.multitenancy</groupId>
         <version>4.7.0-SNAPSHOT</version>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
     <artifactId>axon-multitenancy</artifactId>
 
     <name>Axon Framework Multi-Tenancy Extension</name>
     <description>
-        This module provides simplified support to enable multi-tenancy within an Axon Framework based application.
+        Module containing Axon Framework infrastructure components capable of delegating towards tenant-specific
+        versions of these components.
     </description>
 
-    <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-
-        <axon.version>4.6.1</axon.version>
-        <junit.jupiter.version>5.9.0</junit.jupiter.version>
-    </properties>
+    <packaging>jar</packaging>
 
     <dependencies>
         <!-- Axon -->
@@ -43,13 +38,11 @@
             <groupId>org.axonframework</groupId>
             <artifactId>axon-messaging</artifactId>
             <scope>provided</scope>
-            <version>${axon.version}</version>
         </dependency>
         <dependency>
             <groupId>org.axonframework</groupId>
             <artifactId>axon-configuration</artifactId>
             <scope>provided</scope>
-            <version>${axon.version}</version>
         </dependency>
         <!-- Test -->
         <dependency>
