@@ -31,7 +31,7 @@
     </description>
 
     <properties>
-        <spring.web.version>5.3.24</spring.web.version>
+        <spring.web.version>6.0.0</spring.web.version>
         <assertj.core.version>3.23.1</assertj.core.version>
     </properties>
 
