@@ -1,4 +1,7 @@
 # Axon Framework - Multitenancy Extension
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.axonframework.extensions.multitenancy/axon-multitenancy/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.axonframework.extensions.multitenancy/axon-multitenancy/)
+![Build Status](https://github.com/AxonFramework/extension-multitenancy/workflows/Multi-Tenancy%20Extension/badge.svg?branch=master)
+[![SonarCloud Status](https://sonarcloud.io/api/project_badges/measure?project=AxonFramework_extension-multitenancy&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=AxonFramework_extension-multitenancy)
 
 Axon Framework is a framework for building evolutionary, event-driven microservice systems,
 based on the principles of Domain Driven Design, Command-Query Responsibility Segregation (CQRS) and Event Sourcing.
