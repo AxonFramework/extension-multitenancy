@@ -26,7 +26,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>multitenancy-spring-boot-3-integrationtests</artifactId>
+    <artifactId>axon-multitenancy-spring-boot-3-integrationtests</artifactId>
     <groupId>org.axonframework.extensions.multitenancy</groupId>
 
     <name>Axon Framework Multi-Tenancy Extension Spring Boot 3 Integration Tests</name>
