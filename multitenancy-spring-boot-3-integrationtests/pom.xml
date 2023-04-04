@@ -38,7 +38,7 @@
     <packaging>jar</packaging>
 
     <properties>
-        <testcoontainers.version>1.17.6</testcoontainers.version>
+        <testcoontainers.version>1.18.0</testcoontainers.version>
 
         <jar-plugin.version>3.3.0</jar-plugin.version>
         <jacoco-plugin.version>0.8.8</jacoco-plugin.version>
