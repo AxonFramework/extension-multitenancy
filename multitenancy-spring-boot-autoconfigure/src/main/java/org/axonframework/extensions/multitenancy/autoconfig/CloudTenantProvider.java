@@ -69,6 +69,7 @@ public class CloudTenantProvider implements TenantProvider, Lifecycle {
 
     public void start() {
         tenantDescriptors.addAll(getInitialTenants());
+        tenantDescriptors.forEach(this::addTenant);
         if (preDefinedContexts == null || preDefinedContexts.isEmpty()) {
             subscribeToUpdates();
         }
