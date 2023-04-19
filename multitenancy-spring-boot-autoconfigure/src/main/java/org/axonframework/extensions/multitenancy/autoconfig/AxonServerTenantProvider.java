@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,8 @@ import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComp
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.lifecycle.Lifecycle;
+import org.axonframework.lifecycle.Phase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +39,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
-import javax.annotation.PostConstruct;
+import javax.annotation.Nonnull;
 
 /**
  * Axon Server implementation of {@link TenantProvider}
@@ -45,7 +47,7 @@ import javax.annotation.PostConstruct;
  * @author Stefan Dragisic
  * @since 4.6.0
  */
-public class AxonServerTenantProvider implements TenantProvider {
+public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
 
     private static final Logger logger = LoggerFactory.getLogger(AxonServerTenantProvider.class);
 
@@ -66,7 +68,6 @@ public class AxonServerTenantProvider implements TenantProvider {
         this.axonServerConnectionManager = axonServerConnectionManager;
     }
 
-    @PostConstruct
     public void start() {
         tenantDescriptors.addAll(getInitialTenants());
         if (preDefinedContexts == null || preDefinedContexts.isEmpty()) {
@@ -194,5 +195,10 @@ public class AxonServerTenantProvider implements TenantProvider {
             registrationMap = new ConcurrentHashMap<>();
             return true;
         };
+    }
+
+    @Override
+    public void registerLifecycleHandlers(@Nonnull LifecycleRegistry lifecycle) {
+        lifecycle.onStart(Phase.INSTRUCTION_COMPONENTS + 10, this::start);
     }
 }
