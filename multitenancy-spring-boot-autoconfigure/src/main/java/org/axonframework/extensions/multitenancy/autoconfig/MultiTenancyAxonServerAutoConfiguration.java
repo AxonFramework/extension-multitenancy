@@ -47,6 +47,7 @@ import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.SpringAxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -71,6 +72,13 @@ import org.springframework.core.env.Environment;
 @ComponentScan(excludeFilters = {
         @ComponentScan.Filter(type = FilterType.REGEX, pattern = "org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration.class")})
 public class MultiTenancyAxonServerAutoConfiguration {
+
+    @Autowired
+    public void disableHeartBeat(AxonServerConfiguration axonServerConfiguration, Environment env) {
+        if (!"true".equals(env.getProperty("axon.axonserver.heartbeat.enabled"))) {
+            axonServerConfiguration.getHeartbeat().setEnabled(false);
+        }
+    }
 
     @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.command.AxonServerCommandBus")
