@@ -16,14 +16,13 @@
 
 package org.axonframework.extensions.multitenancy.integration;
 
+import org.axonframework.axonserver.connector.AxonServerConfiguration;
 import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.GenericCommandMessage;
-import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.MultiTenantCommandBus;
-import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.messaging.GenericMessage;
@@ -122,6 +121,27 @@ class MultiTenancyIntegrationTest {
                     assertNotNull(queryBus);
                     assertTrue(queryBus instanceof MultiTenantQueryBus);
                     executeQueryWhileTenantNotSet(queryBus);
+                });
+    }
+
+    @Test
+    void heartBeatDisabled() {
+        testApplicationContext
+                .run(context -> {
+                    AxonServerConfiguration axonServerConfiguration = context.getBean(AxonServerConfiguration.class);
+                    assertNotNull(axonServerConfiguration);
+                    assertFalse(axonServerConfiguration.getHeartbeat().isEnabled());
+                });
+    }
+
+    @Test
+    void heartBeatEnabled() {
+        testApplicationContext
+                .withPropertyValues("axon.axonserver.heartbeat.enabled=true")
+                .run(context -> {
+                    AxonServerConfiguration axonServerConfiguration = context.getBean(AxonServerConfiguration.class);
+                    assertNotNull(axonServerConfiguration);
+                    assertTrue(axonServerConfiguration.getHeartbeat().isEnabled());
                 });
     }
 
