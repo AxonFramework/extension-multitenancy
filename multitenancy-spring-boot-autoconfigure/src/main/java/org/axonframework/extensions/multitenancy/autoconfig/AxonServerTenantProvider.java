@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -155,9 +156,10 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
     }
 
     private TenantDescriptor toTenantDescriptor(ContextOverview context) {
-        return new TenantDescriptor(context.getName(),
-                                    context.getMetaDataMap(),
-                                    context.getReplicationGroup().getName());
+        Map<String, String> metaDataMap = context.getMetaDataMap();
+        metaDataMap.putIfAbsent("replicationGroup", context.getReplicationGroup().getName());
+
+        return new TenantDescriptor(context.getName(), metaDataMap);
     }
 
     protected void addTenant(TenantDescriptor tenantDescriptor) {
