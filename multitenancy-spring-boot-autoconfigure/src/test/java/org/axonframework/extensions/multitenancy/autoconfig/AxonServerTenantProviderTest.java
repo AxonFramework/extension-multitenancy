@@ -164,13 +164,20 @@ class AxonServerTenantProviderTest {
         ArgumentCaptor<TenantDescriptor> tenantDescriptorArgumentCaptor = ArgumentCaptor.forClass(TenantDescriptor.class);
 
         //initial setup
-        verify(mockComponent).registerAndStartTenant(tenantDescriptorArgumentCaptor.capture());
-        assertEquals("tenant-3", tenantDescriptorArgumentCaptor.getValue().tenantId());
-        assertEquals("tenant-3-rp", tenantDescriptorArgumentCaptor.getValue().properties().get("replicationGroup"));
+        verify(mockComponent, times(2)).registerTenant(tenantDescriptorArgumentCaptor.capture());
 
-        verify(mockComponent).registerAndStartTenant(tenantDescriptorArgumentCaptor.capture());
-        assertEquals("tenant-4", tenantDescriptorArgumentCaptor.getValue().tenantId());
-        assertEquals("tenant-4-rp", tenantDescriptorArgumentCaptor.getValue().properties().get("replicationGroup"));
+        tenantDescriptorArgumentCaptor.getAllValues().forEach(tenantDescriptor -> {
+            if (tenantDescriptor.tenantId().equals("tenant-3")) {
+                assertEquals("tenant-3", tenantDescriptor.tenantId());
+                assertEquals("tenant-3-rp", tenantDescriptor.properties().get("replicationGroup"));
+            } else if (tenantDescriptor.tenantId().equals("tenant-4")) {
+                assertEquals("tenant-4", tenantDescriptor.tenantId());
+                assertEquals("tenant-4-rp", tenantDescriptor.properties().get("replicationGroup"));
+            } else {
+                fail("Unexpected tenant descriptor");
+            }
+        });
+
 
         //additionally created contexts
         verify(mockComponent).registerAndStartTenant(TenantDescriptor.tenantWithId("tenant-1"));
