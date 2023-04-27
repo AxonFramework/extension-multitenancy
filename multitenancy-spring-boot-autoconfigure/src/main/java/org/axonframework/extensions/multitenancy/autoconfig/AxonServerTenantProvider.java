@@ -33,8 +33,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -155,9 +157,10 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
     }
 
     private TenantDescriptor toTenantDescriptor(ContextOverview context) {
-        return new TenantDescriptor(context.getName(),
-                                    context.getMetaDataMap(),
-                                    context.getReplicationGroup().getName());
+        Map<String, String> metaDataMap = new HashMap<>(context.getMetaDataMap());
+        metaDataMap.putIfAbsent("replicationGroup", context.getReplicationGroup().getName());
+
+        return new TenantDescriptor(context.getName(), metaDataMap);
     }
 
     protected void addTenant(TenantDescriptor tenantDescriptor) {
