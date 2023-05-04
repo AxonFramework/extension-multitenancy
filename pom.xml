@@ -54,7 +54,7 @@
             ${project.basedir}/../coverage-report/target/site/jacoco-aggregate/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
 
-        <axon.version>4.7.0</axon.version>
+        <axon.version>4.8.0-SNAPSHOT</axon.version>
 
         <projectreactor.version>3.5.5</projectreactor.version>
 
