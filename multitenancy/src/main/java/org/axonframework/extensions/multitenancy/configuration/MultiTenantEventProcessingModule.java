@@ -55,6 +55,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     /**
      * Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a default {@link MultiTenantStreamableMessageSourceProvider},
      * which does not change the default {@link StreamableMessageSource} for any {@link TenantDescriptor}.
+     *
      * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
      */
     public MultiTenantEventProcessingModule(TenantProvider tenantProvider) {
@@ -65,8 +66,9 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     /**
      *  Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a {@link MultiTenantStreamableMessageSourceProvider},
      *  which allows for the customization of the {@link StreamableMessageSource} for each {@link TenantDescriptor}.
+     *
      * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
-     * @param multiTenantStreamableMessageSourceProvider the {@link MultiTenantStreamableMessageSourceProvider}used to customize the {@link StreamableMessageSource} for each {@link TenantDescriptor}
+     * @param multiTenantStreamableMessageSourceProvider the {@link MultiTenantStreamableMessageSourceProvider} used to customize the {@link StreamableMessageSource} for each {@link TenantDescriptor}
      */
     public MultiTenantEventProcessingModule(TenantProvider tenantProvider,
                                             MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider) {

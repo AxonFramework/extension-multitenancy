@@ -111,7 +111,7 @@ public class MultiTenancyAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceConfiguration() {
+    public MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider() {
         return (defaultTenantSource, processorName, tenantDescriptor, configuration) -> defaultTenantSource;
     }
 
