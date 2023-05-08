@@ -52,13 +52,13 @@ class MultiTenantEventProcessingModuleTest {
     private Configurer configurer;
     private MultiTenantEventProcessor multiTenantEventProcessor;
 
-    private MultiTenantStreamableMessageSourceConfiguration multiTenantStreamableMessageSourceConfiguration;
+    private MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider;
 
     @BeforeEach
     void setUp() {
         configurer = DefaultConfigurer.defaultConfiguration();
         multiTenantEventProcessor = mock(MultiTenantEventProcessor.class);
-        multiTenantStreamableMessageSourceConfiguration =
+        multiTenantStreamableMessageSourceProvider =
                 (defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource;
     }
 
@@ -137,10 +137,11 @@ class MultiTenantEventProcessingModuleTest {
         StreamableMessageSource<TrackedEventMessage<?>> customSource = mock(StreamableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
 
-        MultiTenantStreamableMessageSourceConfiguration multiTenantStreamableMessageSourceConfiguration =
+        MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider =
                 (source, processorName, tenantDescriptor, configuration) -> customSource;
 
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,multiTenantStreamableMessageSourceConfiguration));
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
+                                                                       multiTenantStreamableMessageSourceProvider));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
@@ -265,12 +266,12 @@ class MultiTenantEventProcessingModuleTest {
 
         StreamableMessageSource<TrackedEventMessage<?>> customSource = mock(StreamableMessageSource.class);
 
-        MultiTenantStreamableMessageSourceConfiguration multiTenantStreamableMessageSourceConfiguration =
+        MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider =
                 (source, processorName, tenantDescriptor, configuration) -> customSource;
 
         TenantProvider tenantProvider = mock(TenantProvider.class);
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
-                                                                       multiTenantStreamableMessageSourceConfiguration));
+                                                                       multiTenantStreamableMessageSourceProvider));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
