@@ -27,6 +27,7 @@ import org.axonframework.extensions.multitenancy.components.eventstore.TenantEve
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
+import org.axonframework.extensions.multitenancy.configuration.MultiTenantStreamableMessageSourceProvider;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
@@ -107,9 +108,17 @@ public class MultiTenancyAutoConfiguration {
         return multiTenantEventStore;
     }
 
+
     @Bean
-    public MultiTenantEventProcessingModule multiTenantEventProcessingModule(TenantProvider tenantProvider) {
-        return new MultiTenantEventProcessingModule(tenantProvider);
+    @ConditionalOnMissingBean
+    public MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider() {
+        return (defaultTenantSource, processorName, tenantDescriptor, configuration) -> defaultTenantSource;
+    }
+
+    @Bean
+    public MultiTenantEventProcessingModule multiTenantEventProcessingModule(TenantProvider tenantProvider,
+                                                                             MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider) {
+        return new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider);
     }
 
     @Bean

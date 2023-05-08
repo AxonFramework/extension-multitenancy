@@ -42,15 +42,38 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 /**
+ * An extension of the {@link EventProcessingModule} that allows for the creation of {@link MultiTenantEventProcessor}s.
+ *
  * @author Stefan Dragisic
  * @since 4.6.0
  */
 public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
     private final TenantProvider tenantProvider;
+    private final MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider;
 
+    /**
+     * Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a default {@link MultiTenantStreamableMessageSourceProvider},
+     * which does not change the default {@link StreamableMessageSource} for any {@link TenantDescriptor}.
+     *
+     * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
+     */
     public MultiTenantEventProcessingModule(TenantProvider tenantProvider) {
         this.tenantProvider = tenantProvider;
+        multiTenantStreamableMessageSourceProvider = ((defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource);
+    }
+
+    /**
+     *  Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a {@link MultiTenantStreamableMessageSourceProvider},
+     *  which allows for the customization of the {@link StreamableMessageSource} for each {@link TenantDescriptor}.
+     *
+     * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
+     * @param multiTenantStreamableMessageSourceProvider the {@link MultiTenantStreamableMessageSourceProvider} used to customize the {@link StreamableMessageSource} for each {@link TenantDescriptor}
+     */
+    public MultiTenantEventProcessingModule(TenantProvider tenantProvider,
+                                            MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider) {
+        this.tenantProvider = tenantProvider;
+        this.multiTenantStreamableMessageSourceProvider = multiTenantStreamableMessageSourceProvider;
     }
 
     private static String getName(String name, TenantDescriptor tenantDescriptor) {
@@ -123,10 +146,17 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                                             .name(name)
                                                                             .tenantSegmentFactory(
                                                                                     tenantDescriptor -> {
-                                                                                        StreamableMessageSource<TrackedEventMessage<?>> messageSource =
+                                                                                        StreamableMessageSource<TrackedEventMessage<?>> tenantSource =
                                                                                                 source instanceof MultiTenantEventStore
                                                                                                         ? ((MultiTenantEventStore) source).tenantSegment(tenantDescriptor)
                                                                                                         : source;
+
+                                                                                        tenantSource = multiTenantStreamableMessageSourceProvider.build(
+                                                                                                tenantSource,
+                                                                                                name,
+                                                                                                tenantDescriptor,
+                                                                                                configuration
+                                                                                        );
                                                                                         return TrackingEventProcessor.builder()
                                                                                                                      .name(getName(name, tenantDescriptor))
                                                                                                                      .eventHandlerInvoker(eventHandlerInvoker)
@@ -134,7 +164,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                                                                                      .errorHandler(super.errorHandler(name))
                                                                                                                      .messageMonitor(super.messageMonitor(TrackingEventProcessor.class,
                                                                                                                                                           name))
-                                                                                                                     .messageSource(messageSource)
+                                                                                                                     .messageSource(tenantSource)
                                                                                                                      .tokenStore(super.tokenStore(name))
                                                                                                                      .transactionManager(new TenantWrappedTransactionManager(super.transactionManager(
                                                                                                                              name), tenantDescriptor))
@@ -154,7 +184,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
             String name,
             EventHandlerInvoker eventHandlerInvoker,
             Configuration config,
-            StreamableMessageSource<TrackedEventMessage<?>> messageSource,
+            StreamableMessageSource<TrackedEventMessage<?>> source,
             PooledStreamingProcessorConfiguration processorConfiguration
     ) {
 
@@ -162,10 +192,17 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                                             .name(name)
                                                                             .tenantSegmentFactory(
                                                                                     tenantDescriptor -> {
-                                                                                        StreamableMessageSource<TrackedEventMessage<?>> source =
-                                                                                                messageSource instanceof MultiTenantEventStore
-                                                                                                        ? ((MultiTenantEventStore) messageSource).tenantSegment(tenantDescriptor)
-                                                                                                        : messageSource;
+                                                                                        StreamableMessageSource<TrackedEventMessage<?>> tenantSource =
+                                                                                                source instanceof MultiTenantEventStore
+                                                                                                        ? ((MultiTenantEventStore) source).tenantSegment(tenantDescriptor)
+                                                                                                        : source;
+
+                                                                                        tenantSource = multiTenantStreamableMessageSourceProvider.build(
+                                                                                                tenantSource,
+                                                                                                name,
+                                                                                                tenantDescriptor,
+                                                                                                configuration
+                                                                                        );
 
                                                                                         PooledStreamingEventProcessor.Builder builder =
                                                                                                 PooledStreamingEventProcessor.builder()
@@ -176,7 +213,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                                                                                              .messageMonitor(super.messageMonitor(
                                                                                                                                      PooledStreamingEventProcessor.class,
                                                                                                                                      name))
-                                                                                                                             .messageSource(source)
+                                                                                                                             .messageSource(tenantSource)
                                                                                                                              .tokenStore(super.tokenStore(name))
                                                                                                                              .transactionManager(new TenantWrappedTransactionManager(
                                                                                                                                      super.transactionManager(name),
