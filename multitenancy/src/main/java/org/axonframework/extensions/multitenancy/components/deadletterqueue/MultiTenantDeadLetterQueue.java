@@ -19,6 +19,7 @@ package org.axonframework.extensions.multitenancy.components.deadletterqueue;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
@@ -56,15 +57,22 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
     private final AtomicReference<Supplier<SequencedDeadLetterQueue<M>>> registeredDeadLetterQueue = new AtomicReference<>();
     private final TargetTenantResolver<M> targetTenantResolver;
-
     private final String processingGroup;
 
+    /**
+     * Builder class to instantiate a {@link MultiTenantDeadLetterQueue}.
+     * @param builder
+     */
     public MultiTenantDeadLetterQueue(MultiTenantDeadLetterQueue.Builder<M> builder) {
         builder.validate();
         this.targetTenantResolver = builder.targetTenantResolver;
         this.processingGroup = builder.processingGroup;
     }
 
+    /**
+     * Instantiate a Builder to be able to create a {@link MultiTenantDeadLetterQueue}.
+     * @return a Builder to be able to create a {@link MultiTenantDeadLetterQueue}.
+     */
     public static MultiTenantDeadLetterQueue.Builder builder() {
         return new MultiTenantDeadLetterQueue.Builder();
     }
@@ -74,11 +82,13 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
      * @param deadLetterQueue
      */
     public void registerDeadLetterQueue(Supplier<SequencedDeadLetterQueue<M>> deadLetterQueue) {
-        //atomic reference to supplier
         registeredDeadLetterQueue.set(deadLetterQueue);
     }
 
-
+    /**
+     * Returns all available tenant segments of the {@link SequencedDeadLetterQueue}.
+     * @return all available tenant segments of the {@link SequencedDeadLetterQueue}.
+     */
     public Map<TenantDescriptor, Supplier<SequencedDeadLetterQueue<M>>> getTenantSegments() {
         return Collections.unmodifiableMap(tenantSegments);
     }
@@ -92,12 +102,18 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
         return tenantDeadLetterQueue;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void enqueue(Object sequenceIdentifier, DeadLetter<? extends M> letter)
             throws DeadLetterQueueOverflowException {
         resolveTenant(letter).enqueue(sequenceIdentifier, letter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean enqueueIfPresent(Object sequenceIdentifier, Supplier<DeadLetter<? extends M>> letterBuilder)
             throws DeadLetterQueueOverflowException {
@@ -105,83 +121,108 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
                 .enqueueIfPresent(sequenceIdentifier, letterBuilder);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void evict(DeadLetter<? extends M> letter) {
         resolveTenant(letter).evict(letter);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void requeue(DeadLetter<? extends M> letter, UnaryOperator<DeadLetter<? extends M>> letterUpdater)
             throws NoSuchDeadLetterException {
         resolveTenant(letter).requeue(letter, letterUpdater);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean contains(Object sequenceIdentifier) {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().contains(sequenceIdentifier);
     }
 
     @Override
     public Iterable<DeadLetter<? extends M>> deadLetterSequence(Object sequenceIdentifier) {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().deadLetterSequence(sequenceIdentifier);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Iterable<Iterable<DeadLetter<? extends M>>> deadLetters() {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().deadLetters();
     }
 
     @Override
     public boolean isFull(Object sequenceIdentifier) {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().isFull(sequenceIdentifier);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public long size() {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().size();
     }
 
     @Override
     public long sequenceSize(Object sequenceIdentifier) {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().sequenceSize(sequenceIdentifier);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public long amountOfSequences() {
-        throw new UnsupportedOperationException("Not supported. Use method on tenant specific queue.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().amountOfSequences();
     }
 
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean process(Predicate<DeadLetter<? extends M>> sequenceFilter,
                            Function<DeadLetter<? extends M>, EnqueueDecision<M>> processingTask) {
-        return tenantSegments.entrySet().stream().allMatch(entry->{
-            TenantDescriptor tenantDescriptor = entry.getKey();
-
-            SequencedDeadLetterQueue<M> deadLetterQueueSupplier = entry.getValue().get();
-
-            return deadLetterQueueSupplier.process(sequenceFilter, processingTask);
-        });
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().process(sequenceFilter, processingTask);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean process(Function<DeadLetter<? extends M>, EnqueueDecision<M>> processingTask) {
-        return tenantSegments.entrySet().stream().allMatch(entry->{
-            TenantDescriptor tenantDescriptor = entry.getKey(); //to be used
-            SequencedDeadLetterQueue<M> deadLetterQueueSupplier = entry.getValue().get();
-
-            return deadLetterQueueSupplier.process(processingTask);
-        });
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        return tenantSegments.get(currentTenant).get().process(processingTask);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void clear() {
-        tenantSegments.forEach((tenantDescriptor, value) -> {
-            SequencedDeadLetterQueue<M> deadLetterQueueSupplier = value.get();
-            deadLetterQueueSupplier.clear();
-        });
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        tenantSegments.get(currentTenant).get().clear();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         //to be used to create queue tenantDescriptor
@@ -192,9 +233,20 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
         };
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         return registerTenant(tenantDescriptor);
+    }
+
+    /**
+     * Return processing group that this queue is bounded to.
+     * @return processing group that this queue is bounded to.
+     */
+    public String processingGroup() {
+        return processingGroup;
     }
 
     public static class Builder <M extends EventMessage<?>> {
@@ -227,7 +279,6 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
         protected void validate() {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(processingGroup, "The ProcessingGroup is a hard requirement");
         }
     }
 
