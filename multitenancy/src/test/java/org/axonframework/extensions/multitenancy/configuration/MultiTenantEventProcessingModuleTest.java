@@ -69,7 +69,7 @@ class MultiTenantEventProcessingModuleTest {
 
         TenantProvider tenantProvider = mock(TenantProvider.class);
 
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider));
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
         configurer.eventProcessing()
                   .registerEventProcessorFactory((name, config, eventHandlerInvoker) -> {
                       processors.put(name, multiTenantEventProcessor);
@@ -90,7 +90,7 @@ class MultiTenantEventProcessingModuleTest {
     public void testTrackingEventProcessor() {
         StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider));
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
@@ -141,7 +141,8 @@ class MultiTenantEventProcessingModuleTest {
                 (source, processorName, tenantDescriptor, configuration) -> customSource;
 
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
-                                                                       multiTenantStreamableMessageSourceProvider));
+                                                                       multiTenantStreamableMessageSourceProvider,
+                                                                       null)); //todo
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
@@ -209,7 +210,7 @@ class MultiTenantEventProcessingModuleTest {
     public void subscribingEventProcessor() {
         SubscribableMessageSource<EventMessage<?>> mockedSource = mock(SubscribableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider));
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
 
         configurer.eventProcessing()
                   .usingSubscribingEventProcessors()
@@ -234,7 +235,7 @@ class MultiTenantEventProcessingModuleTest {
     public void pooledStreamingEventProcessor() {
         StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider));
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
@@ -271,7 +272,8 @@ class MultiTenantEventProcessingModuleTest {
 
         TenantProvider tenantProvider = mock(TenantProvider.class);
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
-                                                                       multiTenantStreamableMessageSourceProvider));
+                                                                       multiTenantStreamableMessageSourceProvider,
+                                                                       null)); //todo
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()

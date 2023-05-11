@@ -16,12 +16,15 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.MultiTenantCommandBus;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueue;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
@@ -37,6 +40,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.axonframework.extensions.multitenancy.autoconfig.TenantConfiguration.TENANT_CORRELATION_KEY;
 
@@ -108,6 +114,23 @@ public class MultiTenancyAutoConfiguration {
         return multiTenantEventStore;
     }
 
+    @Bean
+    public MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory(TenantProvider tenantProvider,
+                                                                                                TargetTenantResolver targetTenantResolver) {
+
+        Map<String, MultiTenantDeadLetterQueue<EventMessage<?>>> multiTenantDeadLetterQueue = new ConcurrentHashMap<>();
+
+        return (processingGroup) -> multiTenantDeadLetterQueue.computeIfAbsent(processingGroup, (key) -> {
+            MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue  = MultiTenantDeadLetterQueue.builder()
+                                                                                                    .targetTenantResolver(
+                                                                                                            targetTenantResolver)
+                                                                                                    .processingGroup(processingGroup)
+                                                                                                    .build();
+            tenantProvider.subscribe(deadLetterQueue);
+            return deadLetterQueue;
+        });
+    }
+
 
     @Bean
     @ConditionalOnMissingBean
@@ -117,8 +140,10 @@ public class MultiTenancyAutoConfiguration {
 
     @Bean
     public MultiTenantEventProcessingModule multiTenantEventProcessingModule(TenantProvider tenantProvider,
-                                                                             MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider) {
-        return new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider);
+                                                                             MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider,
+                                                                             MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory) {
+        return new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider,
+                                                    multiTenantDeadLetterQueueFactory);
     }
 
     @Bean

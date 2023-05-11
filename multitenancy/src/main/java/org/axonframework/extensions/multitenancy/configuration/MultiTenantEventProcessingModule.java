@@ -17,6 +17,7 @@ package org.axonframework.extensions.multitenancy.configuration;
 
 import org.axonframework.common.AxonThreadFactory;
 import org.axonframework.config.Configuration;
+import org.axonframework.config.EventProcessingConfigurer;
 import org.axonframework.config.EventProcessingModule;
 import org.axonframework.eventhandling.DirectEventProcessingStrategy;
 import org.axonframework.eventhandling.EventHandlerInvoker;
@@ -30,15 +31,20 @@ import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueue;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.messaging.StreamableMessageSource;
 import org.axonframework.messaging.SubscribableMessageSource;
+import org.axonframework.messaging.deadletter.EnqueuePolicy;
+import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -52,27 +58,36 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     private final TenantProvider tenantProvider;
     private final MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider;
 
+    protected final MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory;
     /**
      * Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a default {@link MultiTenantStreamableMessageSourceProvider},
      * which does not change the default {@link StreamableMessageSource} for any {@link TenantDescriptor}.
      *
      * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
      */
-    public MultiTenantEventProcessingModule(TenantProvider tenantProvider) {
+    public MultiTenantEventProcessingModule(TenantProvider tenantProvider, MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory) {
         this.tenantProvider = tenantProvider;
+        this.multiTenantDeadLetterQueueFactory = multiTenantDeadLetterQueueFactory;
         multiTenantStreamableMessageSourceProvider = ((defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource);
     }
 
     /**
-     *  Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a {@link MultiTenantStreamableMessageSourceProvider},
-     *  which allows for the customization of the {@link StreamableMessageSource} for each {@link TenantDescriptor}.
+     * Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a
+     * {@link MultiTenantStreamableMessageSourceProvider}, which allows for the customization of the
+     * {@link StreamableMessageSource} for each {@link TenantDescriptor}.
      *
-     * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
-     * @param multiTenantStreamableMessageSourceProvider the {@link MultiTenantStreamableMessageSourceProvider} used to customize the {@link StreamableMessageSource} for each {@link TenantDescriptor}
+     * @param tenantProvider                             the default {@link TenantProvider} used to build
+     *                                                   {@link MultiTenantEventProcessor}s
+     * @param multiTenantStreamableMessageSourceProvider the {@link MultiTenantStreamableMessageSourceProvider} used to
+     *                                                   customize the {@link StreamableMessageSource} for each
+     *                                                   {@link TenantDescriptor}
+     * @param multiTenantDeadLetterQueueFactory
      */
     public MultiTenantEventProcessingModule(TenantProvider tenantProvider,
-                                            MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider) {
+                                            MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider,
+                                            MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory) {
         this.tenantProvider = tenantProvider;
+        this.multiTenantDeadLetterQueueFactory = multiTenantDeadLetterQueueFactory;
         this.multiTenantStreamableMessageSourceProvider = multiTenantStreamableMessageSourceProvider;
     }
 
@@ -240,6 +255,54 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
         tenantProvider.subscribe(eventProcessor);
         return eventProcessor;
+    }
+
+    @Override
+    public Optional<SequencedDeadLetterQueue<EventMessage<?>>> deadLetterQueue(String processingGroup) {
+        return super.deadLetterQueue(processingGroup);
+    }
+
+    @Override
+    public Optional<EnqueuePolicy<EventMessage<?>>> deadLetterPolicy(String processingGroup) {
+        return super.deadLetterPolicy(processingGroup);
+    }
+
+    @Override
+    public EventProcessingConfigurer registerDeadLetteringEventHandlerInvokerConfiguration(String processingGroup,
+                                                                                           DeadLetteringInvokerConfiguration configuration) {
+        return super.registerDeadLetteringEventHandlerInvokerConfiguration(processingGroup, configuration);
+    }
+
+    /**
+     * Registers a {@link MultiTenantDeadLetterQueue} for the given {@code processingGroup}. The given {@code queueBuilder}
+     * Overrides user defined queue builder and puts the {@link SequencedDeadLetterQueue} in a {@link MultiTenantDeadLetterQueue}.
+     *
+     * @param processingGroup A {@link String} specifying the name of the processing group to register the given
+     *                        {@link SequencedDeadLetterQueue} for.
+     * @param queueBuilder    A builder method returning a {@link SequencedDeadLetterQueue} based on a
+     *                        {@link Configuration}. The outcome is used by the given {@code processingGroup} to enqueue
+     *                        and evaluate failed events in.
+     * @return the current {@link EventProcessingConfigurer} instance, for fluent interfacing
+     */
+    @Override
+    public EventProcessingConfigurer registerDeadLetterQueue(String processingGroup,
+                                                             Function<Configuration, SequencedDeadLetterQueue<EventMessage<?>>> queueBuilder) {
+        MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue = multiTenantDeadLetterQueueFactory
+                .getDeadLetterQueue(processingGroup);
+        deadLetterQueue.registerDeadLetterQueue(() -> queueBuilder.apply(configuration));
+        return super.registerDeadLetterQueue(processingGroup, configuration -> deadLetterQueue);
+    }
+
+    @Override
+    public EventProcessingConfigurer registerDeadLetterPolicy(String processingGroup,
+                                                              Function<Configuration, EnqueuePolicy<EventMessage<?>>> policyBuilder) {
+        return super.registerDeadLetterPolicy(processingGroup, policyBuilder);
+    }
+
+    @Override
+    public EventProcessingConfigurer registerDefaultDeadLetterPolicy(
+            Function<Configuration, EnqueuePolicy<EventMessage<?>>> policyBuilder) {
+        return super.registerDefaultDeadLetterPolicy(policyBuilder);
     }
 
     private ScheduledExecutorService defaultExecutor(String factoryName) {
