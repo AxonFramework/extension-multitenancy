@@ -31,6 +31,7 @@ import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterProcessor;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueue;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
@@ -38,6 +39,7 @@ import org.axonframework.extensions.multitenancy.components.eventstore.MultiTena
 import org.axonframework.messaging.StreamableMessageSource;
 import org.axonframework.messaging.SubscribableMessageSource;
 import org.axonframework.messaging.deadletter.EnqueuePolicy;
+import org.axonframework.messaging.deadletter.SequencedDeadLetterProcessor;
 import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 
 import java.util.Map;
@@ -257,22 +259,6 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
         return eventProcessor;
     }
 
-    @Override
-    public Optional<SequencedDeadLetterQueue<EventMessage<?>>> deadLetterQueue(String processingGroup) {
-        return super.deadLetterQueue(processingGroup);
-    }
-
-    @Override
-    public Optional<EnqueuePolicy<EventMessage<?>>> deadLetterPolicy(String processingGroup) {
-        return super.deadLetterPolicy(processingGroup);
-    }
-
-    @Override
-    public EventProcessingConfigurer registerDeadLetteringEventHandlerInvokerConfiguration(String processingGroup,
-                                                                                           DeadLetteringInvokerConfiguration configuration) {
-        return super.registerDeadLetteringEventHandlerInvokerConfiguration(processingGroup, configuration);
-    }
-
     /**
      * Registers a {@link MultiTenantDeadLetterQueue} for the given {@code processingGroup}. The given {@code queueBuilder}
      * Overrides user defined queue builder and puts the {@link SequencedDeadLetterQueue} in a {@link MultiTenantDeadLetterQueue}.
@@ -294,15 +280,10 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     }
 
     @Override
-    public EventProcessingConfigurer registerDeadLetterPolicy(String processingGroup,
-                                                              Function<Configuration, EnqueuePolicy<EventMessage<?>>> policyBuilder) {
-        return super.registerDeadLetterPolicy(processingGroup, policyBuilder);
-    }
-
-    @Override
-    public EventProcessingConfigurer registerDefaultDeadLetterPolicy(
-            Function<Configuration, EnqueuePolicy<EventMessage<?>>> policyBuilder) {
-        return super.registerDefaultDeadLetterPolicy(policyBuilder);
+    public Optional<SequencedDeadLetterProcessor<EventMessage<?>>> sequencedDeadLetterProcessor(
+            String processingGroup) {
+        return super.sequencedDeadLetterProcessor(processingGroup)
+                .map(MultiTenantDeadLetterProcessor::new);
     }
 
     private ScheduledExecutorService defaultExecutor(String factoryName) {

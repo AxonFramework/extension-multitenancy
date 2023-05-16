@@ -30,7 +30,10 @@ import org.axonframework.messaging.deadletter.DeadLetterQueueOverflowException;
 import org.axonframework.messaging.deadletter.EnqueueDecision;
 import org.axonframework.messaging.deadletter.NoSuchDeadLetterException;
 import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,19 +42,23 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 /**
  * Implementation of a {@link SequencedDeadLetterQueue} that is aware of the tenants in the application. This
- * implementation will delegate the dead letter queue to the correct tenant segment based on the {@link
- * TargetTenantResolver} provided.
+ * implementation will delegate the dead letter queue to the correct tenant segment based on the
+ * {@link TargetTenantResolver} provided.
  *
  * @author Stefan Dragisic
  * @since 4.8.0
  */
-public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements SequencedDeadLetterQueue<M>,
+public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements SequencedDeadLetterQueue<M>,
         MultiTenantAwareComponent {
+
+    private static final Logger logger = LoggerFactory.getLogger(MultiTenantDeadLetterQueue.class);
 
     private final Map<TenantDescriptor, Supplier<SequencedDeadLetterQueue<M>>> tenantSegments = new ConcurrentHashMap<>();
 
@@ -61,6 +68,7 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
     /**
      * Builder class to instantiate a {@link MultiTenantDeadLetterQueue}.
+     *
      * @param builder
      */
     public MultiTenantDeadLetterQueue(MultiTenantDeadLetterQueue.Builder<M> builder) {
@@ -71,6 +79,7 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
     /**
      * Instantiate a Builder to be able to create a {@link MultiTenantDeadLetterQueue}.
+     *
      * @return a Builder to be able to create a {@link MultiTenantDeadLetterQueue}.
      */
     public static MultiTenantDeadLetterQueue.Builder builder() {
@@ -79,6 +88,7 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
     /**
      * Registers a {@link SequencedDeadLetterQueue} that will be used by tenants.
+     *
      * @param deadLetterQueue
      */
     public void registerDeadLetterQueue(Supplier<SequencedDeadLetterQueue<M>> deadLetterQueue) {
@@ -87,6 +97,7 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
     /**
      * Returns all available tenant segments of the {@link SequencedDeadLetterQueue}.
+     *
      * @return all available tenant segments of the {@link SequencedDeadLetterQueue}.
      */
     public Map<TenantDescriptor, Supplier<SequencedDeadLetterQueue<M>>> getTenantSegments() {
@@ -94,7 +105,8 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     }
 
     private SequencedDeadLetterQueue<M> resolveTenant(DeadLetter<? extends M> deadLetter) {
-        TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(deadLetter.message(), tenantSegments.keySet());
+        TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(deadLetter.message(),
+                                                                               tenantSegments.keySet());
         SequencedDeadLetterQueue<M> tenantDeadLetterQueue = tenantSegments.get(tenantDescriptor).get();
         if (tenantDeadLetterQueue == null) {
             throw new NoSuchTenantException(tenantDescriptor.tenantId());
@@ -144,13 +156,30 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     @Override
     public boolean contains(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().contains(sequenceIdentifier);
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().contains(sequenceIdentifier);
+        } else {
+            logger.info("No tenant found for current thread. Checking if any tenant contains the sequence identifier.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .anyMatch(it -> it.get().contains(sequenceIdentifier));
+        }
     }
 
     @Override
     public Iterable<DeadLetter<? extends M>> deadLetterSequence(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().deadLetterSequence(sequenceIdentifier);
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().deadLetterSequence(sequenceIdentifier);
+        } else {
+            logger.info("No tenant found for current thread. Returning all tenants dead letter sequences.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .map(Supplier::get)
+                                 .map(it -> it.deadLetterSequence(sequenceIdentifier))
+                                 .flatMap(it -> StreamSupport.stream(it.spliterator(), false))
+                                 .collect(Collectors.toList());
+        }
     }
 
     /**
@@ -159,13 +188,30 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     @Override
     public Iterable<Iterable<DeadLetter<? extends M>>> deadLetters() {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().deadLetters();
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().deadLetters();
+        } else {
+            logger.info("No tenant found for current thread. Returning all tenants dead letters.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .map(Supplier::get)
+                                 .map(SequencedDeadLetterQueue::deadLetters)
+                                 .flatMap(it -> StreamSupport.stream(it.spliterator(), false))
+                                 .collect(Collectors.toList());
+        }
     }
 
     @Override
     public boolean isFull(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().isFull(sequenceIdentifier);
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().isFull(sequenceIdentifier);
+        } else {
+            logger.info("No tenant found for current thread. Checking if any of the tenants queues is full.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .anyMatch(tenant -> tenant.get().isFull(sequenceIdentifier));
+        }
     }
 
     /**
@@ -174,13 +220,31 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     @Override
     public long size() {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().size();
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().size();
+        } else {
+            logger.info("No tenant found for current thread. Returning total size of all tenants queues.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .map(Supplier::get)
+                                 .mapToLong(SequencedDeadLetterQueue::size)
+                                 .sum();
+        }
     }
 
     @Override
     public long sequenceSize(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().sequenceSize(sequenceIdentifier);
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().sequenceSize(sequenceIdentifier);
+        } else {
+            logger.info("No tenant found for current thread. Returning total size of sequences.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .filter(it -> it.get().contains(sequenceIdentifier))
+                                 .findFirst().map(it -> it.get().sequenceSize(sequenceIdentifier))
+                                 .orElse(0L);
+        }
     }
 
     /**
@@ -189,7 +253,16 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     @Override
     public long amountOfSequences() {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
-        return tenantSegments.get(currentTenant).get().amountOfSequences();
+        if (currentTenant != null) {
+            return tenantSegments.get(currentTenant).get().amountOfSequences();
+        } else {
+            logger.info("No tenant found for current thread. Returning total amount of sequences.");
+            return tenantSegments.values()
+                                 .stream()
+                                 .map(Supplier::get)
+                                 .mapToLong(SequencedDeadLetterQueue::amountOfSequences)
+                                 .sum();
+        }
     }
 
     /**
@@ -199,6 +272,10 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     public boolean process(Predicate<DeadLetter<? extends M>> sequenceFilter,
                            Function<DeadLetter<? extends M>, EnqueueDecision<M>> processingTask) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        if (currentTenant == null) {
+            logger.warn("No tenant found for current thread. No dead letters will be processed.");
+            return false;
+        }
         return tenantSegments.get(currentTenant).get().process(sequenceFilter, processingTask);
     }
 
@@ -208,6 +285,10 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     @Override
     public boolean process(Function<DeadLetter<? extends M>, EnqueueDecision<M>> processingTask) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        if (currentTenant == null) {
+            logger.warn("No tenant found for current thread. No dead letters will be processed.");
+            return false;
+        }
         return tenantSegments.get(currentTenant).get().process(processingTask);
     }
 
@@ -217,6 +298,10 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
     @Override
     public void clear() {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        if (currentTenant == null) {
+            logger.warn("No tenant found for current thread. No dead letters will be cleared.");
+            return;
+        }
         tenantSegments.get(currentTenant).get().clear();
     }
 
@@ -225,7 +310,6 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
      */
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
-        //to be used to create queue tenantDescriptor
         tenantSegments.putIfAbsent(tenantDescriptor, registeredDeadLetterQueue.get());
         return () -> {
             tenantSegments.remove(tenantDescriptor);
@@ -243,13 +327,14 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
 
     /**
      * Return processing group that this queue is bounded to.
+     *
      * @return processing group that this queue is bounded to.
      */
     public String processingGroup() {
         return processingGroup;
     }
 
-    public static class Builder <M extends EventMessage<?>> {
+    public static class Builder<M extends EventMessage<?>> {
 
         public TargetTenantResolver<M> targetTenantResolver;
         public String processingGroup;
@@ -261,7 +346,8 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
          * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
          * @return the current Builder instance, for fluent interfacing
          */
-        public MultiTenantDeadLetterQueue.Builder<M> targetTenantResolver(TargetTenantResolver<M> targetTenantResolver) {
+        public MultiTenantDeadLetterQueue.Builder<M> targetTenantResolver(
+                TargetTenantResolver<M> targetTenantResolver) {
             BuilderUtils.assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;
@@ -281,5 +367,4 @@ public class MultiTenantDeadLetterQueue <M extends EventMessage<?>> implements S
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
         }
     }
-
 }

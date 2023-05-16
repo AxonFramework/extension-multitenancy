@@ -36,9 +36,17 @@ import java.util.function.Predicate;
 public class MultiTenantDeadLetterProcessor
         implements SequencedDeadLetterProcessor<EventMessage<?>> {
 
-    private final TenantDescriptor tenantDescriptor;
+    private TenantDescriptor tenantDescriptor;
 
     private final SequencedDeadLetterProcessor<EventMessage<?>> delegate;
+
+    /**
+     * Creates a {@link MultiTenantDeadLetterProcessor} for the given {@link SequencedDeadLetterProcessor} delegate.
+     * @param delegate The {@link SequencedDeadLetterProcessor} delegate
+     */
+    public MultiTenantDeadLetterProcessor(SequencedDeadLetterProcessor<EventMessage<?>> delegate) {
+        this.delegate = delegate;
+    }
 
     /**
      * Creates a {@link MultiTenantDeadLetterProcessor}
@@ -47,10 +55,19 @@ public class MultiTenantDeadLetterProcessor
      * @param tenantDescriptor The {@link TenantDescriptor} used to determine the correct tenant segment
      * @param delegate The {@link SequencedDeadLetterProcessor} delegate
      */
-    public MultiTenantDeadLetterProcessor(TenantDescriptor tenantDescriptor,
+    private MultiTenantDeadLetterProcessor(TenantDescriptor tenantDescriptor,
                                            SequencedDeadLetterProcessor<EventMessage<?>> delegate) {
         this.tenantDescriptor = tenantDescriptor;
         this.delegate = delegate;
+    }
+
+    /**
+     * Sets the {@link TenantDescriptor} used to determine the correct tenant segment.
+     * @param tenantDescriptor The {@link TenantDescriptor} used to determine the correct tenant segment
+     * @return A {@link MultiTenantDeadLetterProcessor} with the given {@link TenantDescriptor}
+     */
+    public MultiTenantDeadLetterProcessor forTenant(TenantDescriptor tenantDescriptor) {
+        return new MultiTenantDeadLetterProcessor(tenantDescriptor, delegate);
     }
 
     /**
@@ -58,6 +75,9 @@ public class MultiTenantDeadLetterProcessor
      */
     @Override
     public boolean process(Predicate<DeadLetter<? extends EventMessage<?>>> sequenceFilter) {
+        if (tenantDescriptor == null) {
+            throw new IllegalStateException("Tenant descriptor is not set. Use forTenant method to set it.");
+        }
         return new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE, tenantDescriptor)
                 .fetchInTransaction(() -> delegate.process(sequenceFilter));
     }
