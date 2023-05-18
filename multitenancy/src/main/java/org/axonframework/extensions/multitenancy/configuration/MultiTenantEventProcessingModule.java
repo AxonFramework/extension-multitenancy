@@ -279,6 +279,9 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
         return super.registerDeadLetterQueue(processingGroup, configuration -> deadLetterQueue);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Optional<SequencedDeadLetterProcessor<EventMessage<?>>> sequencedDeadLetterProcessor(
             String processingGroup) {

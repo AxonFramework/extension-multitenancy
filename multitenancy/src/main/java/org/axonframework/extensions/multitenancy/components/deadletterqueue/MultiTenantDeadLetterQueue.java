@@ -69,7 +69,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
     /**
      * Builder class to instantiate a {@link MultiTenantDeadLetterQueue}.
      *
-     * @param builder
+     * @param builder the {@link Builder} used to instantiate a {@link MultiTenantDeadLetterQueue} instance.
      */
     public MultiTenantDeadLetterQueue(MultiTenantDeadLetterQueue.Builder<M> builder) {
         builder.validate();
@@ -89,7 +89,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
     /**
      * Registers a {@link SequencedDeadLetterQueue} that will be used by tenants.
      *
-     * @param deadLetterQueue
+     * @param deadLetterQueue the {@link SequencedDeadLetterQueue} that will be used by tenants.
      */
     public void registerDeadLetterQueue(Supplier<SequencedDeadLetterQueue<M>> deadLetterQueue) {
         registeredDeadLetterQueue.set(deadLetterQueue);
@@ -166,6 +166,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Iterable<DeadLetter<? extends M>> deadLetterSequence(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
@@ -201,6 +204,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isFull(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
@@ -232,6 +238,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public long sequenceSize(Object sequenceIdentifier) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
@@ -334,6 +343,10 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
         return processingGroup;
     }
 
+    /**
+     * Builder class to instantiate a {@link MultiTenantDeadLetterQueue}.
+     * @param <M> the type of {@link EventMessage} contained in the {@link DeadLetter}
+     */
     public static class Builder<M extends EventMessage<?>> {
 
         public TargetTenantResolver<M> targetTenantResolver;
@@ -353,6 +366,11 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>> implements Se
             return this;
         }
 
+        /**
+         * Sets the processing group that this queue is bounded to.
+         * @param processingGroup the processing group that this queue is bounded to.
+         * @return the current Builder instance, for fluent interfacing
+         */
         public MultiTenantDeadLetterQueue.Builder<M> processingGroup(String processingGroup) {
             BuilderUtils.assertNonNull(processingGroup, "The processingGroup is a hard requirement");
             this.processingGroup = processingGroup;

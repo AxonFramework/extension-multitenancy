@@ -126,6 +126,30 @@ Name of each event processor is: {even processor name}@{tenant name}
 Access all tenant event processors by retrieving `MultiTenantEventProcessor` only.
 `MultiTenantEventProcessor` acts as a proxy Event Processor that references all tenant event processors.
 
+#### Dead-letter queue
+
+Configuration of dead-letter queue exactly the same as in non-multi-tenant environment. Tenant will be resolved on message metadata and routed to corresponding DLQ.
+If you which to have different ensuing policy, you may use metadata from the dead letter message to determine to which tenant message belongs to and act accordingly.
+
+However, processing dead-letters from the queue is slight different as you need to specific tenant context to process dead-letter from.
+
+To be able to select tenant for which you want to process dead-letter from, you need to cast `SequencedDeadLetterProcessor` to `MultiTenantDeadLetterProcessor` and use `forTenant` method to select tenant.
+
+    SequencedDeadLetterProcessor deadLetterProcessor = configuration.sequencedDeadLetterProcessor();
+    MultiTenantDeadLetterProcessor multiTenantDeadLetterProcessor = (MultiTenantDeadLetterProcessor) deadLetterProcessor;
+    multiTenantDeadLetterProcessor.forTenant("tenant-1").process(deadLetterHandler);
+
+Here is full example of REST endpoint to retry dead-letters for specific tenant:
+
+    @PostMapping(path = "/retry-dlq")
+    public void retryDLQ(@RequestParam String tenant, @RequestParam String processingGroup) {
+        configuration.eventProcessingConfiguration()
+                .sequencedDeadLetterProcessor(processingGroup)
+                .map(p -> (MultiTenantDeadLetterProcessor) p)
+                .map(mp -> mp.forTenant(TenantDescriptor.tenantWithId(tenant)))
+                .ifPresent(SequencedDeadLetterProcessor::processAny);
+    }
+
 ### Supported multi-tenant components
 
 Currently, supported multi-tenants components are as follows:
