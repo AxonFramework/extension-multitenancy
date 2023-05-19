@@ -16,6 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.configuration;
 
+import org.axonframework.common.Registration;
 import org.axonframework.common.stream.BlockingStream;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.Configurer;
@@ -27,11 +28,17 @@ import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.TrackingToken;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
+import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterProcessor;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueue;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
 import org.axonframework.messaging.StreamableMessageSource;
 import org.axonframework.messaging.SubscribableMessageSource;
+import org.axonframework.messaging.deadletter.SequencedDeadLetterProcessor;
+import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
 
@@ -54,12 +61,82 @@ class MultiTenantEventProcessingModuleTest {
 
     private MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider;
 
+    private MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory;
+
     @BeforeEach
     void setUp() {
         configurer = DefaultConfigurer.defaultConfiguration();
         multiTenantEventProcessor = mock(MultiTenantEventProcessor.class);
         multiTenantStreamableMessageSourceProvider =
                 (defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource;
+        multiTenantDeadLetterQueueFactory = mock(MultiTenantDeadLetterQueueFactory.class);
+    }
+
+    @Test
+    public void testDeadLetterQueue() {
+        Map<String, MultiTenantDeadLetterQueue<EventMessage<?>>> multiTenantDeadLetterQueueMap = new ConcurrentHashMap<>();
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+
+        multiTenantDeadLetterQueueFactory = (processingGroup) -> multiTenantDeadLetterQueueMap.computeIfAbsent(processingGroup, (key) -> {
+            MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue  = MultiTenantDeadLetterQueue.builder()
+                                                                                                     .targetTenantResolver(
+                                                                                                             mock(TargetTenantResolver.class))
+                                                                                                     .processingGroup(processingGroup)
+                                                                                                     .build();
+            return deadLetterQueue;
+        });
+
+        SequencedDeadLetterQueue originalDeadLetterQueue = mock(SequencedDeadLetterQueue.class);
+
+
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, multiTenantDeadLetterQueueFactory));
+        configurer.eventProcessing()
+                  .registerDeadLetterQueue("dlq", c ->  originalDeadLetterQueue);
+
+        MultiTenantDeadLetterQueue<EventMessage<?>> multiTenantDeadLetterQueue = multiTenantDeadLetterQueueMap.get("dlq");
+
+        multiTenantDeadLetterQueue.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant1"));
+        multiTenantDeadLetterQueue.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant2"));
+
+        assertEquals(originalDeadLetterQueue, multiTenantDeadLetterQueue.getTenantSegment(TenantDescriptor.tenantWithId("tenant1")));
+        assertEquals(originalDeadLetterQueue, multiTenantDeadLetterQueue.getTenantSegment(TenantDescriptor.tenantWithId("tenant2")));
+    }
+
+    @Test
+    public void testSequencedDeadLetterProcessor() {
+        multiTenantDeadLetterQueueFactory = (processingGroup) -> {
+            MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue  = MultiTenantDeadLetterQueue.builder()
+                                                                                                     .targetTenantResolver(
+                                                                                                             mock(TargetTenantResolver.class))
+                                                                                                     .processingGroup(processingGroup)
+                                                                                                     .build();
+            return deadLetterQueue;
+        };
+
+        configurer.registerModule(new MultiTenantEventProcessingModule(mock(TenantProvider.class), multiTenantDeadLetterQueueFactory));
+
+        configurer.eventProcessing()
+                  .usingTrackingEventProcessors()
+                  .registerDeadLetterQueue("java.lang", c ->  mock(SequencedDeadLetterQueue.class))
+                  .configureDefaultStreamableMessageSource(config ->  mock(StreamableMessageSource.class))
+                  .registerEventHandler(c -> new Object()); // --> java.lang
+
+        Configuration configuration = configurer.start();
+
+        ArgumentCaptor<MultiTenantEventProcessor> sep = ArgumentCaptor.forClass(MultiTenantEventProcessor.class);
+        sep.getAllValues()
+           .forEach(ep -> {
+                        ep.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant1"));
+                        ep.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant2"));
+                    }
+           );
+
+        Optional<SequencedDeadLetterProcessor<EventMessage<?>>> deadLetterProcessor = configuration.eventProcessingConfiguration()
+                                                                                                                        .sequencedDeadLetterProcessor(
+                                                                                                                                "java.lang");
+
+        assertTrue(deadLetterProcessor.isPresent());
+        assertTrue(deadLetterProcessor.get() instanceof MultiTenantDeadLetterProcessor);
     }
 
     @Test
@@ -69,7 +146,7 @@ class MultiTenantEventProcessingModuleTest {
 
         TenantProvider tenantProvider = mock(TenantProvider.class);
 
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, multiTenantDeadLetterQueueFactory));
         configurer.eventProcessing()
                   .registerEventProcessorFactory((name, config, eventHandlerInvoker) -> {
                       processors.put(name, multiTenantEventProcessor);
@@ -90,7 +167,7 @@ class MultiTenantEventProcessingModuleTest {
     public void testTrackingEventProcessor() {
         StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, multiTenantDeadLetterQueueFactory));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
@@ -210,7 +287,7 @@ class MultiTenantEventProcessingModuleTest {
     public void subscribingEventProcessor() {
         SubscribableMessageSource<EventMessage<?>> mockedSource = mock(SubscribableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, multiTenantDeadLetterQueueFactory));
 
         configurer.eventProcessing()
                   .usingSubscribingEventProcessors()
@@ -235,7 +312,7 @@ class MultiTenantEventProcessingModuleTest {
     public void pooledStreamingEventProcessor() {
         StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
-        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, null)); //todo
+        configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider, multiTenantDeadLetterQueueFactory));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()
@@ -273,7 +350,7 @@ class MultiTenantEventProcessingModuleTest {
         TenantProvider tenantProvider = mock(TenantProvider.class);
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
                                                                        multiTenantStreamableMessageSourceProvider,
-                                                                       null)); //todo
+                                                                       multiTenantDeadLetterQueueFactory));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()

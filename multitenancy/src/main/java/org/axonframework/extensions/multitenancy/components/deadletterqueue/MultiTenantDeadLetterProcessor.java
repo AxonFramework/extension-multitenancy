@@ -81,4 +81,16 @@ public class MultiTenantDeadLetterProcessor
         return new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE, tenantDescriptor)
                 .fetchInTransaction(() -> delegate.process(sequenceFilter));
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean processAny() {
+        if (tenantDescriptor == null) {
+            throw new IllegalStateException("Tenant descriptor is not set. Use forTenant method to set it.");
+        }
+        return new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE, tenantDescriptor)
+                .fetchInTransaction(delegate::processAny);
+    }
 }

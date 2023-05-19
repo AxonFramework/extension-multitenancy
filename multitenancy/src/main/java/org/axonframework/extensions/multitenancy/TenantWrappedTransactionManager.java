@@ -43,19 +43,24 @@ public class TenantWrappedTransactionManager implements TransactionManager {
     @Override
     public Transaction startTransaction() {
         threadLocal.set(tenantDescriptor);
-        return delegate.startTransaction();
+        Transaction transaction = delegate.startTransaction();
+        threadLocal.remove();
+        return transaction;
     }
 
     @Override
     public void executeInTransaction(Runnable task) {
         threadLocal.set(tenantDescriptor);
         delegate.executeInTransaction(task);
+        threadLocal.remove();
     }
 
     @Override
     public <T> T fetchInTransaction(Supplier<T> supplier) {
         threadLocal.set(tenantDescriptor);
-        return delegate.fetchInTransaction(supplier);
+        T t = delegate.fetchInTransaction(supplier);
+        threadLocal.remove();
+        return t;
     }
 
     public static TenantDescriptor getCurrentTenant() {

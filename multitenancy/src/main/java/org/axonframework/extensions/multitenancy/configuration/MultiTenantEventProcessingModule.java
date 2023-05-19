@@ -38,7 +38,6 @@ import org.axonframework.extensions.multitenancy.components.eventhandeling.Multi
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.messaging.StreamableMessageSource;
 import org.axonframework.messaging.SubscribableMessageSource;
-import org.axonframework.messaging.deadletter.EnqueuePolicy;
 import org.axonframework.messaging.deadletter.SequencedDeadLetterProcessor;
 import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 
@@ -275,7 +274,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                              Function<Configuration, SequencedDeadLetterQueue<EventMessage<?>>> queueBuilder) {
         MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue = multiTenantDeadLetterQueueFactory
                 .getDeadLetterQueue(processingGroup);
-        deadLetterQueue.registerDeadLetterQueue(() -> queueBuilder.apply(configuration));
+        deadLetterQueue.registerDeadLetterQueueSupplier(() -> queueBuilder.apply(configuration));
         return super.registerDeadLetterQueue(processingGroup, configuration -> deadLetterQueue);
     }
 

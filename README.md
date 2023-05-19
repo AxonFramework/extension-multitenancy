@@ -127,6 +127,7 @@ Access all tenant event processors by retrieving `MultiTenantEventProcessor` onl
 `MultiTenantEventProcessor` acts as a proxy Event Processor that references all tenant event processors.
 
 #### Dead-letter queue
+Only JPA Dead letter queue and In-Memory queues are supported at the moment.
 
 Configuration of dead-letter queue exactly the same as in non-multi-tenant environment. Tenant will be resolved on message metadata and routed to corresponding DLQ.
 If you which to have different ensuing policy, you may use metadata from the dead letter message to determine to which tenant message belongs to and act accordingly.
