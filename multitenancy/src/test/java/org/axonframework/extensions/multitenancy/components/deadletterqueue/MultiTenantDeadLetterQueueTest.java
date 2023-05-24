@@ -189,9 +189,12 @@ class MultiTenantDeadLetterQueueTest {
         subject.getTenantSegment(TenantDescriptor.tenantWithId("tenant-send-to"));
         subject.getTenantSegment(secondTenant);
 
+        deadLetterQueues.forEach(q ->             when(q.contains(any())).thenReturn(true));
         subject.deadLetterSequence("id");
-
-        deadLetterQueues.forEach(q-> verify(q, times(1)).deadLetterSequence("id"));
+        deadLetterQueues.forEach(q-> {
+            verify(q, times(1)).contains("id");
+            verify(q, times(1)).deadLetterSequence("id");
+        });
     }
 
     @Test

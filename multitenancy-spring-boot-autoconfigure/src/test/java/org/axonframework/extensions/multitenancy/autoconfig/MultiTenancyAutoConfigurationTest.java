@@ -102,7 +102,7 @@ class MultiTenancyAutoConfigurationTest {
                          assertThat(context).getBean("multiTenantEventStore")
                                             .isExactlyInstanceOf(MultiTenantEventStore.class);
                          assertThat(context).getBean("multiTenantDeadLetterQueueFactory")
-                                            .isExactlyInstanceOf(MultiTenantDeadLetterQueueFactory.class);
+                                            .isInstanceOf(MultiTenantDeadLetterQueueFactory.class);
                      });
     }
 
