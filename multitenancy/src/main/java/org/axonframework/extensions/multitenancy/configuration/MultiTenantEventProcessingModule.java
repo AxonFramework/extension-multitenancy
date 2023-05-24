@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy.configuration;
 
+import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.AxonThreadFactory;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.EventProcessingConfigurer;
@@ -29,6 +30,7 @@ import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
+import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterProcessor;
@@ -43,6 +45,7 @@ import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Function;
@@ -60,6 +63,19 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     private final MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider;
 
     protected final MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory;
+
+    /**
+     * Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a default {@link MultiTenantStreamableMessageSourceProvider},
+     * which does not change the default {@link StreamableMessageSource} for any {@link TenantDescriptor}.
+     *
+     * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
+     */
+    public MultiTenantEventProcessingModule(TenantProvider tenantProvider) {
+        this.tenantProvider = tenantProvider;
+        this.multiTenantDeadLetterQueueFactory = null;
+        multiTenantStreamableMessageSourceProvider = ((defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource);
+    }
+
     /**
      * Initializes a {@link MultiTenantEventProcessingModule} with a default {@link TenantProvider} and a default {@link MultiTenantStreamableMessageSourceProvider},
      * which does not change the default {@link StreamableMessageSource} for any {@link TenantDescriptor}.
@@ -272,6 +288,9 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     @Override
     public EventProcessingConfigurer registerDeadLetterQueue(String processingGroup,
                                                              Function<Configuration, SequencedDeadLetterQueue<EventMessage<?>>> queueBuilder) {
+        if (multiTenantDeadLetterQueueFactory == null) {
+            throw new AxonConfigurationException("Cannot register a DeadLetterQueue without a MultiTenantDeadLetterQueueFactory");
+        }
         MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue = multiTenantDeadLetterQueueFactory
                 .getDeadLetterQueue(processingGroup);
         deadLetterQueue.registerDeadLetterQueueSupplier(() -> queueBuilder.apply(configuration));
@@ -280,6 +299,15 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
     /**
      * {@inheritDoc}
+     * <p>
+     * Wraps the {@link SequencedDeadLetterProcessor} in a {@link MultiTenantDeadLetterProcessor}, which will delegate
+     * the processing of the dead letter to the {@link SequencedDeadLetterProcessor} for the tenant of the failed event.
+     * Enabling the {@link SequencedDeadLetterProcessor} to process dead letters for multiple tenants.
+     * <p>
+     * It is necessary to invoke {@code forTenant} method on the returned {@link SequencedDeadLetterProcessor}
+     * to specify the tenant for which the dead letter should be processed.
+     *
+     * @param processingGroup The name of the processing group to register the {@link SequencedDeadLetterProcessor} for.
      */
     @Override
     public Optional<SequencedDeadLetterProcessor<EventMessage<?>>> sequencedDeadLetterProcessor(

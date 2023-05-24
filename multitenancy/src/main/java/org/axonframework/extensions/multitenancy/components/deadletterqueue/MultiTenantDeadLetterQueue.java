@@ -52,6 +52,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * Implementation of a {@link SequencedDeadLetterQueue} that is aware of the tenants in the application. This
  * implementation will dead-letter queue operations to the correct tenant segment based on the provided {@link TargetTenantResolver}.
  *
+ * @param <M> An implementation of {@link Message} contained in the {@link DeadLetter dead letters} within this queue.
  * @author Stefan Dragisic
  * @since 4.8.0
  */
@@ -70,6 +71,8 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
      * Builder class to instantiate a {@link MultiTenantDeadLetterQueue}.
      *
      * @param builder the {@link Builder} used to instantiate a {@link MultiTenantDeadLetterQueue} instance.
+     * The {@link TargetTenantResolver} is a <b>hard requirement</b> and as such should be provided.
+     * The {@link String} processingGroup is a <b>hard requirement</b> and as such should be provided.
      */
     protected MultiTenantDeadLetterQueue(MultiTenantDeadLetterQueue.Builder<M> builder) {
         builder.validate();
@@ -99,6 +102,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
      * Gets the {@link SequencedDeadLetterQueue} for the given {@link TenantDescriptor}.
      * If the tenant is not registered, it will return null. If the tenant is registered, but the
      * {@link SequencedDeadLetterQueue} is not yet created, it will create it and return it.
+     *
+     * @param tenantDescriptor the {@link TenantDescriptor} for which to get the {@link SequencedDeadLetterQueue}.
+     * @return the {@link SequencedDeadLetterQueue} for the given {@link TenantDescriptor}.
      */
     public SequencedDeadLetterQueue<M> getTenantSegment(TenantDescriptor tenantDescriptor) {
         return tenantSegments.computeIfAbsent(tenantDescriptor, t -> {
@@ -155,7 +161,15 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Check whether there's a sequence of {@link DeadLetter dead letters} for the given {@code sequenceIdentifier}.
+     * <p>
+     * If executed in tenant aware transaction, it will check if the current tenant contains the sequence identifier,
+     * otherwise it will check if any registered tenant contains the sequence identifier.
+     *
+     * @param sequenceIdentifier The identifier used to validate for contained {@link DeadLetter dead letters}
+     *                           instances.
+     * @return {@code true} if there are {@link DeadLetter dead letters} present for the given
+     * {@code sequenceIdentifier}, {@code false} otherwise.
      */
     @Override
     public boolean contains(Object sequenceIdentifier) {
@@ -168,8 +182,16 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
                                                                               seg -> seg.contains(sequenceIdentifier)));
         }
     }
+
     /**
-     * {@inheritDoc}
+     * Return all the {@link DeadLetter dead letters} for the given {@code sequenceIdentifier} in insert order.
+     * If executed in tenant aware transaction, it will return all the {@link DeadLetter dead letters} for the given
+     * {@code sequenceIdentifier} for current tenant, otherwise it will return all the
+     * {@link DeadLetter dead letters} for the given {@code sequenceIdentifier} for any registered tenant that contains
+     * the sequence identifier.
+     *
+     * @param sequenceIdentifier The identifier of the sequence of {@link DeadLetter dead letters}to return.
+     * @return All the {@link DeadLetter dead letters} for the given {@code sequenceIdentifier} in insert order.
      */
     @Override
     public Iterable<DeadLetter<? extends M>> deadLetterSequence(Object sequenceIdentifier) {
@@ -178,7 +200,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
             return fetchFromTenantSegment(currentTenant, seg -> seg.deadLetterSequence(sequenceIdentifier));
         } else {
             logger.info("No tenant found for current thread. Returning all tenants dead letter sequences.");
-            return tenants.stream().map(tenant -> fetchFromTenantSegment(tenant,
+            return tenants.stream()
+                          .filter(tenant -> fetchFromTenantSegment(tenant, seg -> seg.contains(sequenceIdentifier)))
+                          .map(tenant -> fetchFromTenantSegment(tenant,
                                                                          seg -> seg.deadLetterSequence(
                                                                                  sequenceIdentifier)))
                           .flatMap(it -> StreamSupport.stream(it.spliterator(), false)).collect(Collectors.toList());
@@ -186,7 +210,14 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Return all {@link DeadLetter dead letter} sequences held by this queue. The sequences are not necessarily
+     * returned in insert order.
+     * <p>
+     * If executed in tenant aware transaction, it will return all {@link DeadLetter dead letter} sequences held by
+     * current tenant, otherwise it will return all {@link DeadLetter dead letter} sequences held by all registered
+     * tenant.
+     *
+     * @return All {@link DeadLetter dead letter} sequences held by this queue.
      */
     @Override
     public Iterable<Iterable<DeadLetter<? extends M>>> deadLetters() {
@@ -201,7 +232,16 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Validates whether this queue is full for the given {@code sequenceIdentifier}.
+     * <p>
+     * This method returns {@code true} either when the maximum amount of sequences or the maximum sequence size is
+     * reached.
+     * <p>
+     * If executed in tenant aware transaction, it will check if the current tenant queue is full, otherwise it will
+     * check if any registered tenant queue is full.
+     *
+     * @param sequenceIdentifier The identifier of the sequence to validate for.
+     * @return {@code true} either when the limit of this queue is reached. Returns {@code false} otherwise.
      */
     @Override
     public boolean isFull(Object sequenceIdentifier) {
@@ -216,7 +256,12 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the number of dead letters contained in this queue.
+     * <p>
+     * If executed in tenant aware transaction, it will return the number of dead letters contained in current
+     * tenant queue, otherwise it will return the number of dead letters contained in all registered tenants queues.
+     *
+     * @return The number of dead letters contained in this queue.
      */
     @Override
     public long size() {
@@ -231,7 +276,19 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the number of dead letters for the sequence matching the given {@code sequenceIdentifier} contained in
+     * this queue.
+     * <p>
+     * Note that there's a window of opportunity where the size might exceed the maximum sequence size to accompany
+     * concurrent usage.
+     * <p>
+     * If executed in tenant aware transaction, it will return the number of dead letters for the sequence matching the
+     * given {@code sequenceIdentifier} contained in current tenant queue, otherwise it will return the number of dead
+     * letters for the sequence matching the given {@code sequenceIdentifier} contained in any registered tenant queue,
+     * that contains the sequence identifier.
+     *
+     * @param sequenceIdentifier The identifier of the sequence to retrieve the size from.
+     * @return The number of dead letters for the sequence matching the given {@code sequenceIdentifier}.
      */
     @Override
     public long sequenceSize(Object sequenceIdentifier) {
@@ -249,7 +306,15 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the number of unique sequences contained in this queue.
+     * <p>
+     * Note that there's a window of opportunity where the size might exceed the maximum amount of sequences to
+     * accompany concurrent usage of this dead letter queue.
+     * <p>
+     * If executed in tenant aware transaction, it will return the number of unique sequences contained in current
+     * tenant queue, otherwise it will return the number of unique sequences contained in all registered tenants.
+     *
+     * @return The number of unique sequences contained in this queue.
      */
     @Override
     public long amountOfSequences() {
@@ -265,7 +330,35 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Process a sequence of enqueued {@link DeadLetter dead letters} through the given {@code processingTask} matching
+     * the {@code sequenceFilter}. Will pick the oldest available sequence based on the {@link DeadLetter#lastTouched()}
+     * field from every sequence's first entry.
+     * <p>
+     * Note that only a <em>single</em> matching sequence is processed! Furthermore, only the first dead letter is
+     * validated, because it is the blocker for the processing of the rest of the sequence.
+     * <p>
+     * Uses the {@link EnqueueDecision} returned by the {@code processingTask} to decide whether to
+     * {@link #evict(DeadLetter)} or {@link #requeue(DeadLetter, UnaryOperator)} a dead letter from the selected
+     * sequence. The {@code processingTask} is invoked as long as letters are present in the selected sequence and the
+     * result of processing returns {@code false} for {@link EnqueueDecision#shouldEnqueue()} decision. The latter means
+     * the dead letter should be evicted.
+     * <p>
+     * This operation protects against concurrent invocations of the {@code processingTask} on the filtered sequence.
+     * Doing so ensure enqueued messages are handled in order.
+     * <p>
+     * If executed in tenant aware transaction, it will process a sequence of enqueued {@link DeadLetter dead letters}
+     * through the given {@code processingTask} matching the {@code sequenceFilter} from current tenant queue,
+     * otherwise it will process a sequence of enqueued {@link DeadLetter dead letters} through the given
+     * {@code processingTask} matching the {@code sequenceFilter} from all registered tenants queues.
+     *
+     * @param sequenceFilter A {@link Predicate lambda} selecting the sequences within this queue to process with the
+     *                       {@code processingTask}.
+     * @param processingTask A function processing a {@link DeadLetter dead letter}. Returns a {@link EnqueueDecision}
+     *                       used to deduce whether to {@link #evict(DeadLetter)} or
+     *                       {@link #requeue(DeadLetter, UnaryOperator)} the dead letter.
+     * @return {@code true} if any entire sequence of {@link DeadLetter dead letters} was processed successfully,
+     * {@code false} otherwise. This means the {@code processingTask} processed all {@link DeadLetter dead letters} of a
+     * sequence and the outcome was to evict each instance.
      */
     @Override
     public boolean process(Predicate<DeadLetter<? extends M>> sequenceFilter,
@@ -284,7 +377,32 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Process a sequence of enqueued {@link DeadLetter dead letters} with the given {@code processingTask}. Will pick
+     * the oldest available sequence based on the {@link DeadLetter#lastTouched()} field from every sequence's first
+     * entry.
+     * <p>
+     * Note that only a <em>single</em> matching sequence is processed!
+     * <p>
+     * Uses the {@link EnqueueDecision} returned by the {@code processingTask} to decide whether to
+     * {@link #evict(DeadLetter)} or {@link #requeue(DeadLetter, UnaryOperator)} the dead letter. The
+     * {@code processingTask} is invoked as long as letters are present in the selected sequence and the result of
+     * processing returns {@code false} for {@link EnqueueDecision#shouldEnqueue()} decision. The latter means the dead
+     * letter should be evicted.
+     * <p>
+     * This operation protects against concurrent invocations of the {@code processingTask} on the filtered sequence. *
+     * Doing so ensure enqueued messages are handled in order.
+     * <p>
+     * If executed in tenant aware transaction, it will process a sequence of enqueued {@link DeadLetter dead letters}
+     * with the given {@code processingTask} from current tenant queue, otherwise it will process a sequence of
+     * enqueued {@link DeadLetter dead letters} with the given {@code processingTask} from all registered tenants
+     * queues.
+     *
+     * @param processingTask A function processing a {@link DeadLetter dead letter}. Returns a {@link EnqueueDecision}
+     *                       used to deduce whether to {@link #evict(DeadLetter)} or
+     *                       {@link #requeue(DeadLetter, UnaryOperator)} the dead letter.
+     * @return {@code true} if any entire sequence of {@link DeadLetter dead letters} was processed successfully,
+     * {@code false} otherwise. This means the {@code processingTask} processed all {@link DeadLetter dead letters} of a
+     * sequence and the outcome was to evict each instance.
      */
     @Override
     public boolean process(Function<DeadLetter<? extends M>, EnqueueDecision<M>> processingTask) {
@@ -299,7 +417,11 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * {@inheritDoc}
+     * Clears out all {@link DeadLetter dead letters} present in this queue.
+     * <p>
+     * If executed in tenant aware transaction, it will clear out all {@link DeadLetter dead letters} present in
+     * current tenant queue, otherwise it will clear out all {@link DeadLetter dead letters}
+     * all registered tenants queues.
      */
     @Override
     public void clear() {
@@ -313,17 +435,16 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     private <R> R fetchFromTenantSegment(TenantDescriptor tenantDescriptor,
-                                         Function<SequencedDeadLetterQueue<M>, R> function) {
-        R res = new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE,
-                                                  tenantDescriptor).fetchInTransaction(() -> function.apply(
+                                         Function<SequencedDeadLetterQueue<M>, R> fetchBlock) {
+        R res = new TenantWrappedTransactionManager(tenantDescriptor).fetchInTransaction(() -> fetchBlock.apply(
                 getTenantSegment(tenantDescriptor)));
         return res;
     }
 
     private void executeForTenantSegment(TenantDescriptor tenantDescriptor,
-                                         Consumer<SequencedDeadLetterQueue<M>> consumer) {
-        new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE, tenantDescriptor).fetchInTransaction(() -> {
-            consumer.accept(getTenantSegment(tenantDescriptor));
+                                         Consumer<SequencedDeadLetterQueue<M>> executeBlock) {
+        new TenantWrappedTransactionManager(tenantDescriptor).fetchInTransaction(() -> {
+            executeBlock.accept(getTenantSegment(tenantDescriptor));
             return null;
         });
     }
@@ -371,6 +492,8 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
         /**
          * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message}
          * message.
+         * <p>
+         * This is a <b>hard requirement</b> and as such should be provided.
          *
          * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
          * @return the current Builder instance, for fluent interfacing
@@ -389,15 +512,22 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
          * @return the current Builder instance, for fluent interfacing
          */
         public MultiTenantDeadLetterQueue.Builder<M> processingGroup(String processingGroup) {
-            BuilderUtils.assertNonNull(processingGroup, "The processingGroup is a hard requirement");
             this.processingGroup = processingGroup;
             return this;
         }
 
+        /**
+         * Initializes a {@link MultiTenantDeadLetterQueue} as specified through this Builder.
+         *
+         * @return a {@link MultiTenantDeadLetterQueue} as specified through this Builder
+         */
         public MultiTenantDeadLetterQueue<M> build() {
             return new MultiTenantDeadLetterQueue<>(this);
         }
 
+        /**
+         * Validates whether the fields contained in this Builder are set accordingly.
+         */
         protected void validate() {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
         }

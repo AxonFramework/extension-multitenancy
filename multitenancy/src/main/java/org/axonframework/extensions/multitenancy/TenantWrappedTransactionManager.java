@@ -15,6 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy;
 
+import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.common.transaction.Transaction;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -34,6 +35,10 @@ public class TenantWrappedTransactionManager implements TransactionManager {
     private final TenantDescriptor tenantDescriptor;
     private static final ThreadLocal<TenantDescriptor> threadLocal = new ThreadLocal<>();
 
+    public TenantWrappedTransactionManager(TenantDescriptor tenantDescriptor) {
+        this.delegate = NoTransactionManager.INSTANCE;
+        this.tenantDescriptor = tenantDescriptor;
+    }
     public TenantWrappedTransactionManager(TransactionManager delegate,
                                            TenantDescriptor tenantDescriptor) {
         this.delegate = delegate;

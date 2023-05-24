@@ -17,19 +17,26 @@
 package org.axonframework.extensions.multitenancy.components.deadletterqueue;
 
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.messaging.Message;
+import org.axonframework.messaging.deadletter.DeadLetter;
 
 /**
  * Factory for creating {@link MultiTenantDeadLetterQueue} instances.
  * <p>
  * This factory is used to create a {@link MultiTenantDeadLetterQueue} for a specific processing group.
  *
+ * @param <M> An implementation of {@link Message} contained in the {@link DeadLetter dead letters} within this queue.
  * @author Stefan Dragisic
  * @since 4.8.0
  */
 @FunctionalInterface
 public interface MultiTenantDeadLetterQueueFactory <M extends EventMessage<?>> {
 
-    //get the dead letter queue for the given processing group
+    /**
+     * Returns a {@link MultiTenantDeadLetterQueue} for the given processing group.
+     * @param processingGroup The processing group for which to return a {@link MultiTenantDeadLetterQueue}
+     * @return a {@link MultiTenantDeadLetterQueue} for the given processing group
+     */
     MultiTenantDeadLetterQueue<M> getDeadLetterQueue(String processingGroup);
 
 }

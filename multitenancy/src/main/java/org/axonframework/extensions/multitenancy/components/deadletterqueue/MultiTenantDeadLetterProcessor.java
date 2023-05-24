@@ -79,7 +79,7 @@ public class MultiTenantDeadLetterProcessor
         if (tenantDescriptor == null) {
             throw new IllegalStateException("Tenant descriptor is not set. Use forTenant method to set it.");
         }
-        return new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE, tenantDescriptor)
+        return new TenantWrappedTransactionManager(tenantDescriptor)
                 .fetchInTransaction(() -> delegate.process(sequenceFilter));
     }
 
@@ -91,7 +91,7 @@ public class MultiTenantDeadLetterProcessor
         if (tenantDescriptor == null) {
             throw new IllegalStateException("Tenant descriptor is not set. Use forTenant method to set it.");
         }
-        return new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE, tenantDescriptor)
+        return new TenantWrappedTransactionManager(tenantDescriptor)
                 .fetchInTransaction(delegate::processAny);
     }
 }
