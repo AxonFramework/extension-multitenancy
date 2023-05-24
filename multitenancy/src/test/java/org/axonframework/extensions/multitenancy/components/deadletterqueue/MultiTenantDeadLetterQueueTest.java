@@ -68,8 +68,6 @@ class MultiTenantDeadLetterQueueTest {
         subject.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant-send-to"));
     }
 
-
-
     @Test
     void testInit() {
         assertEquals(subject.getTenantSegment(TenantDescriptor.tenantWithId("tenant-send-to")), deadLetterQueues.stream().findFirst().get());

@@ -50,8 +50,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 /**
  * Implementation of a {@link SequencedDeadLetterQueue} that is aware of the tenants in the application. This
- * implementation will delegate the dead letter queue to the correct tenant segment based on the
- * {@link TargetTenantResolver} provided.
+ * implementation will dead-letter queue operations to the correct tenant segment based on the provided {@link TargetTenantResolver}.
  *
  * @author Stefan Dragisic
  * @since 4.8.0
@@ -72,7 +71,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
      *
      * @param builder the {@link Builder} used to instantiate a {@link MultiTenantDeadLetterQueue} instance.
      */
-    public MultiTenantDeadLetterQueue(MultiTenantDeadLetterQueue.Builder<M> builder) {
+    protected MultiTenantDeadLetterQueue(MultiTenantDeadLetterQueue.Builder<M> builder) {
         builder.validate();
         this.targetTenantResolver = builder.targetTenantResolver;
         this.processingGroup = builder.processingGroup;
@@ -83,8 +82,8 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
      *
      * @return a Builder to be able to create a {@link MultiTenantDeadLetterQueue}.
      */
-    public static MultiTenantDeadLetterQueue.Builder builder() {
-        return new MultiTenantDeadLetterQueue.Builder();
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
@@ -258,7 +257,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
         if (currentTenant != null) {
             return fetchFromTenantSegment(currentTenant, SequencedDeadLetterQueue::amountOfSequences);
         } else {
-            logger.info("No tenant found for current thread. Returning total amount of sequences.");
+            logger.info("No tenant found for current thread. Returning total amount of all sequences from every tenant.");
             return tenants.stream().mapToLong(tenant -> fetchFromTenantSegment(tenant,
                                                                                SequencedDeadLetterQueue::amountOfSequences))
                           .sum();
@@ -275,7 +274,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
         if (currentTenant != null) {
             return fetchFromTenantSegment(currentTenant, seg -> seg.process(sequenceFilter, processingTask));
         } else {
-            logger.info("No tenant found for current thread. Processing all tenants queues.");
+            logger.info("No tenant found for current thread. Will process a sequence for all tenants.");
             return tenants.stream().map(tenant -> fetchFromTenantSegment(tenant,
                                                                          seg -> seg.process(sequenceFilter,
                                                                                             processingTask))).reduce(
@@ -293,7 +292,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
         if (currentTenant != null) {
             return fetchFromTenantSegment(currentTenant, seg -> seg.process(processingTask));
         } else {
-            logger.info("No tenant found for current thread. Processing all tenants queues.");
+            logger.info("No tenant found for current thread. Will process a sequence for all tenants.");
             return tenants.stream().map(tenant -> fetchFromTenantSegment(tenant, seg -> seg.process(processingTask)))
                           .reduce(false, (a, b) -> a || b);
         }
@@ -308,7 +307,7 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
         if (currentTenant != null) {
             executeForTenantSegment(currentTenant, SequencedDeadLetterQueue::clear);
         } else {
-            logger.info("No tenant found for current thread. Clearing all tenants queues.");
+            logger.info("No tenant found for current thread. Clearing queues for all tenants.");
             tenants.forEach(tenant -> executeForTenantSegment(tenant, SequencedDeadLetterQueue::clear));
         }
     }
@@ -351,9 +350,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
     }
 
     /**
-     * Return processing group that this queue is bounded to.
+     * Return the processing group that this queue is bound to.
      *
-     * @return processing group that this queue is bounded to.
+     * @return The processing group that this queue is bound to.
      */
     public String processingGroup() {
         return processingGroup;
@@ -366,12 +365,12 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
      */
     public static class Builder<M extends EventMessage<?>> {
 
-        public TargetTenantResolver<M> targetTenantResolver;
-        public String processingGroup;
+        private TargetTenantResolver<M> targetTenantResolver;
+        private String processingGroup;
 
         /**
          * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message}
-         * message
+         * message.
          *
          * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
          * @return the current Builder instance, for fluent interfacing
@@ -384,9 +383,9 @@ public class MultiTenantDeadLetterQueue<M extends EventMessage<?>>
         }
 
         /**
-         * Sets the processing group that this queue is bounded to.
+         * Sets the processing group that this queue is bound to.
          *
-         * @param processingGroup the processing group that this queue is bounded to.
+         * @param processingGroup The processing group that this queue is bound to.
          * @return the current Builder instance, for fluent interfacing
          */
         public MultiTenantDeadLetterQueue.Builder<M> processingGroup(String processingGroup) {

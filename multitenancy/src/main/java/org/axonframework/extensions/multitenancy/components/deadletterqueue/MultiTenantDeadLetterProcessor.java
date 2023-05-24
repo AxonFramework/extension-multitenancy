@@ -26,9 +26,8 @@ import org.axonframework.messaging.deadletter.SequencedDeadLetterProcessor;
 import java.util.function.Predicate;
 
 /**
- * Utility class, implementation of a {@link SequencedDeadLetterProcessor} that is used to invoke process operation on a correct tenant segment.
- * This implementation will delegate the method to the correct tenant segment based on the {@link
- * TenantDescriptor} provided.
+ * Utility class, implementing a {@link SequencedDeadLetterProcessor} that invokes dead letter process operations on the correct tenant segment.
+ * This implementation will delegate the method to the correct tenant segment based on the provided {@link TenantDescriptor}.
  *
  * @author Stefan Dragisic
  * @since 4.8.0
@@ -42,6 +41,7 @@ public class MultiTenantDeadLetterProcessor
 
     /**
      * Creates a {@link MultiTenantDeadLetterProcessor} for the given {@link SequencedDeadLetterProcessor} delegate.
+     *
      * @param delegate The {@link SequencedDeadLetterProcessor} delegate
      */
     public MultiTenantDeadLetterProcessor(SequencedDeadLetterProcessor<EventMessage<?>> delegate) {
@@ -63,6 +63,7 @@ public class MultiTenantDeadLetterProcessor
 
     /**
      * Sets the {@link TenantDescriptor} used to determine the correct tenant segment.
+     *
      * @param tenantDescriptor The {@link TenantDescriptor} used to determine the correct tenant segment
      * @return A {@link MultiTenantDeadLetterProcessor} with the given {@link TenantDescriptor}
      */
