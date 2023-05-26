@@ -21,6 +21,7 @@ import org.axonframework.extensions.multitenancy.components.TenantConnectPredica
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.MultiTenantCommandBus;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
@@ -100,6 +101,8 @@ class MultiTenancyAutoConfigurationTest {
                                             .isExactlyInstanceOf(MultiTenantQueryBus.class);
                          assertThat(context).getBean("multiTenantEventStore")
                                             .isExactlyInstanceOf(MultiTenantEventStore.class);
+                         assertThat(context).getBean("multiTenantDeadLetterQueueFactory")
+                                            .isInstanceOf(MultiTenantDeadLetterQueueFactory.class);
                      });
     }
 
@@ -120,6 +123,7 @@ class MultiTenancyAutoConfigurationTest {
                          assertThat(context).doesNotHaveBean(TenantQuerySegmentFactory.class);
                          assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
                          assertThat(context).doesNotHaveBean(TenantEventSegmentFactory.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantDeadLetterQueueFactory.class);
                      });
     }
 

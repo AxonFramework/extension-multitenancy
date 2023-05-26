@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ class TenantWrappedTransactionManagerTest {
 
         testSubject.startTransaction();
 
-        assertEquals(tenant1, TenantWrappedTransactionManager.getCurrentTenant());
+        assertNull(TenantWrappedTransactionManager.getCurrentTenant());
         verify(delegate, times(1)).startTransaction();
     }
 
@@ -56,11 +56,10 @@ class TenantWrappedTransactionManagerTest {
     public void executeInTransaction() {
         doNothing().when(delegate).executeInTransaction(any());
 
-        Runnable task = () -> {
-        };
+        Runnable task = () -> assertEquals(tenant1, TenantWrappedTransactionManager.getCurrentTenant());
         testSubject.executeInTransaction(task);
 
-        assertEquals(tenant1, TenantWrappedTransactionManager.getCurrentTenant());
+        assertNull(TenantWrappedTransactionManager.getCurrentTenant());
         verify(delegate, times(1)).executeInTransaction(task);
     }
 
@@ -68,11 +67,13 @@ class TenantWrappedTransactionManagerTest {
     public void fetchInTransaction() {
         when(delegate.fetchInTransaction(any())).thenReturn("result");
 
-        Supplier<String> supplier = () -> "string";
+        Supplier<String> supplier = () -> {
+            assertEquals(tenant1, TenantWrappedTransactionManager.getCurrentTenant());
+            return "string";
+        };
+        testSubject.fetchInTransaction(supplier);
 
-        assertEquals("result", testSubject.fetchInTransaction(supplier));
-
-        assertEquals(tenant1, TenantWrappedTransactionManager.getCurrentTenant());
+        assertNull(TenantWrappedTransactionManager.getCurrentTenant());
         verify(delegate, times(1)).fetchInTransaction(supplier);
     }
 }

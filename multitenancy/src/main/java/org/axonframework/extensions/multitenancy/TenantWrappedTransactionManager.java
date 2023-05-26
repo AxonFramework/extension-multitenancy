@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy;
 
+import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.common.transaction.Transaction;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -34,6 +35,20 @@ public class TenantWrappedTransactionManager implements TransactionManager {
     private final TenantDescriptor tenantDescriptor;
     private static final ThreadLocal<TenantDescriptor> threadLocal = new ThreadLocal<>();
 
+    /**
+     * Creates a new {@link TenantWrappedTransactionManager} with the given {@code tenantDescriptor}.
+     * @param tenantDescriptor the tenant descriptor to be added to the transaction context
+     */
+    public TenantWrappedTransactionManager(TenantDescriptor tenantDescriptor) {
+        this.delegate = NoTransactionManager.INSTANCE;
+        this.tenantDescriptor = tenantDescriptor;
+    }
+
+    /**
+     * Creates a new {@link TenantWrappedTransactionManager} with the given {@code delegate} and {@code tenantDescriptor}.
+     * @param delegate the delegate transaction manager.
+     * @param tenantDescriptor the tenant descriptor to be added to the transaction context
+     */
     public TenantWrappedTransactionManager(TransactionManager delegate,
                                            TenantDescriptor tenantDescriptor) {
         this.delegate = delegate;
@@ -43,19 +58,24 @@ public class TenantWrappedTransactionManager implements TransactionManager {
     @Override
     public Transaction startTransaction() {
         threadLocal.set(tenantDescriptor);
-        return delegate.startTransaction();
+        Transaction transaction = delegate.startTransaction();
+        threadLocal.remove();
+        return transaction;
     }
 
     @Override
     public void executeInTransaction(Runnable task) {
         threadLocal.set(tenantDescriptor);
         delegate.executeInTransaction(task);
+        threadLocal.remove();
     }
 
     @Override
     public <T> T fetchInTransaction(Supplier<T> supplier) {
         threadLocal.set(tenantDescriptor);
-        return delegate.fetchInTransaction(supplier);
+        T t = delegate.fetchInTransaction(supplier);
+        threadLocal.remove();
+        return t;
     }
 
     public static TenantDescriptor getCurrentTenant() {
