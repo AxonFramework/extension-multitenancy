@@ -81,6 +81,8 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
      * which does not change the default {@link StreamableMessageSource} for any {@link TenantDescriptor}.
      *
      * @param tenantProvider the default {@link TenantProvider} used to build {@link MultiTenantEventProcessor}s
+     * @param multiTenantDeadLetterQueueFactory the {@link MultiTenantDeadLetterQueueFactory}
+     * used to build {@link MultiTenantDeadLetterQueue}s for each {@link TenantDescriptor}
      */
     public MultiTenantEventProcessingModule(TenantProvider tenantProvider, MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory) {
         this.tenantProvider = tenantProvider;
@@ -98,7 +100,8 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
      * @param multiTenantStreamableMessageSourceProvider the {@link MultiTenantStreamableMessageSourceProvider} used to
      *                                                   customize the {@link StreamableMessageSource} for each
      *                                                   {@link TenantDescriptor}
-     * @param multiTenantDeadLetterQueueFactory
+     * @param multiTenantDeadLetterQueueFactory         the {@link MultiTenantDeadLetterQueueFactory}
+     *                                                  used to build {@link MultiTenantDeadLetterQueue}s for each {@link TenantDescriptor}
      */
     public MultiTenantEventProcessingModule(TenantProvider tenantProvider,
                                             MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider,

@@ -35,10 +35,20 @@ public class TenantWrappedTransactionManager implements TransactionManager {
     private final TenantDescriptor tenantDescriptor;
     private static final ThreadLocal<TenantDescriptor> threadLocal = new ThreadLocal<>();
 
+    /**
+     * Creates a new {@link TenantWrappedTransactionManager} with the given {@code tenantDescriptor}.
+     * @param tenantDescriptor the tenant descriptor to be added to the transaction context
+     */
     public TenantWrappedTransactionManager(TenantDescriptor tenantDescriptor) {
         this.delegate = NoTransactionManager.INSTANCE;
         this.tenantDescriptor = tenantDescriptor;
     }
+
+    /**
+     * Creates a new {@link TenantWrappedTransactionManager} with the given {@code delegate} and {@code tenantDescriptor}.
+     * @param delegate the delegate transaction manager.
+     * @param tenantDescriptor the tenant descriptor to be added to the transaction context
+     */
     public TenantWrappedTransactionManager(TransactionManager delegate,
                                            TenantDescriptor tenantDescriptor) {
         this.delegate = delegate;

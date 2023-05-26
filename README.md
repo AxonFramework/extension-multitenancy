@@ -25,6 +25,9 @@ Currently, following requirements needs to be meet for extension to work:
 - Use **Axon Server EE 4.6+** or Axon Cloud as event store
 - This is not hard requirement but if you wish to enable multitenancy on projection side, only SQL databases are supported out-of-the box
 
+## Restrictions
+Only components that interact with Axon Server and or database via JPA are supported out of the box.
+If you wish to use other components, you need to implement multi-tenancy support for them.
 
 ### Configuration
 
@@ -127,22 +130,22 @@ Access all tenant event processors by retrieving `MultiTenantEventProcessor` onl
 `MultiTenantEventProcessor` acts as a proxy Event Processor that references all tenant event processors.
 
 #### Dead-letter queue
-Only JPA Dead letter queue and In-Memory queues are supported at the moment.
 
 The configuration of a dead-letter queue is similar to a non-multi-tenant environment. The tenant will be resolved through the Message's `MetaData` and routed to the corresponding DLQ.
 If you wish to have different enqueuing policies per tenant, you can use the `MetaData` from the dead letter message to determine to which tenant the message belongs to act accordingly.
 
 Do note that processing dead letters from the queue is slightly different, as you need the specific tenant context to process dead-letter from.
 
-To be able to select the tenant for which you want to process a dead letter, you need to cast the `SequencedDeadLetterProcessor` to a `MultiTenantDeadLetterProcessor`.
-From the `MultiTenantDeadLetterProcessor`, you can use the `forTenant` method to select the tenant-specific `SequencedDeadLetterProcessor`.
+To select the tenant for which you want to process a dead letter, you need to cast the `SequencedDeadLetterProcessor` to a `MultiTenantDeadLetterProcessor`.
+From the `MultiTenantDeadLetterProcessor`, you need to use the `forTenant` method to select the tenant-specific `SequencedDeadLetterProcessor`.
 
 ```java
 SequencedDeadLetterProcessor deadLetterProcessor = configuration.sequencedDeadLetterProcessor();
 MultiTenantDeadLetterProcessor multiTenantDeadLetterProcessor = (MultiTenantDeadLetterProcessor) deadLetterProcessor;
 multiTenantDeadLetterProcessor.forTenant("tenant-1").process(deadLetterHandler);
-
+```
 Here is a full example of a REST endpoint to retry dead letters for a specific tenant:
+
 
 ```java
 @PostMapping(path = "/retry-dlq")
@@ -153,6 +156,9 @@ public void retryDLQ(@RequestParam String tenant, @RequestParam String processin
             .map(mp -> mp.forTenant(TenantDescriptor.tenantWithId(tenant)))
             .ifPresent(SequencedDeadLetterProcessor::processAny);
 }
+```
+
+Only JPA Dead letter queue and In-Memory queues are supported.
 
 ### Supported multi-tenant components
 
