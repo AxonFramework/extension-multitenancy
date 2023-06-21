@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,20 +31,24 @@ import org.mockito.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantEventProcessorControlService}.
+ *
  * @author Stefan Dragisic
  */
 class MultiTenantEventProcessorControlServiceTest {
 
-    AxonServerConnectionManager axonServerConnectionManager;
-    EventProcessingConfiguration eventProcessingConfiguration;
-    AxonServerConfiguration axonServerConfiguration;
+    private AxonServerConnectionManager axonServerConnectionManager;
+    private EventProcessingConfiguration eventProcessingConfiguration;
+
     private MultiTenantEventProcessorControlService testSubject;
 
     @BeforeEach
     void setUp() {
         axonServerConnectionManager = mock(AxonServerConnectionManager.class);
         eventProcessingConfiguration = mock(EventProcessingConfiguration.class);
-        axonServerConfiguration = mock(AxonServerConfiguration.class);
+        AxonServerConfiguration axonServerConfiguration = mock(AxonServerConfiguration.class);
+        when(axonServerConfiguration.getEventProcessorConfiguration())
+                .thenReturn(new AxonServerConfiguration.EventProcessorConfiguration());
         testSubject = new MultiTenantEventProcessorControlService(axonServerConnectionManager,
                                                                   eventProcessingConfiguration,
                                                                   axonServerConfiguration);
@@ -122,6 +126,7 @@ class MultiTenantEventProcessorControlServiceTest {
                 mock(MultiTenantEventProcessor.class)
         ));
 
+        //noinspection resource
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant-2"));
         verify(controlTenant2).registerEventProcessor(eq("tep@tenant-2"), any(), any());
     }
