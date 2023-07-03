@@ -22,11 +22,11 @@
         <version>4.9.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>multitenancy-spring-boot-autoconfigure</artifactId>
+    <artifactId>axon-multitenancy-spring-boot-autoconfigure</artifactId>
 
     <name>Axon Framework MultiTenancy Extension - Spring Boot Support</name>
     <description>
-        Module providing support for auto configuration of the MultiTenancy Axon Framework extension through Spring
+        Module providing support for autoconfiguration of the MultiTenancy Axon Framework extension through Spring
         Boot.
     </description>
 
