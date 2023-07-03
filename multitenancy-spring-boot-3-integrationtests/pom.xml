@@ -54,7 +54,7 @@
 
         <dependency>
             <groupId>org.axonframework.extensions.multitenancy</groupId>
-            <artifactId>multitenancy-spring-boot-starter</artifactId>
+            <artifactId>axon-multitenancy-spring-boot-starter</artifactId>
             <version>${project.version}</version>
         </dependency>
 
