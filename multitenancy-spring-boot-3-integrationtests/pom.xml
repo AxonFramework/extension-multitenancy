@@ -42,7 +42,7 @@
         <testcoontainers.version>1.18.3</testcoontainers.version>
 
         <jar-plugin.version>3.3.0</jar-plugin.version>
-        <jacoco-plugin.version>0.8.8</jacoco-plugin.version>
+        <jacoco-plugin.version>0.8.10</jacoco-plugin.version>
     </properties>
 
     <dependencies>
@@ -180,7 +180,7 @@
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.8.10</version>
+                        <version>${jacoco-plugin.version}</version>
                         <executions>
                             <execution>
                                 <id>prepare-agent-for-unit-tests</id>
