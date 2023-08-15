@@ -65,7 +65,7 @@
         <junit.jupiter.version>5.9.3</junit.jupiter.version>
         <mockito.version>4.11.0</mockito.version>
 
-        <projectreactor.version>3.5.8</projectreactor.version>
+        <projectreactor.version>3.5.9</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
 
         <jacoco-maven.version>0.8.10</jacoco-maven.version>
