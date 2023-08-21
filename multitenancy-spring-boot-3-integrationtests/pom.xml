@@ -39,7 +39,7 @@
 
     <properties>
         <axon.version>4.8.0</axon.version>
-        <testcoontainers.version>1.18.3</testcoontainers.version>
+        <testcoontainers.version>1.19.0</testcoontainers.version>
 
         <jar-plugin.version>3.3.0</jar-plugin.version>
         <jacoco-plugin.version>0.8.10</jacoco-plugin.version>
