@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@ import org.axonframework.extensions.multitenancy.components.commandhandeling.Ten
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueue;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
@@ -112,6 +113,21 @@ public class MultiTenancyAutoConfiguration {
         tenantProvider.subscribe(multiTenantEventStore);
 
         return multiTenantEventStore;
+    }
+
+    @Bean
+    @Primary
+    public MultiTenantEventScheduler multiTenantEventScheduler(TenantEventSchedulerSegmentFactory tenantEventSchedulerSegmentFactory,
+                                         TargetTenantResolver targetTenantResolver,
+                                         TenantProvider tenantProvider) {
+        MultiTenantEventScheduler multiTenantEventScheduler = MultiTenantEventScheduler.builder()
+                                                                                       .tenantSegmentFactory(
+                                                                                               tenantEventSchedulerSegmentFactory)
+                                                                                       .targetTenantResolver(
+                                                                                               targetTenantResolver)
+                                                                                       .build();
+        tenantProvider.subscribe(multiTenantEventScheduler);
+        return multiTenantEventScheduler;
     }
 
     @Bean
