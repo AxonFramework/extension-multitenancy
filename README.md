@@ -171,7 +171,7 @@ Currently, supported multi-tenants components are as follows:
 - <span style="color:green">MultiTenantQueryUpdateEmitter</span>
 - <span style="color:green">MultiTenantEventProcessorControlService</span>
 - <span style="color:green">MultiTenantDataSourceManager</span>
-- <span style="color:green">MultitenantEventScheduler</span>
+- <span style="color:green">MultiTenantEventScheduler</span>
 
 Not supported components are:
 
