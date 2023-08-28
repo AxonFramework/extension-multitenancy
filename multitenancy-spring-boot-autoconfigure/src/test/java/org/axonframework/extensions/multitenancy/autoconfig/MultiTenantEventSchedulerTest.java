@@ -64,7 +64,7 @@ class MultiTenantEventSchedulerTest {
                                            .build();
     }
     @Test
-    void scheduleWithInstant() {
+    void scheduleWithInstantAndTenantMetaData() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -77,7 +77,7 @@ class MultiTenantEventSchedulerTest {
 
 
     @Test
-    void scheduleWithDuration() {
+    void scheduleWithDurationAndTenantMetaData() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -89,7 +89,7 @@ class MultiTenantEventSchedulerTest {
     }
 
     @Test
-    void scheduleObject() {
+    void scheduleObjectWithoutMetaDataShouldFail() {
         assertThrowsExactly(IllegalArgumentException.class, () -> testSubject.schedule(Instant.MAX, "event"));
     }
 

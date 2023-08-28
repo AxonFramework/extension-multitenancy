@@ -16,6 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.BuilderUtils;
 import org.axonframework.common.Registration;
 import org.axonframework.eventhandling.EventMessage;
@@ -281,6 +282,12 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
             return new MultiTenantEventScheduler(this);
         }
 
+        /**
+         * Validates whether the fields contained in this Builder are set accordingly.
+         *
+         * @throws AxonConfigurationException if one field is asserted to be incorrect according to the Builder's
+         *                                    specifications
+         */
         protected void validate() {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
