@@ -95,7 +95,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      * Therefor only EventMessage type is supported.
      *
      * @param duration The amount of time to wait before publishing the event
-     * @param o           The event to publish
+     * @param event           The event to publish
      * @return the token to use when cancelling the schedule
      */
     @Override
