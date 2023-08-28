@@ -93,7 +93,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      * @return the token to use when cancelling the schedule
      */
     @Override
-    public ScheduleToken schedule(Duration duration, Object o) {
+    public ScheduleToken schedule(Duration duration, Object event) {
         return resolveTenant(o).schedule(duration, o);
     }
 
