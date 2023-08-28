@@ -94,7 +94,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      */
     @Override
     public ScheduleToken schedule(Duration duration, Object event) {
-        return resolveTenant(o).schedule(duration, o);
+        return resolveTenant(event).schedule(duration, event);
     }
 
     /**
