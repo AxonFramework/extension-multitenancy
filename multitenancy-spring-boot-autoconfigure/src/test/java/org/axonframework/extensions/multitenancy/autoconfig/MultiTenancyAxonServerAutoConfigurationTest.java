@@ -83,8 +83,6 @@ class MultiTenancyAxonServerAutoConfigurationTest {
                                             .isInstanceOf(TenantCommandSegmentFactory.class);
                          assertThat(context).getBean("tenantAxonServerQuerySegmentFactory")
                                             .isInstanceOf(TenantQuerySegmentFactory.class);
-                         assertThat(context).getBean("multiTenantQueryUpdateEmitter")
-                                            .isInstanceOf(MultiTenantQueryUpdateEmitter.class);
                          assertThat(context).getBean("tenantQueryUpdateEmitterSegmentFactory")
                                             .isInstanceOf(TenantQueryUpdateEmitterSegmentFactory.class);
                          assertThat(context).getBean("tenantEventSegmentFactory")
@@ -105,7 +103,6 @@ class MultiTenancyAxonServerAutoConfigurationTest {
                          assertThat(context).doesNotHaveBean(TenantEventSchedulerSegmentFactory.class);
                          assertThat(context).doesNotHaveBean(TenantCommandSegmentFactory.class);
                          assertThat(context).doesNotHaveBean(TenantQuerySegmentFactory.class);
-                         assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
                          assertThat(context).doesNotHaveBean(TenantQueryUpdateEmitterSegmentFactory.class);
                          assertThat(context).doesNotHaveBean(TenantEventSegmentFactory.class);
                          assertThat(context).doesNotHaveBean(TenantEventSchedulerSegmentFactory.class);

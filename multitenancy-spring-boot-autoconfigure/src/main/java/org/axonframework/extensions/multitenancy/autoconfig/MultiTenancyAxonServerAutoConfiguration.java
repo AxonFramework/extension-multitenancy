@@ -161,26 +161,6 @@ public class MultiTenancyAxonServerAutoConfiguration {
     }
 
     @Bean
-    @Primary
-    @ConditionalOnClass(name = "org.axonframework.axonserver.connector.query.AxonServerQueryBus")
-    public QueryUpdateEmitter multiTenantQueryUpdateEmitter(
-            TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory,
-            TargetTenantResolver targetTenantResolver,
-            TenantProvider tenantProvider) {
-
-        MultiTenantQueryUpdateEmitter multiTenantQueryUpdateEmitter = MultiTenantQueryUpdateEmitter.builder()
-                                                                                                   .tenantSegmentFactory(
-                                                                                                           tenantQueryUpdateEmitterSegmentFactory)
-                                                                                                   .targetTenantResolver(
-                                                                                                           targetTenantResolver)
-                                                                                                   .build();
-
-        tenantProvider.subscribe(multiTenantQueryUpdateEmitter);
-
-        return multiTenantQueryUpdateEmitter;
-    }
-
-    @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.query.AxonServerQueryBus")
     public TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory(
             SpringAxonConfiguration axonConfiguration) {

@@ -105,6 +105,8 @@ class MultiTenancyAutoConfigurationTest {
                                             .isInstanceOf(MultiTenantDeadLetterQueueFactory.class);
                          assertThat(context).getBean("multiTenantEventScheduler")
                                             .isExactlyInstanceOf(MultiTenantEventScheduler.class);
+                         assertThat(context).getBean("multiTenantQueryUpdateEmitter")
+                                            .isInstanceOf(MultiTenantQueryUpdateEmitter.class);
                      });
     }
 
@@ -127,6 +129,7 @@ class MultiTenancyAutoConfigurationTest {
                          assertThat(context).doesNotHaveBean(TenantEventSegmentFactory.class);
                          assertThat(context).doesNotHaveBean(MultiTenantDeadLetterQueueFactory.class);
                          assertThat(context).doesNotHaveBean(MultiTenantEventScheduler.class);
+                         assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
                      });
     }
 

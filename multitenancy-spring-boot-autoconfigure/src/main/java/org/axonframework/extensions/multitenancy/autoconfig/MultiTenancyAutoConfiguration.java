@@ -29,14 +29,18 @@ import org.axonframework.extensions.multitenancy.components.eventstore.MultiTena
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
+import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantStreamableMessageSourceProvider;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
+import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -96,6 +100,25 @@ public class MultiTenancyAutoConfiguration {
         tenantProvider.subscribe(queryBus);
 
         return queryBus;
+    }
+
+    @Bean
+    @Primary
+    public QueryUpdateEmitter multiTenantQueryUpdateEmitter(
+            TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory,
+            TargetTenantResolver targetTenantResolver,
+            TenantProvider tenantProvider) {
+
+        MultiTenantQueryUpdateEmitter multiTenantQueryUpdateEmitter = MultiTenantQueryUpdateEmitter.builder()
+                                                                                                   .tenantSegmentFactory(
+                                                                                                           tenantQueryUpdateEmitterSegmentFactory)
+                                                                                                   .targetTenantResolver(
+                                                                                                           targetTenantResolver)
+                                                                                                   .build();
+
+        tenantProvider.subscribe(multiTenantQueryUpdateEmitter);
+
+        return multiTenantQueryUpdateEmitter;
     }
 
     @Bean

@@ -29,6 +29,7 @@ import org.axonframework.extensions.multitenancy.components.TargetTenantResolver
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.Message;
+import org.axonframework.messaging.MetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +80,9 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      * </p>
      * It is <em>required</em> that the given {@code event} is of type {@link EventMessage}, containing a resolvable {@link TenantDescriptor} from the {@link Message#getMetaData meta data}.
      * Without a {@code TenantDescriptor}, the `MultiTenantEventScheduler` is incapable of resolving the tenant-specific {@link EventScheduler}.
-     * Therefor, the provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's {@link MetaData meta data}.
+     * Therefor, the provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's {@link MetaData}.
+     *
+     * Convenience method around {@link #cancelSchedule(ScheduleToken)} and {@link #schedule(Duration, Object)}.
      *
      * @param instant The moment to trigger publication of the event
      * @param event           The event to publish
@@ -116,17 +119,22 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     public void cancelSchedule(ScheduleToken scheduleToken) {
         TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
         if (currentTenant != null) {
-             tenantSegments.get(currentTenant).cancelSchedule(scheduleToken);
+            tenantSegments.get(currentTenant).cancelSchedule(scheduleToken);
         } else {
-            logger.info("No current tenant found. Canceling schedule token {} by searching in all tenants...", scheduleToken);
-                tenantSegments.forEach((tenantDescriptor, eventScheduler) -> {
-                    try {
-                        logger.info("Cancelling schedule token {} for tenant {}...", scheduleToken, tenantDescriptor.tenantId());
-                        eventScheduler.cancelSchedule(scheduleToken);
-                    } catch (IllegalArgumentException e) {
-                        logger.info("Schedule token {} does not belong to tenant {}... Skipping.", scheduleToken, tenantDescriptor.tenantId());
-                    }
-                });
+            logger.info("No current tenant found. Canceling schedule token {} by searching in all tenants...",
+                        scheduleToken);
+            tenantSegments.forEach((tenantDescriptor, eventScheduler) -> {
+                try {
+                    logger.info("Cancelling schedule token {} for tenant {}...",
+                                scheduleToken,
+                                tenantDescriptor.tenantId());
+                    eventScheduler.cancelSchedule(scheduleToken);
+                } catch (IllegalArgumentException e) {
+                    logger.info("Schedule token {} does not belong to tenant {}... Skipping.",
+                                scheduleToken,
+                                tenantDescriptor.tenantId());
+                }
+            });
         }
     }
 
