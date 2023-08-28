@@ -53,7 +53,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      * Instantiate a {@link MultiTenantEventScheduler} based on the fields contained in the {@link Builder}.
      * @param builder the {@link Builder} used to instantiate a {@link MultiTenantEventScheduler} instance
      */
-    public MultiTenantEventScheduler(MultiTenantEventScheduler.Builder builder) {
+    protected MultiTenantEventScheduler(Builder builder) {
         builder.validate();
         this.tenantSegmentFactory = builder.tenantSegmentFactory;
         this.targetTenantResolver = builder.targetTenantResolver;
@@ -69,16 +69,18 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
 
     /**
      * Schedule the given {@code event} for publication at the given {@code triggerDateTime}.
-     * Message must contain MetaData with {@link TenantDescriptor} to resolve the tenant.
-     * Therefor only EventMessage type is supported.
+     * </p>
+     * It is <em>required</em> that the given {@code event} is of type {@link EventMessage}, containing a resolvable {@link TenantDescriptor} from the {@link Message#getMetaData meta data}.
+     * Without a {@code TenantDescriptor}, the `MultiTenantEventScheduler` is incapable of resolving the tenant-specific {@link EventScheduler}.
+     * Therefor, the provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's {@link MetaData meta data}.
      *
      * @param instant The moment to trigger publication of the event
-     * @param o           The event to publish
-     * @return the token to use when cancelling the schedule
+     * @param event           The event to publish
+     * @return the token to use when canceling the schedule
      */
     @Override
-    public ScheduleToken schedule(Instant instant, Object o) {
-        return resolveTenant(o).schedule(instant, o);
+    public ScheduleToken schedule(Instant instant, Object event) {
+        return resolveTenant(event).schedule(instant, event);
     }
 
     /**
@@ -232,7 +234,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
          * @param tenantSegmentFactory tenant aware segment factory
          * @return the current Builder instance, for fluent interfacing
          */
-        public MultiTenantEventScheduler.Builder tenantSegmentFactory(TenantEventSchedulerSegmentFactory tenantSegmentFactory) {
+        public Builder tenantSegmentFactory(TenantEventSchedulerSegmentFactory tenantSegmentFactory) {
             BuilderUtils.assertNonNull(tenantSegmentFactory,
                                        "The TenantEventProcessorSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
@@ -246,7 +248,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
          * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
          * @return the current Builder instance, for fluent interfacing
          */
-        public MultiTenantEventScheduler.Builder targetTenantResolver(TargetTenantResolver<EventMessage<?>> targetTenantResolver) {
+        public Builder targetTenantResolver(TargetTenantResolver<EventMessage<?>> targetTenantResolver) {
             BuilderUtils.assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;
