@@ -17,10 +17,12 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.common.Registration;
+import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.GenericEventMessage;
 import org.axonframework.eventhandling.scheduling.EventScheduler;
 import org.axonframework.eventhandling.scheduling.ScheduleToken;
+import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
@@ -92,8 +94,30 @@ class MultiTenantEventSchedulerTest {
     }
 
     @Test
-    void cancelSchedule() {
-        assertThrowsExactly(UnsupportedOperationException.class, () -> testSubject.cancelSchedule(mock(ScheduleToken.class)));
+    void cancelScheduleWithTenantInfo() {
+        testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
+
+        new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE,
+                                            TenantDescriptor.tenantWithId("fixtureTenant2"))
+                .executeInTransaction(() ->
+                                              testSubject.cancelSchedule(mock(ScheduleToken.class)));
+
+        verify(fixtureSegment2).cancelSchedule(any());
+        verifyNoInteractions(fixtureSegment1);
+    }
+
+    @Test
+    void cancelScheduleNoTenantInfo() {
+        testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
+
+        doThrow(IllegalArgumentException.class).when(fixtureSegment1).cancelSchedule(any());
+        doNothing().when(fixtureSegment2).cancelSchedule(any());
+
+        testSubject.cancelSchedule(mock(ScheduleToken.class));
+        verify(fixtureSegment2).cancelSchedule(any());
+        verify(fixtureSegment1).cancelSchedule(any());
     }
 
     @Test

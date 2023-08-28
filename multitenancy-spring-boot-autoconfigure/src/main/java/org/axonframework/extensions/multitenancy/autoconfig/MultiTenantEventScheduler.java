@@ -21,13 +21,17 @@ import org.axonframework.common.Registration;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.scheduling.EventScheduler;
 import org.axonframework.eventhandling.scheduling.ScheduleToken;
+import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -43,6 +47,8 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * @since 4.9.0
  */
 public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwareComponent {
+
+    private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     private final TenantEventSchedulerSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<EventMessage<?>> targetTenantResolver;
@@ -98,16 +104,29 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     }
 
     /**
-     * Cancel the publication of a scheduled event. This method is not supported for multi-tenant event scheduler.
-     * Get the tenant specific event scheduler and cancel the schedule there.
+     * Cancel the publication of a scheduled event.
+     * Tries to extract {@link TenantDescriptor} from {@link TenantWrappedTransactionManager#getCurrentTenant()}.
+     * If {@link TenantDescriptor} is not found, it tries to cancel the schedule token in all tenants until it finds the correct one.
      * See {@link #forTenant(TenantDescriptor)}.
      *
      * @param scheduleToken the token returned when the event was scheduled
      */
     @Override
     public void cancelSchedule(ScheduleToken scheduleToken) {
-        throw new UnsupportedOperationException("Cancel schedule is not supported for multi-tenant event scheduler directly."
-                                                        + "Get the tenant specific event scheduler and cancel the schedule there.");
+        TenantDescriptor currentTenant = TenantWrappedTransactionManager.getCurrentTenant();
+        if (currentTenant != null) {
+             tenantSegments.get(currentTenant).cancelSchedule(scheduleToken);
+        } else {
+            logger.info("No current tenant found. Canceling schedule token {} by searching in all tenants...", scheduleToken);
+                tenantSegments.forEach((tenantDescriptor, eventScheduler) -> {
+                    try {
+                        logger.info("Cancelling schedule token {} for tenant {}...", scheduleToken, tenantDescriptor.tenantId());
+                        eventScheduler.cancelSchedule(scheduleToken);
+                    } catch (IllegalArgumentException e) {
+                        logger.info("Schedule token {} does not belong to tenant {}... Skipping.", scheduleToken, tenantDescriptor.tenantId());
+                    }
+                });
+        }
     }
 
     /**
