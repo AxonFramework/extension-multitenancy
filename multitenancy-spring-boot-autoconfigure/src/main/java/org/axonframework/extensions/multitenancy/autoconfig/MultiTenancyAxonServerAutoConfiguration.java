@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,7 @@ import org.axonframework.axonserver.connector.TargetContextResolver;
 import org.axonframework.axonserver.connector.command.AxonServerCommandBus;
 import org.axonframework.axonserver.connector.command.CommandLoadFactorProvider;
 import org.axonframework.axonserver.connector.command.CommandPriorityCalculator;
+import org.axonframework.axonserver.connector.event.axon.AxonServerEventScheduler;
 import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore;
 import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
 import org.axonframework.axonserver.connector.query.AxonServerQueryBus;
@@ -33,6 +34,7 @@ import org.axonframework.extensions.multitenancy.components.TargetTenantResolver
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
@@ -159,26 +161,6 @@ public class MultiTenancyAxonServerAutoConfiguration {
     }
 
     @Bean
-    @Primary
-    @ConditionalOnClass(name = "org.axonframework.axonserver.connector.query.AxonServerQueryBus")
-    public QueryUpdateEmitter multiTenantQueryUpdateEmitter(
-            TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory,
-            TargetTenantResolver targetTenantResolver,
-            TenantProvider tenantProvider) {
-
-        MultiTenantQueryUpdateEmitter multiTenantQueryUpdateEmitter = MultiTenantQueryUpdateEmitter.builder()
-                                                                                                   .tenantSegmentFactory(
-                                                                                                           tenantQueryUpdateEmitterSegmentFactory)
-                                                                                                   .targetTenantResolver(
-                                                                                                           targetTenantResolver)
-                                                                                                   .build();
-
-        tenantProvider.subscribe(multiTenantQueryUpdateEmitter);
-
-        return multiTenantQueryUpdateEmitter;
-    }
-
-    @Bean
     @ConditionalOnClass(name = "org.axonframework.axonserver.connector.query.AxonServerQueryBus")
     public TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory(
             SpringAxonConfiguration axonConfiguration) {
@@ -211,6 +193,18 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                              .snapshotFilter(configuration.getObject().snapshotFilter())
                                              .upcasterChain(configuration.getObject().upcasterChain())
                                              .build();
+    }
+
+    @Bean
+    @ConditionalOnClass(name = "org.axonframework.axonserver.connector.event.axon.AxonServerEventScheduler")
+    public TenantEventSchedulerSegmentFactory tenantEventSchedulerSegmentFactory(
+            AxonServerConnectionManager axonServerConnectionManager,
+            Serializer serializer) {
+        return tenant -> AxonServerEventScheduler.builder()
+                .connectionManager(axonServerConnectionManager)
+                .eventSerializer(serializer)
+                .defaultContext(tenant.tenantId())
+                .build();
     }
 
     @Bean
