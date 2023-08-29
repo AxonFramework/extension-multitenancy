@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ import org.axonframework.extensions.multitenancy.components.eventstore.TenantEve
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
+import org.axonframework.extensions.multitenancy.components.scheduling.MultiTenantEventScheduler;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
@@ -56,7 +57,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
- * Test class validating the Multi-Tenancy auto-configuration.
+ * Test class validating the multi-tenancy auto-configuration.
  *
  * @author Stefan Dragisic
  */

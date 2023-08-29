@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.axonframework.extensions.multitenancy.autoconfig;
+package org.axonframework.extensions.multitenancy.components.scheduling;
 
 import org.axonframework.common.Registration;
 import org.axonframework.common.transaction.NoTransactionManager;
@@ -23,9 +23,9 @@ import org.axonframework.eventhandling.GenericEventMessage;
 import org.axonframework.eventhandling.scheduling.EventScheduler;
 import org.axonframework.eventhandling.scheduling.ScheduleToken;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
+import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSchedulerSegmentFactory;
 import org.junit.jupiter.api.*;
 
 import java.time.Duration;
@@ -35,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantEventScheduler}.
+ *
  * @author Stefan Dragisic
  */
 class MultiTenantEventSchedulerTest {
@@ -55,17 +57,20 @@ class MultiTenantEventSchedulerTest {
                 return fixtureSegment2;
             }
         };
-        TargetTenantResolver<EventMessage<?>> targetTenantResolver = (m, tenants) -> TenantDescriptor.tenantWithId(
-                "fixtureTenant2");
+        TargetTenantResolver<EventMessage<?>> targetTenantResolver =
+                (m, tenants) -> TenantDescriptor.tenantWithId("fixtureTenant2");
 
         testSubject = MultiTenantEventScheduler.builder()
-                                           .tenantSegmentFactory(tenantSegmentFactory)
-                                           .targetTenantResolver(targetTenantResolver)
-                                           .build();
+                                               .tenantSegmentFactory(tenantSegmentFactory)
+                                               .targetTenantResolver(targetTenantResolver)
+                                               .build();
     }
+
     @Test
     void scheduleWithInstantAndTenantMetaData() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         EventMessage<Object> event = GenericEventMessage.asEventMessage("event");
@@ -78,7 +83,9 @@ class MultiTenantEventSchedulerTest {
 
     @Test
     void scheduleWithDurationAndTenantMetaData() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         EventMessage<Object> event = GenericEventMessage.asEventMessage("event");
@@ -89,19 +96,27 @@ class MultiTenantEventSchedulerTest {
     }
 
     @Test
-    void scheduleObjectWithoutMetaDataShouldFail() {
+    void scheduleNonEventMessageThrowsIllegalArgumentException() {
         assertThrowsExactly(IllegalArgumentException.class, () -> testSubject.schedule(Instant.MAX, "event"));
     }
 
     @Test
+    void scheduleEventMessageWithoutTenantDescriptorInTheMetaDataThrowsNoSuchTenantException() {
+        EventMessage<Object> event = GenericEventMessage.asEventMessage("event");
+
+        assertThrowsExactly(NoSuchTenantException.class, () -> testSubject.schedule(Instant.MAX, event));
+    }
+
+    @Test
     void cancelScheduleWithTenantInfo() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
-        new TenantWrappedTransactionManager(NoTransactionManager.INSTANCE,
-                                            TenantDescriptor.tenantWithId("fixtureTenant2"))
-                .executeInTransaction(() ->
-                                              testSubject.cancelSchedule(mock(ScheduleToken.class)));
+        new TenantWrappedTransactionManager(
+                NoTransactionManager.INSTANCE, TenantDescriptor.tenantWithId("fixtureTenant2")
+        ).executeInTransaction(() -> testSubject.cancelSchedule(mock(ScheduleToken.class)));
 
         verify(fixtureSegment2).cancelSchedule(any());
         verifyNoInteractions(fixtureSegment1);
@@ -109,7 +124,9 @@ class MultiTenantEventSchedulerTest {
 
     @Test
     void cancelScheduleNoTenantInfo() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         doThrow(IllegalArgumentException.class).when(fixtureSegment1).cancelSchedule(any());
@@ -122,7 +139,9 @@ class MultiTenantEventSchedulerTest {
 
     @Test
     void cancelScheduleOnTenantSegment() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
         TenantDescriptor fixtureTenant = TenantDescriptor.tenantWithId("fixtureTenant2");
         testSubject.forTenant(fixtureTenant).cancelSchedule(mock(ScheduleToken.class));
@@ -131,33 +150,39 @@ class MultiTenantEventSchedulerTest {
 
     @Test
     void reschedule() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         EventMessage<Object> event = GenericEventMessage.asEventMessage("event");
         Instant instant = Instant.MIN;
         ScheduleToken scheduleToken = mock(ScheduleToken.class);
         testSubject.reschedule(scheduleToken, instant, event);
-        verify(fixtureSegment2).reschedule(scheduleToken,instant, event);
+        verify(fixtureSegment2).reschedule(scheduleToken, instant, event);
         verify(fixtureSegment1, times(0)).reschedule(scheduleToken, instant, event);
     }
 
     @Test
     void rescheduleDuration() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         EventMessage<Object> event = GenericEventMessage.asEventMessage("event");
         Duration duration = Duration.ZERO;
         ScheduleToken scheduleToken = mock(ScheduleToken.class);
         testSubject.reschedule(scheduleToken, duration, event);
-        verify(fixtureSegment2).reschedule(scheduleToken,duration, event);
+        verify(fixtureSegment2).reschedule(scheduleToken, duration, event);
         verify(fixtureSegment1, times(0)).reschedule(scheduleToken, duration, event);
     }
 
     @Test
     void shutdownAll() {
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
+        //noinspection resource
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         doNothing().when(fixtureSegment1).shutdown();
@@ -172,6 +197,7 @@ class MultiTenantEventSchedulerTest {
     @Test
     void registerUnregisterTenant() {
         TenantDescriptor tenantDescriptor = TenantDescriptor.tenantWithId("fixtureTenant1");
+        //noinspection resource
         Registration registeredTenant = testSubject.registerTenant(tenantDescriptor);
         assertNotNull(testSubject.forTenant(tenantDescriptor));
 
