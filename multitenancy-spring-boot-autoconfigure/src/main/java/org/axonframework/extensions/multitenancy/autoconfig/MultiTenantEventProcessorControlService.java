@@ -65,7 +65,7 @@ public class MultiTenantEventProcessorControlService
         this(axonServerConnectionManager,
              eventProcessingConfiguration,
              axonServerConfiguration.getContext(),
-             axonServerConfiguration.getEventProcessorConfiguration().getProcessors());
+             axonServerConfiguration.getEventhandling().getProcessors());
     }
 
     /**
@@ -89,7 +89,7 @@ public class MultiTenantEventProcessorControlService
             AxonServerConnectionManager axonServerConnectionManager,
             EventProcessingConfiguration eventProcessingConfiguration,
             String context,
-            Map<String, AxonServerConfiguration.EventProcessorConfiguration.ProcessorSettings> processorConfig
+            Map<String, AxonServerConfiguration.Eventhandling.ProcessorSettings> processorConfig
     ) {
         super(axonServerConnectionManager, eventProcessingConfiguration, context, processorConfig);
     }

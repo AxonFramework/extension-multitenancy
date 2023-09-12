@@ -47,8 +47,8 @@ class MultiTenantEventProcessorControlServiceTest {
         axonServerConnectionManager = mock(AxonServerConnectionManager.class);
         eventProcessingConfiguration = mock(EventProcessingConfiguration.class);
         AxonServerConfiguration axonServerConfiguration = mock(AxonServerConfiguration.class);
-        when(axonServerConfiguration.getEventProcessorConfiguration())
-                .thenReturn(new AxonServerConfiguration.EventProcessorConfiguration());
+        when(axonServerConfiguration.getEventhandling())
+                .thenReturn(new AxonServerConfiguration.Eventhandling());
         testSubject = new MultiTenantEventProcessorControlService(axonServerConnectionManager,
                                                                   eventProcessingConfiguration,
                                                                   axonServerConfiguration);
