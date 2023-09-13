@@ -63,7 +63,7 @@
         <log4j.version>2.13.0</log4j.version>
 
         <junit.jupiter.version>5.10.0</junit.jupiter.version>
-        <mockito.version>5.5.0</mockito.version>
+        <mockito.version>4.11.0</mockito.version>
 
         <projectreactor.version>3.5.10</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
