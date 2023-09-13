@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,14 @@
  */
 package org.axonframework.extensions.multitenancy.components.eventstore;
 
-import org.axonframework.common.BuilderUtils;
+import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.Registration;
 import org.axonframework.common.stream.BlockingStream;
 import org.axonframework.eventhandling.DomainEventMessage;
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.eventhandling.MultiStreamableMessageSource;
 import org.axonframework.eventhandling.TrackedEventMessage;
 import org.axonframework.eventhandling.TrackingToken;
-import org.axonframework.eventhandling.MultiStreamableMessageSource;
 import org.axonframework.eventsourcing.eventstore.DomainEventStream;
 import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
@@ -43,40 +43,58 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import javax.annotation.Nonnull;
 
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 
 /**
- * Multi tenant implementation of the {@link EventStore} that delegates to a single {@link EventStore} instance.
+ * Tenant aware implementation of the {@link EventStore}.
  * <p>
+ * Tenant-specific {@code EventStore} segments are either resolved from the
+ * {@link EventMessage#getMetaData() event's metadata} or from the expected existence of the
+ * {@link org.axonframework.messaging.unitofwork.UnitOfWork}. The {@link #openStream(TrackingToken)} operation defaults
+ * to returning a {@link MultiStreamableMessageSource} combining all tenant segments.
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
  * @since 4.6.0
  */
-public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent,
+public class MultiTenantEventStore implements
+        EventStore,
+        MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<EventMessage<?>, EventStore> {
 
     private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
     private final List<Consumer<List<? extends EventMessage<?>>>> messageProcessors = new CopyOnWriteArrayList<>();
-
+    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
     private final List<MessageDispatchInterceptor<? super EventMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
     private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
-
-    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
 
     private final TenantEventSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<Message<?>> targetTenantResolver;
 
     private MultiStreamableMessageSource multiSource;
 
-    public MultiTenantEventStore(Builder builder) {
+    /**
+     * Instantiate a {@link MultiTenantEventStore} based on the given {@link Builder builder}.
+     *
+     * @param builder The {@link Builder} used to instantiate a {@link MultiTenantEventStore} instance with.
+     */
+    protected MultiTenantEventStore(Builder builder) {
         builder.validate();
         this.tenantSegmentFactory = builder.tenantSegmentFactory;
         this.targetTenantResolver = builder.targetTenantResolver;
     }
 
+    /**
+     * Instantiate a builder to be able to construct a {@link MultiTenantEventStore}
+     * <p>
+     * The {@link TenantEventSegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b> and as such
+     * should be provided.
+     *
+     * @return A Builder to be able to create a {@link MultiTenantEventStore}.
+     */
     public static Builder builder() {
         return new Builder();
     }
@@ -98,15 +116,21 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     }
 
     @Override
-    public Registration subscribe(Consumer<List<? extends EventMessage<?>>> messageProcessor) {
+    public Registration subscribe(@Nonnull Consumer<List<? extends EventMessage<?>>> messageProcessor) {
         messageProcessors.add(messageProcessor);
 
-        tenantSegments.forEach((tenant, segment) ->
-                                       subscribeRegistrations.putIfAbsent(tenant, segment.subscribe(messageProcessor)));
+        tenantSegments.forEach((tenant, segment) -> subscribeRegistrations.putIfAbsent(
+                tenant, segment.subscribe(messageProcessor)
+        ));
 
-        return () -> subscribeRegistrations.values().stream().map(Registration::cancel).reduce((prev, acc) -> prev && acc).orElse(false);
+        return () -> subscribeRegistrations.values()
+                                           .stream()
+                                           .map(Registration::cancel)
+                                           .reduce((prev, acc) -> prev && acc)
+                                           .orElse(false);
     }
 
+    @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
         tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
@@ -117,9 +141,12 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         };
     }
 
-    public EventStore unregisterTenant(TenantDescriptor tenantDescriptor) {
+    private EventStore unregisterTenant(TenantDescriptor tenantDescriptor) {
+        //noinspection resource
         Registration remove = subscribeRegistrations.remove(tenantDescriptor);
-        if (remove != null) remove.cancel();
+        if (remove != null) {
+            remove.cancel();
+        }
         return tenantSegments.remove(tenantDescriptor);
     }
 
@@ -128,16 +155,16 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         tenantSegments.computeIfAbsent(tenantDescriptor, k -> {
             EventStore tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
 
-            dispatchInterceptors.forEach(dispatchInterceptor ->
-                                                 dispatchInterceptorsRegistration
-                                                         .computeIfAbsent(tenantDescriptor,
-                                                                          t -> new CopyOnWriteArrayList<>())
-                                                         .add(tenantSegment.registerDispatchInterceptor(
-                                                                 dispatchInterceptor)));
+            dispatchInterceptors.forEach(
+                    dispatchInterceptor ->
+                            dispatchInterceptorsRegistration
+                                    .computeIfAbsent(tenantDescriptor, t -> new CopyOnWriteArrayList<>())
+                                    .add(tenantSegment.registerDispatchInterceptor(dispatchInterceptor))
+            );
 
-            messageProcessors.forEach(processor ->
-                                              subscribeRegistrations.putIfAbsent(tenantDescriptor,
-                                                                                 tenantSegment.subscribe(processor)));
+            messageProcessors.forEach(processor -> subscribeRegistrations.putIfAbsent(
+                    tenantDescriptor, tenantSegment.subscribe(processor)
+            ));
 
             return tenantSegment;
         });
@@ -167,22 +194,52 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
     }
 
     @Override
-    public DomainEventStream readEvents(String aggregateIdentifier) {
+    public DomainEventStream readEvents(@Nonnull String aggregateIdentifier) {
         return resolveSegment()
                 .readEvents(aggregateIdentifier);
     }
 
-    public DomainEventStream readEvents(String aggregateIdentifier, TenantDescriptor tenantDescriptor) {
+    /**
+     * Open an event stream with the {@link EventStore} segment of the given {@code tenantDescriptor}, containing all
+     * domain events belonging to the given {@code aggregateIdentifier}.
+     * <p>
+     * The returned stream is <em>finite</em>, ending with the last known event of the aggregate. If the event store
+     * holds no events of the given aggregate an empty stream is returned.
+     *
+     * @param aggregateIdentifier the identifier of the aggregate whose events to fetch
+     * @param tenantDescriptor    The {@link TenantDescriptor} referring to the {@link EventStore} segment to read an
+     *                            aggregate event stream from.
+     * @return a stream of all currently stored events of the aggregate
+     */
+    public DomainEventStream readEvents(@Nonnull String aggregateIdentifier,
+                                        @Nonnull TenantDescriptor tenantDescriptor) {
         return tenantSegments.get(tenantDescriptor)
                              .readEvents(aggregateIdentifier);
     }
 
     @Override
-    public void storeSnapshot(DomainEventMessage<?> snapshot) {
+    public void storeSnapshot(@Nonnull DomainEventMessage<?> snapshot) {
         resolveSegment()
                 .storeSnapshot(snapshot);
     }
 
+    /**
+     * Stores the given (temporary) {@code snapshot} event with the {@link EventStore} segment of the given
+     * {@code tenantDescriptor}, when present. This snapshot replaces the segment of the event stream identified by the
+     * {@code snapshot}'s {@link DomainEventMessage#getAggregateIdentifier() Aggregate Identifier} up to (and including)
+     * the event with the {@code snapshot}'s {@link DomainEventMessage#getSequenceNumber() sequence number}.
+     * <p>
+     * These snapshots will only affect the {@link DomainEventStream} returned by the {@link #readEvents(String)}
+     * method. They do not change the events returned by {@link EventStore#openStream(TrackingToken)} or those received
+     * by using {@link #subscribe(java.util.function.Consumer)}.
+     * <p>
+     * Note that snapshots are considered a temporary replacement for Events, and are used as performance optimization.
+     * Event Store implementations may choose to ignore or delete snapshots.
+     *
+     * @param snapshot         The snapshot to replace part of the DomainEventStream.
+     * @param tenantDescriptor The {@link TenantDescriptor} referring to the {@link EventStore} segment to store a
+     *                         snapshot in.
+     */
     public void storeSnapshot(DomainEventMessage<?> snapshot, TenantDescriptor tenantDescriptor) {
         tenantSegments.get(tenantDescriptor)
                       .storeSnapshot(snapshot);
@@ -222,14 +279,6 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         return multiSource().createTokenSince(duration);
     }
 
-    /**
-     * @param tenantDescriptor the tenant descriptor to resolve the segment.
-     * @return Returns registered tenant segment for given {@link TenantDescriptor}.
-     */
-    public EventStore tenantSegment(TenantDescriptor tenantDescriptor) {
-        return tenantSegments.get(tenantDescriptor);
-    }
-
     @Override
     public Map<TenantDescriptor, EventStore> tenantSegments() {
         return tenantSegments;
@@ -245,42 +294,63 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         return dispatchInterceptorsRegistration;
     }
 
+    /**
+     * Builder class to instantiate a {@link MultiTenantEventStore}.
+     * <p>
+     * The {@link TenantEventSegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b> and as such
+     * should be provided.
+     */
     public static class Builder {
 
-        public TenantEventSegmentFactory tenantSegmentFactory;
-        public TargetTenantResolver<Message<?>> targetTenantResolver;
+        protected TenantEventSegmentFactory tenantSegmentFactory;
+        protected TargetTenantResolver<Message<?>> targetTenantResolver;
 
         /**
-         * Sets the {@link TenantEventSegmentFactory} used to build {@link EventStore} segment for given {@link TenantDescriptor}.
+         * Sets the {@link TenantEventSegmentFactory} used to build {@link EventStore} segment for given
+         * {@link TenantDescriptor}.
          *
          * @param tenantSegmentFactory tenant aware segment factory
          * @return the current Builder instance, for fluent interfacing
          */
         public Builder tenantSegmentFactory(TenantEventSegmentFactory tenantSegmentFactory) {
-            BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantEventSegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory, "The TenantEventSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
 
         /**
-         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message} message
+         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message}
+         * message
          *
          * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
          * @return the current Builder instance, for fluent interfacing
          */
         public Builder targetTenantResolver(TargetTenantResolver<Message<?>> targetTenantResolver) {
-            BuilderUtils.assertNonNull(targetTenantResolver, "");
+            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;
         }
 
+        /**
+         * Initializes a {@link MultiTenantEventStore} as specified through this Builder.
+         *
+         * @return a {@link MultiTenantEventStore} as specified through this Builder
+         */
         public MultiTenantEventStore build() {
             return new MultiTenantEventStore(this);
         }
 
+        /**
+         * Validate whether the fields contained in this Builder as set accordingly.
+         *
+         * @throws AxonConfigurationException If one field is asserted to be incorrect according to the Builder's
+         *          *                                    specifications.
+         */
         protected void validate() {
-            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory,
+                          "The TenantEventProcessorSegmentFactory is a hard requirement and should be provided");
+            assertNonNull(targetTenantResolver,
+                          "The TargetTenantResolver is a hard requirement and should be provided");
         }
     }
 }

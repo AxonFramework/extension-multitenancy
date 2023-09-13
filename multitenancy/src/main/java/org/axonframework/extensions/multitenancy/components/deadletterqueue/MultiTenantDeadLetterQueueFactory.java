@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,13 +30,13 @@ import org.axonframework.messaging.deadletter.DeadLetter;
  * @since 4.8.0
  */
 @FunctionalInterface
-public interface MultiTenantDeadLetterQueueFactory <M extends EventMessage<?>> {
+public interface MultiTenantDeadLetterQueueFactory<M extends EventMessage<?>> {
 
     /**
      * Returns a {@link MultiTenantDeadLetterQueue} for the given processing group.
+     *
      * @param processingGroup The processing group for which to return a {@link MultiTenantDeadLetterQueue}
      * @return a {@link MultiTenantDeadLetterQueue} for the given processing group
      */
     MultiTenantDeadLetterQueue<M> getDeadLetterQueue(String processingGroup);
-
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy.components.queryhandeling;
 
-import org.axonframework.common.BuilderUtils;
+import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.components.MultiTenantDispatchInterceptorSupport;
@@ -37,49 +37,63 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
+import javax.annotation.Nonnull;
 
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 /**
- * Implementation of {@link QueryUpdateEmitter} that emits updates to a specific tenant.
- * <p>
+ * Tenant aware {@link QueryUpdateEmitter} implementation, emitting updates to specific tenants once a
+ * {@link TenantDescriptor} can be resolved.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
  */
-public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiTenantAwareComponent,
+public class MultiTenantQueryUpdateEmitter implements
+        QueryUpdateEmitter,
+        MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<SubscriptionQueryUpdateMessage<?>, QueryUpdateEmitter> {
 
     private final Map<TenantDescriptor, QueryUpdateEmitter> tenantSegments = new ConcurrentHashMap<>();
-
+    private final Map<TenantDescriptor, List<UpdateHandlerRegistration<?>>> updateHandlersRegistration = new ConcurrentHashMap<>();
     private final List<MessageDispatchInterceptor<? super SubscriptionQueryUpdateMessage<?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
     private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
-
-    private final Map<TenantDescriptor, List<UpdateHandlerRegistration<?>>> updateHandlersRegistration = new ConcurrentHashMap<>();
 
     private final TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<Message<?>> targetTenantResolver;
 
-
-    public MultiTenantQueryUpdateEmitter(MultiTenantQueryUpdateEmitter.Builder builder) {
+    /**
+     * Instantiates a {@link MultiTenantQueryUpdateEmitter} based on the given {@code builder}.
+     *
+     * @param builder The {@link Builder} used to instantiate a {@link MultiTenantQueryUpdateEmitter} with.
+     */
+    protected MultiTenantQueryUpdateEmitter(Builder builder) {
         builder.validate();
         this.tenantSegmentFactory = builder.tenantSegmentFactory;
         this.targetTenantResolver = builder.targetTenantResolver;
     }
 
-    public static MultiTenantQueryUpdateEmitter.Builder builder() {
-        return new MultiTenantQueryUpdateEmitter.Builder();
+    /**
+     * Instantiate a builder to be able to construct a {@link MultiTenantQueryUpdateEmitter}.
+     * <p>
+     * The {@link TenantQueryUpdateEmitterSegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b>
+     * and as such should be provided.
+     *
+     * @return A Builder to be able to create a {@link MultiTenantQueryUpdateEmitter}.
+     */
+    public static Builder builder() {
+        return new Builder();
     }
 
     @Override
-    public <U> void emit(Predicate<SubscriptionQueryMessage<?, ?, U>> filter,
-                         SubscriptionQueryUpdateMessage<U> update) {
+    public <U> void emit(@Nonnull Predicate<SubscriptionQueryMessage<?, ?, U>> filter,
+                         @Nonnull SubscriptionQueryUpdateMessage<U> update) {
         QueryUpdateEmitter tenantEmitter = resolveTenant(update);
         tenantEmitter.emit(filter, update);
     }
 
     @Override
-    public <U> void emit(Predicate<SubscriptionQueryMessage<?, ?, U>> filter, U update) {
+    public <U> void emit(@Nonnull Predicate<SubscriptionQueryMessage<?, ?, U>> filter,
+                         U update) {
         Message<?> message;
         if (update instanceof Message) {
             message = (Message<?>) update;
@@ -95,13 +109,17 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     }
 
     @Override
-    public <Q, U> void emit(Class<Q> queryType, Predicate<? super Q> filter, SubscriptionQueryUpdateMessage<U> update) {
+    public <Q, U> void emit(@Nonnull Class<Q> queryType,
+                            @Nonnull Predicate<? super Q> filter,
+                            @Nonnull SubscriptionQueryUpdateMessage<U> update) {
         QueryUpdateEmitter tenantEmitter = resolveTenant(update);
         tenantEmitter.emit(queryType, filter, update);
     }
 
     @Override
-    public <Q, U> void emit(Class<Q> queryType, Predicate<? super Q> filter, U update) {
+    public <Q, U> void emit(@Nonnull Class<Q> queryType,
+                            @Nonnull Predicate<? super Q> filter,
+                            U update) {
         Message<?> message;
         if (update instanceof Message) {
             message = (Message<?>) update;
@@ -117,31 +135,34 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     }
 
     @Override
-    public void complete(Predicate<SubscriptionQueryMessage<?, ?, ?>> filter) {
+    public void complete(@Nonnull Predicate<SubscriptionQueryMessage<?, ?, ?>> filter) {
         throw new UnsupportedOperationException(
                 "Invoke operation directly on tenant segment. Use: MultiTenantQueryUpdateEmitter::getTenant");
     }
 
     @Override
-    public <Q> void complete(Class<Q> queryType, Predicate<? super Q> filter) {
+    public <Q> void complete(@Nonnull Class<Q> queryType, @Nonnull Predicate<? super Q> filter) {
         throw new UnsupportedOperationException(
                 "Invoke operation directly on tenant segment. Use: MultiTenantQueryUpdateEmitter::getTenant");
     }
 
     @Override
-    public void completeExceptionally(Predicate<SubscriptionQueryMessage<?, ?, ?>> filter, Throwable cause) {
+    public void completeExceptionally(@Nonnull Predicate<SubscriptionQueryMessage<?, ?, ?>> filter,
+                                      @Nonnull Throwable cause) {
         throw new UnsupportedOperationException(
                 "Invoke operation directly on tenant segment. Use: MultiTenantQueryUpdateEmitter::getTenant");
     }
 
     @Override
-    public <Q> void completeExceptionally(Class<Q> queryType, Predicate<? super Q> filter, Throwable cause) {
+    public <Q> void completeExceptionally(@Nonnull Class<Q> queryType,
+                                          @Nonnull Predicate<? super Q> filter,
+                                          @Nonnull Throwable cause) {
         throw new UnsupportedOperationException(
                 "Invoke operation directly on tenant segment. Use: MultiTenantQueryUpdateEmitter::getTenant");
     }
 
     @Override
-    public boolean queryUpdateHandlerRegistered(SubscriptionQueryMessage<?, ?, ?> query) {
+    public boolean queryUpdateHandlerRegistered(@Nonnull SubscriptionQueryMessage<?, ?, ?> query) {
         return tenantSegments.values().stream().anyMatch(segment -> segment.queryUpdateHandlerRegistered(query));
     }
 
@@ -154,11 +175,11 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
     }
 
     @Override
-    public <U> UpdateHandlerRegistration<U> registerUpdateHandler(SubscriptionQueryMessage<?, ?, ?> query,
+    public <U> UpdateHandlerRegistration<U> registerUpdateHandler(@Nonnull SubscriptionQueryMessage<?, ?, ?> query,
                                                                   int updateBufferSize) {
         QueryUpdateEmitter queryUpdateEmitter = resolveTenant(query);
-        UpdateHandlerRegistration<U> updateHandlerRegistration = queryUpdateEmitter.registerUpdateHandler(query,
-                                                                                                          updateBufferSize);
+        UpdateHandlerRegistration<U> updateHandlerRegistration =
+                queryUpdateEmitter.registerUpdateHandler(query, updateBufferSize);
 
         updateHandlersRegistration
                 .computeIfAbsent(targetTenantResolver.resolveTenant(query, tenantSegments.keySet()),
@@ -192,7 +213,7 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         return tenantSegments.get(tenantDescriptor);
     }
 
-    public QueryUpdateEmitter unregisterTenant(TenantDescriptor tenantDescriptor) {
+    private QueryUpdateEmitter unregisterTenant(TenantDescriptor tenantDescriptor) {
         List<UpdateHandlerRegistration<?>> updateHandlerRegistrations = updateHandlersRegistration.remove(
                 tenantDescriptor);
         if (updateHandlerRegistrations != null) {
@@ -242,45 +263,68 @@ public class MultiTenantQueryUpdateEmitter implements QueryUpdateEmitter, MultiT
         return dispatchInterceptorsRegistration;
     }
 
+    /**
+     * Builder class to instantiate a {@link MultiTenantQueryUpdateEmitter}.
+     * <p>
+     * The {@link TenantQueryUpdateEmitterSegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b>
+     * and as such should be provided.
+     */
     public static class Builder {
 
-        public TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory;
-        public TargetTenantResolver<Message<?>> targetTenantResolver;
+        protected TargetTenantResolver<Message<?>> targetTenantResolver;
+        protected TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory;
 
         /**
-         * Sets the {@link TenantQueryUpdateEmitterSegmentFactory} used to build {@link QueryUpdateEmitter} segment for given {@link TenantDescriptor}.
+         * Sets the {@link TenantQueryUpdateEmitterSegmentFactory} used to build {@link QueryUpdateEmitter} segment for
+         * given {@link TenantDescriptor}.
          *
-         * @param tenantSegmentFactory tenant aware segment factory
-         * @return the current Builder instance, for fluent interfacing
+         * @param tenantSegmentFactory A tenant-aware {@link QueryUpdateEmitter} segment factory.
+         * @return The current Builder instance, for fluent interfacing.
          */
         public MultiTenantQueryUpdateEmitter.Builder tenantSegmentFactory(
                 TenantQueryUpdateEmitterSegmentFactory tenantSegmentFactory) {
-            BuilderUtils.assertNonNull(tenantSegmentFactory,
-                                       "The TenantQueryUpdateEmitterSegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory,
+                          "The TenantQueryUpdateEmitterSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
 
         /**
-         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message} message
+         * Sets the {@link TargetTenantResolver} used to resolve a {@link TenantDescriptor} based on a {@link Message}.
+         * Used to find the tenant-specific {@link QueryUpdateEmitter} segment.
          *
-         * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
-         * @return the current Builder instance, for fluent interfacing
+         * @param targetTenantResolver The resolver of a {@link TenantDescriptor} based on a {@link Message}. Used to
+         *                             find the tenant-specific {@link QueryUpdateEmitter} segment.
+         * @return The current builder instance, for fluent interfacing.
          */
         public MultiTenantQueryUpdateEmitter.Builder targetTenantResolver(
-                TargetTenantResolver<Message<?>> targetTenantResolver) {
-            BuilderUtils.assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
+                TargetTenantResolver<Message<?>> targetTenantResolver
+        ) {
+            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;
         }
 
+        /**
+         * Initializes a {@link MultiTenantQueryUpdateEmitter} as specified through this Builder.
+         *
+         * @return a {@link MultiTenantQueryUpdateEmitter} as specified through this Builder.
+         */
         public MultiTenantQueryUpdateEmitter build() {
             return new MultiTenantQueryUpdateEmitter(this);
         }
 
+        /**
+         * Validate whether the fields contained in this Builder as set accordingly.
+         *
+         * @throws AxonConfigurationException If one field is asserted to be incorrect according to the Builder's
+         *                                    specifications.
+         */
         protected void validate() {
-            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(tenantSegmentFactory, "The TenantQueryUpdateEmitterSegmentFactory is a hard requirement");
+            assertNonNull(targetTenantResolver,
+                          "The TargetTenantResolver is a hard requirement and should be provided");
+            assertNonNull(tenantSegmentFactory,
+                          "The TenantQueryUpdateEmitterSegmentFactory is a hard requirement and should be provided");
         }
     }
 }

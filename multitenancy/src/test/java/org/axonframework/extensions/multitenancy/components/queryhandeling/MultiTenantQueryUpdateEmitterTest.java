@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,15 +22,12 @@ import org.axonframework.extensions.multitenancy.components.TargetTenantResolver
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
-import org.axonframework.messaging.responsetypes.ResponseTypes;
 import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.axonframework.messaging.unitofwork.UnitOfWork;
-import org.axonframework.queryhandling.GenericSubscriptionQueryMessage;
 import org.axonframework.queryhandling.GenericSubscriptionQueryUpdateMessage;
 import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.axonframework.queryhandling.SubscriptionQueryMessage;
 import org.axonframework.queryhandling.SubscriptionQueryUpdateMessage;
-import org.axonframework.queryhandling.UpdateHandlerRegistration;
 import org.junit.jupiter.api.*;
 
 import java.util.function.Predicate;
@@ -40,13 +37,17 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantQueryUpdateEmitter}.
+ *
  * @author Stefan Dragisic
  */
+@SuppressWarnings("resource")
 class MultiTenantQueryUpdateEmitterTest {
 
-    private MultiTenantQueryUpdateEmitter testSubject;
     private QueryUpdateEmitter fixtureSegment1;
     private QueryUpdateEmitter fixtureSegment2;
+
+    private MultiTenantQueryUpdateEmitter testSubject;
 
     @BeforeEach
     void setUp() {
@@ -70,7 +71,7 @@ class MultiTenantQueryUpdateEmitterTest {
     }
 
     @Test
-    public void emit() {
+    void emit() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -87,6 +88,7 @@ class MultiTenantQueryUpdateEmitterTest {
         verify(fixtureSegment2).emit(filter, testSubscriptionQueryUpdateMessage);
         verify(fixtureSegment1, times(0)).emit(filter, testSubscriptionQueryUpdateMessage);
 
+        //noinspection unchecked
         UnitOfWork<SubscriptionQueryUpdateMessage<Object>> mockUnitOfWork = mock(UnitOfWork.class);
         when(mockUnitOfWork.getMessage()).thenReturn(testSubscriptionQueryUpdateMessage);
         CurrentUnitOfWork.set(mockUnitOfWork);
@@ -105,35 +107,33 @@ class MultiTenantQueryUpdateEmitterTest {
     }
 
     @Test
-    public void unknownTenant() {
+    void unknownTenant() {
         SubscriptionQueryMessage<?, ?, ?> msg = mock(SubscriptionQueryMessage.class);
 
-        NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
-            testSubject.emit(String.class, p -> true, msg);
-        });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        NoSuchTenantException noSuchTenantException =
+                assertThrows(NoSuchTenantException.class, () -> testSubject.emit(String.class, p -> true, msg));
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
-
     @Test
-    public void unregister() {
+    void unregister() {
         SubscriptionQueryMessage<?, ?, ?> msg = mock(SubscriptionQueryMessage.class);
         NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
             testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2")).cancel();
             testSubject.emit(String.class, p -> true, msg);
         });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
     @Test
-    public void getTenant() {
+    void getTenant() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         QueryUpdateEmitter tenant = testSubject.getTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         assertEquals(fixtureSegment1, tenant);
     }
 
     @Test
-    public void registerDispatchInterceptor() {
+    void registerDispatchInterceptor() {
         when(fixtureSegment2.registerDispatchInterceptor(any())).thenReturn(() -> true);
         MessageDispatchInterceptor<Message<?>> messageDispatchInterceptor = messages -> (a, b) -> b;
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
@@ -143,7 +143,7 @@ class MultiTenantQueryUpdateEmitterTest {
     }
 
     @Test
-    public void unregisterTenant() {
+    void unregisterTenant() {
         when(fixtureSegment2.registerDispatchInterceptor(any())).thenReturn(() -> true);
         MessageDispatchInterceptor<Message<?>> messageDispatchInterceptor = messages -> (a, b) -> b;
         Registration registration = testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
@@ -153,18 +153,12 @@ class MultiTenantQueryUpdateEmitterTest {
     }
 
     @Test
-    public void completeUnsupported() {
-        assertThrows(UnsupportedOperationException.class, () -> {
-            testSubject.complete(p -> true);
-        });
-        assertThrows(UnsupportedOperationException.class, () -> {
-            testSubject.complete(String.class, p -> true);
-        });
-        assertThrows(UnsupportedOperationException.class, () -> {
-            testSubject.completeExceptionally(p -> true, new RuntimeException());
-        });
-        assertThrows(UnsupportedOperationException.class, () -> {
-            testSubject.completeExceptionally(String.class, p -> true, new RuntimeException());
-        });
+    void completeUnsupported() {
+        assertThrows(UnsupportedOperationException.class, () -> testSubject.complete(p -> true));
+        assertThrows(UnsupportedOperationException.class, () -> testSubject.complete(String.class, p -> true));
+        assertThrows(UnsupportedOperationException.class,
+                     () -> testSubject.completeExceptionally(p -> true, new RuntimeException()));
+        assertThrows(UnsupportedOperationException.class,
+                     () -> testSubject.completeExceptionally(String.class, p -> true, new RuntimeException()));
     }
 }

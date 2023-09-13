@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,12 @@ import org.axonframework.common.AxonNonTransientException;
  */
 public class NoSuchTenantException extends AxonNonTransientException {
 
+    /**
+     * Construct a {@link NoSuchTenantException} referring to the given {@code tenantId}.
+     *
+     * @param tenantId The tenant identifier that could not be found.
+     */
     public NoSuchTenantException(String tenantId) {
-        super("Unknown tenant: " + tenantId);
+        super("Tenant with identifier [" + tenantId + "] is unknown");
     }
 }

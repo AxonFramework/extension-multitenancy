@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,13 +28,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantEventProcessor}.
+ *
  * @author Stefan Dragisic
  */
+@SuppressWarnings("resource")
 class MultiTenantEventProcessorTest {
 
-    private MultiTenantEventProcessor testSubject;
     private StreamingEventProcessor fixtureSegment1;
     private SubscribingEventProcessor fixtureSegment2;
+
+    private MultiTenantEventProcessor testSubject;
 
     @BeforeEach
     void setUp() {
@@ -56,13 +60,13 @@ class MultiTenantEventProcessorTest {
     }
 
     @Test
-    public void registerTenant() {
+    void registerTenant() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         assertTrue(testSubject.tenantEventProcessors().contains(fixtureSegment1));
     }
 
     @Test
-    public void registerAndStartTenant() {
+    void registerAndStartTenant() {
         doNothing().when(fixtureSegment1).start();
         testSubject.registerHandlerInterceptor((unitOfWork, interceptorChain) -> interceptorChain.proceed());
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
@@ -71,7 +75,7 @@ class MultiTenantEventProcessorTest {
     }
 
     @Test
-    public void stopAndRemoveTenant() {
+    void stopAndRemoveTenant() {
         doNothing().when(fixtureSegment1).shutDown();
         when(fixtureSegment1.registerHandlerInterceptor(any())).thenReturn(() -> true);
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
@@ -82,7 +86,7 @@ class MultiTenantEventProcessorTest {
     }
 
     @Test
-    public void registerHandlerInterceptor() {
+    void registerHandlerInterceptor() {
         when(fixtureSegment1.registerHandlerInterceptor(any())).thenReturn(() -> true);
         MessageHandlerInterceptor<EventMessage<?>> messageHandlerInterceptor = (m, chain) -> chain.proceed();
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
@@ -92,7 +96,7 @@ class MultiTenantEventProcessorTest {
     }
 
     @Test
-    public void startAndShutDown() {
+    void startAndShutDown() {
         when(fixtureSegment1.isRunning()).thenReturn(true);
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         assertTrue(testSubject.tenantEventProcessors().contains(fixtureSegment1));

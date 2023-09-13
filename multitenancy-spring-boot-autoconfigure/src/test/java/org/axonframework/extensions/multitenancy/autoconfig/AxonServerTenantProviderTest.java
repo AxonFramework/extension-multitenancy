@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,6 @@ import org.junit.jupiter.api.*;
 import org.mockito.*;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -39,7 +38,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -123,7 +121,7 @@ class AxonServerTenantProviderTest {
 
 
     @Test
-    public void whenInitialTenantsThenStart() {
+    void whenInitialTenantsThenStart() {
         testSubject = new AxonServerTenantProvider("default, tenant-1, tenant-2",
                                                    tenantConnectPredicate,
                                                    axonServerConnectionManager);
@@ -136,22 +134,16 @@ class AxonServerTenantProviderTest {
         //add new component
         testSubject.subscribe(mockComponent);
 
+        //noinspection resource
         verify(mockComponent).registerTenant(TenantDescriptor.tenantWithId("tenant-1"));
+        //noinspection resource
         verify(mockComponent).registerTenant(TenantDescriptor.tenantWithId("tenant-2"));
     }
 
     @Test
-    public void whenInitialTenantsIsEmpty() throws InterruptedException {
-        testSubject = new AxonServerTenantProvider("",
-                                                   tenantConnectPredicate,
-                                                   axonServerConnectionManager);
+    void whenInitialTenantsIsEmpty() throws InterruptedException {
+        testSubject = new AxonServerTenantProvider("", tenantConnectPredicate, axonServerConnectionManager);
         MultiTenantAwareComponent mockComponent = mock(MultiTenantAwareComponent.class);
-
-        AtomicBoolean removed = new AtomicBoolean();
-        when(mockComponent.registerAndStartTenant(any())).thenReturn(() -> {
-            removed.set(true);
-            return true;
-        });
 
         //first start provider
         testSubject.start();
@@ -161,12 +153,11 @@ class AxonServerTenantProviderTest {
 
         Thread.sleep(3000);
 
-        ArgumentCaptor<TenantDescriptor> tenantDescriptorArgumentCaptor = ArgumentCaptor.forClass(TenantDescriptor.class);
-
+        ArgumentCaptor<TenantDescriptor> tenantCaptor = ArgumentCaptor.forClass(TenantDescriptor.class);
         //initial setup
-        verify(mockComponent, times(2)).registerTenant(tenantDescriptorArgumentCaptor.capture());
-
-        tenantDescriptorArgumentCaptor.getAllValues().forEach(tenantDescriptor -> {
+        //noinspection resource
+        verify(mockComponent, times(2)).registerTenant(tenantCaptor.capture());
+        tenantCaptor.getAllValues().forEach(tenantDescriptor -> {
             if (tenantDescriptor.tenantId().equals("tenant-3")) {
                 assertEquals("tenant-3", tenantDescriptor.tenantId());
                 assertEquals("tenant-3-rp", tenantDescriptor.properties().get("replicationGroup"));
@@ -178,12 +169,13 @@ class AxonServerTenantProviderTest {
             }
         });
 
-
+        tenantCaptor = ArgumentCaptor.forClass(TenantDescriptor.class);
         //additionally created contexts
-        verify(mockComponent).registerAndStartTenant(TenantDescriptor.tenantWithId("tenant-1"));
-        verify(mockComponent).registerAndStartTenant(TenantDescriptor.tenantWithId("tenant-2"));
-
-        assertTrue(removed.get());
+        verify(mockComponent, times(2)).registerAndStartTenant(tenantCaptor.capture());
+        List<TenantDescriptor> resultDescriptors = tenantCaptor.getAllValues();
+        assertEquals(2, resultDescriptors.size());
+        assertEquals("tenant-1", resultDescriptors.get(0).tenantId());
+        assertEquals("tenant-2", resultDescriptors.get(1).tenantId());
     }
 
     private static class StubResultStream<T> implements ResultStream<T> {
@@ -195,13 +187,7 @@ class AxonServerTenantProviderTest {
         private volatile boolean closed;
         private final int totalNumberOfElements;
 
-        public StubResultStream(Throwable error) {
-            this.error = error;
-            this.closed = true;
-            this.responses = Collections.emptyIterator();
-            this.totalNumberOfElements = 1;
-        }
-
+        @SafeVarargs
         public StubResultStream(T... responses) {
             this.error = null;
             List<T> queryResponses = asList(responses);

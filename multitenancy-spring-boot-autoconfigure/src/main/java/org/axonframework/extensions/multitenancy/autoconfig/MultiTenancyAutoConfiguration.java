@@ -16,6 +16,7 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
@@ -37,6 +38,7 @@ import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventP
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantStreamableMessageSourceProvider;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
+import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryUpdateEmitter;
 import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -52,7 +54,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.axonframework.extensions.multitenancy.autoconfig.TenantConfiguration.TENANT_CORRELATION_KEY;
 
 /**
- * Configures Axon Server as implementation for multi-tenant components like CommandBus, QueryBus and EventStore.
+ * Autoconfiguration constructing the
+ * {@link org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent multi-tenant aware}
+ * infrastructure components.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
@@ -72,12 +76,16 @@ public class MultiTenancyAutoConfiguration {
     @Primary
     @ConditionalOnMissingQualifiedBean(qualifier = "!localSegment", beanClass = CommandBus.class)
     public MultiTenantCommandBus multiTenantCommandBus(TenantCommandSegmentFactory tenantCommandSegmentFactory,
-                                                       TargetTenantResolver targetTenantResolver,
+                                                       TargetTenantResolver<?> targetTenantResolver,
                                                        TenantProvider tenantProvider) {
-        MultiTenantCommandBus commandBus = MultiTenantCommandBus.builder()
-                                                                .tenantSegmentFactory(tenantCommandSegmentFactory)
-                                                                .targetTenantResolver(targetTenantResolver)
-                                                                .build();
+        //noinspection unchecked
+        MultiTenantCommandBus commandBus =
+                MultiTenantCommandBus.builder()
+                                     .tenantSegmentFactory(tenantCommandSegmentFactory)
+                                     .targetTenantResolver(
+                                             (TargetTenantResolver<CommandMessage<?>>) targetTenantResolver
+                                     )
+                                     .build();
         tenantProvider.subscribe(commandBus);
         return commandBus;
     }
@@ -85,12 +93,16 @@ public class MultiTenancyAutoConfiguration {
     @Bean
     @Primary
     public MultiTenantQueryBus multiTenantQueryBus(TenantQuerySegmentFactory tenantQuerySegmentFactory,
-                                                   TargetTenantResolver targetTenantResolver,
+                                                   TargetTenantResolver<?> targetTenantResolver,
                                                    TenantProvider tenantProvider) {
-        MultiTenantQueryBus queryBus = MultiTenantQueryBus.builder()
-                                                          .tenantSegmentFactory(tenantQuerySegmentFactory)
-                                                          .targetTenantResolver(targetTenantResolver)
-                                                          .build();
+        //noinspection unchecked
+        MultiTenantQueryBus queryBus =
+                MultiTenantQueryBus.builder()
+                                   .tenantSegmentFactory(tenantQuerySegmentFactory)
+                                   .targetTenantResolver(
+                                           (TargetTenantResolver<QueryMessage<?, ?>>) targetTenantResolver
+                                   )
+                                   .build();
         tenantProvider.subscribe(queryBus);
         return queryBus;
     }
@@ -99,12 +111,16 @@ public class MultiTenancyAutoConfiguration {
     @Primary
     public QueryUpdateEmitter multiTenantQueryUpdateEmitter(
             TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory,
-            TargetTenantResolver targetTenantResolver,
-            TenantProvider tenantProvider) {
+            TargetTenantResolver<?> targetTenantResolver,
+            TenantProvider tenantProvider
+    ) {
+        //noinspection unchecked
         MultiTenantQueryUpdateEmitter multiTenantQueryUpdateEmitter =
                 MultiTenantQueryUpdateEmitter.builder()
                                              .tenantSegmentFactory(tenantQueryUpdateEmitterSegmentFactory)
-                                             .targetTenantResolver(targetTenantResolver)
+                                             .targetTenantResolver(
+                                                     (TargetTenantResolver<Message<?>>) targetTenantResolver
+                                             )
                                              .build();
         tenantProvider.subscribe(multiTenantQueryUpdateEmitter);
         return multiTenantQueryUpdateEmitter;
@@ -113,12 +129,13 @@ public class MultiTenancyAutoConfiguration {
     @Bean
     @Primary
     public MultiTenantEventStore multiTenantEventStore(TenantEventSegmentFactory tenantEventSegmentFactory,
-                                                       TargetTenantResolver targetTenantResolver,
+                                                       TargetTenantResolver<?> targetTenantResolver,
                                                        TenantProvider tenantProvider) {
+        //noinspection unchecked
         MultiTenantEventStore multiTenantEventStore =
                 MultiTenantEventStore.builder()
                                      .tenantSegmentFactory(tenantEventSegmentFactory)
-                                     .targetTenantResolver(targetTenantResolver)
+                                     .targetTenantResolver((TargetTenantResolver<Message<?>>) targetTenantResolver)
                                      .build();
         tenantProvider.subscribe(multiTenantEventStore);
         return multiTenantEventStore;
@@ -128,13 +145,16 @@ public class MultiTenancyAutoConfiguration {
     @Primary
     public MultiTenantEventScheduler multiTenantEventScheduler(
             TenantEventSchedulerSegmentFactory tenantEventSchedulerSegmentFactory,
-            TargetTenantResolver targetTenantResolver,
+            TargetTenantResolver<?> targetTenantResolver,
             TenantProvider tenantProvider
     ) {
+        //noinspection unchecked
         MultiTenantEventScheduler multiTenantEventScheduler =
                 MultiTenantEventScheduler.builder()
                                          .tenantSegmentFactory(tenantEventSchedulerSegmentFactory)
-                                         .targetTenantResolver(targetTenantResolver)
+                                         .targetTenantResolver(
+                                                 (TargetTenantResolver<EventMessage<?>>) targetTenantResolver
+                                         )
                                          .build();
         tenantProvider.subscribe(multiTenantEventScheduler);
         return multiTenantEventScheduler;
@@ -143,13 +163,16 @@ public class MultiTenancyAutoConfiguration {
     @Bean
     public MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory(
             TenantProvider tenantProvider,
-            TargetTenantResolver targetTenantResolver
+            TargetTenantResolver<?> targetTenantResolver
     ) {
         Map<String, MultiTenantDeadLetterQueue<EventMessage<?>>> multiTenantDeadLetterQueue = new ConcurrentHashMap<>();
         return (processingGroup) -> multiTenantDeadLetterQueue.computeIfAbsent(processingGroup, (key) -> {
+            //noinspection unchecked
             MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue =
                     MultiTenantDeadLetterQueue.builder()
-                                              .targetTenantResolver(targetTenantResolver)
+                                              .targetTenantResolver(
+                                                      (TargetTenantResolver<EventMessage<?>>) targetTenantResolver
+                                              )
                                               .processingGroup(processingGroup)
                                               .build();
             tenantProvider.subscribe(deadLetterQueue);

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,13 +27,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link TenantWrappedTransactionManager}.
+ *
  * @author Stefan Dragisic
  */
 class TenantWrappedTransactionManagerTest {
 
-    private TenantWrappedTransactionManager testSubject;
     private TransactionManager delegate;
     private final TenantDescriptor tenant1 = TenantDescriptor.tenantWithId("tenant1");
+
+    private TenantWrappedTransactionManager testSubject;
 
     @BeforeEach
     void setUp() {
@@ -42,7 +45,7 @@ class TenantWrappedTransactionManagerTest {
     }
 
     @Test
-    public void testStartTransaction() {
+    void startTransaction() {
         Transaction transactionMock = mock(Transaction.class);
         when(delegate.startTransaction()).thenReturn(transactionMock);
 
@@ -53,7 +56,7 @@ class TenantWrappedTransactionManagerTest {
     }
 
     @Test
-    public void executeInTransaction() {
+    void executeInTransaction() {
         doNothing().when(delegate).executeInTransaction(any());
 
         Runnable task = () -> assertEquals(tenant1, TenantWrappedTransactionManager.getCurrentTenant());
@@ -64,7 +67,7 @@ class TenantWrappedTransactionManagerTest {
     }
 
     @Test
-    public void fetchInTransaction() {
+    void fetchInTransaction() {
         when(delegate.fetchInTransaction(any())).thenReturn("result");
 
         Supplier<String> supplier = () -> {

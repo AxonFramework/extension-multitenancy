@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@ import org.axonframework.common.Registration;
 
 /**
  * Interface for components that can be registered with a {@link TenantProvider}.
- * <p>
  *
  * @author Stefan Dragisic
  * @since 4.6.0
@@ -27,23 +26,19 @@ import org.axonframework.common.Registration;
 public interface MultiTenantAwareComponent {
 
     /**
-     * Registers the component with the given {@link TenantProvider} and starts without component. Use when the
-     * component should be started by Axon lifecycle.
-     * <p>
+     * Registers the given {@code tenantDescriptor} as a known tenant with this multi-tenant aware component.
      *
-     * @param tenantDescriptor for the component to register
-     * @return registration used to stop the component
+     * @param tenantDescriptor The {@link TenantDescriptor} to register with this component.
+     * @return A {@link Registration} used to deregister the given {@code tenantDescriptor}.
      */
     Registration registerTenant(TenantDescriptor tenantDescriptor);
 
     /**
-     * Registers the component with the given {@link TenantProvider} and starts the component immediately. Use when
-     * component should be started manually. Typical use case is to start components during runtime when new tenants are
-     * created.
-     * <p>
+     * Registers the given {@code tenantDescriptor} as a known tenant with this multi-tenant aware component. If
+     * applicable, this task will construct a tenant segment and start it.
      *
-     * @param tenantDescriptor for the component to register
-     * @return registration used to stop the component
+     * @param tenantDescriptor The {@link TenantDescriptor} to register with this component.
+     * @return A {@link Registration} used to deregister the given {@code tenantDescriptor}.
      */
     Registration registerAndStartTenant(TenantDescriptor tenantDescriptor);
 }

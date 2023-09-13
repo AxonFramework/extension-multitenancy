@@ -34,11 +34,11 @@ import org.axonframework.config.Configuration;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
-import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
 import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryInvocationErrorHandler;
@@ -61,7 +61,8 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.core.env.Environment;
 
 /**
- * Autoconfiguration for Axon Server, that configures abstract tenant-aware Axon Server components and factories.
+ * Autoconfiguration constructing the Axon Server specific tenant factories, with the {@link AxonServerTenantProvider}
+ * at its core.
  *
  * @author Stefan Dragisic
  * @since 4.6.0

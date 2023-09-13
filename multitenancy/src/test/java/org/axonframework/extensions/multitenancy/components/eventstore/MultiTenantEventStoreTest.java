@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,6 +31,7 @@ import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MetaData;
 import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
+import org.axonframework.messaging.unitofwork.DefaultUnitOfWork;
 import org.axonframework.messaging.unitofwork.UnitOfWork;
 import org.junit.jupiter.api.*;
 
@@ -42,13 +43,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantEventStore}.
+ *
  * @author Stefan Dragisic
  */
+@SuppressWarnings("resource")
 class MultiTenantEventStoreTest {
 
-    private MultiTenantEventStore testSubject;
     private EventStore fixtureSegment1;
     private EventStore fixtureSegment2;
+
+    private MultiTenantEventStore testSubject;
 
     @BeforeEach
     void setUp() {
@@ -72,7 +77,7 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void publish() {
+    void publish() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -83,7 +88,7 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void publishMany() {
+    void publishMany() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -95,7 +100,7 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void publishList() {
+    void publishList() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -108,55 +113,52 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void unknownTenant() {
+    void unknownTenant() {
         NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
             EventMessage<?> event = mock(EventMessage.class);
             testSubject.publish(event);
         });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
     @Test
-    public void unregister() {
+    void unregister() {
         NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
             EventMessage<?> event = mock(EventMessage.class);
             testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2")).cancel();
             testSubject.publish(event);
         });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
     @Test
-    public void registerTenantAfterStoreHaveBeenStarted() {
+    void registerTenantAfterStoreHaveBeenStarted() {
         when(fixtureSegment1.subscribe(any())).thenReturn(() -> true);
         when(fixtureSegment2.subscribe(any())).thenReturn(() -> true);
 
         MessageDispatchInterceptor<EventMessage<?>> messageDispatchInterceptor = messages -> (a, b) -> b;
         testSubject.registerDispatchInterceptor(messageDispatchInterceptor);
-
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
 
         Consumer<List<? extends EventMessage<?>>> consumer = e -> {
         };
         testSubject.subscribe(consumer);
-
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
         EventMessage<?> event = mock(EventMessage.class);
         testSubject.publish(event);
         verify(fixtureSegment2).publish(event);
         verify(fixtureSegment1, times(0)).publish(any(EventMessage.class));
-
         verify(fixtureSegment1).subscribe(consumer);
-
         verify(fixtureSegment1).subscribe(consumer);
         verify(fixtureSegment2).registerDispatchInterceptor(messageDispatchInterceptor);
     }
 
     @Test
-    public void registerDispatchInterceptor() {
+    void registerDispatchInterceptor() {
         when(fixtureSegment2.registerDispatchInterceptor(any())).thenReturn(() -> true);
         MessageDispatchInterceptor<EventMessage<?>> messageDispatchInterceptor = messages -> (a, b) -> b;
+
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
         Registration registration = testSubject.registerDispatchInterceptor(messageDispatchInterceptor);
 
@@ -164,9 +166,10 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void readEvents() {
+    void readEvents() {
+        //noinspection rawtypes
         UnitOfWork unitOfWork = mock(UnitOfWork.class);
-        EventMessage eventMessage = mock(EventMessage.class);
+        EventMessage<?> eventMessage = mock(EventMessage.class);
         when(unitOfWork.getMessage()).thenReturn(eventMessage);
         when(unitOfWork.getCorrelationData()).thenReturn(MetaData.emptyInstance());
         CurrentUnitOfWork.set(unitOfWork);
@@ -178,7 +181,7 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void readEventsWithTenant() {
+    void readEventsWithTenant() {
         DomainEventStream domainEventStream = mock(DomainEventStream.class);
         when(fixtureSegment2.readEvents(anyString())).thenReturn(domainEventStream);
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
@@ -187,13 +190,10 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void storeSnapshot() {
-        UnitOfWork unitOfWork = mock(UnitOfWork.class);
-        EventMessage eventMessage = mock(EventMessage.class);
-        when(unitOfWork.getMessage()).thenReturn(eventMessage);
-        when(unitOfWork.getCorrelationData()).thenReturn(MetaData.emptyInstance());
-        CurrentUnitOfWork.set(unitOfWork);
-        DomainEventMessage snapshot = mock(DomainEventMessage.class);
+    void storeSnapshot() {
+        EventMessage<?> eventMessage = mock(EventMessage.class);
+        DefaultUnitOfWork.startAndGet(eventMessage);
+        DomainEventMessage<?> snapshot = mock(DomainEventMessage.class);
         doNothing().when(fixtureSegment2).storeSnapshot(any());
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
         testSubject.storeSnapshot(snapshot);
@@ -201,17 +201,17 @@ class MultiTenantEventStoreTest {
     }
 
     @Test
-    public void storeSnapshotWithTenant() {
-        DomainEventMessage snapshot = mock(DomainEventMessage.class);
+    void storeSnapshotWithTenant() {
+        DomainEventMessage<?> snapshot = mock(DomainEventMessage.class);
         doNothing().when(fixtureSegment2).storeSnapshot(any());
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
         testSubject.storeSnapshot(snapshot, TenantDescriptor.tenantWithId("fixtureTenant2"));
         verify(fixtureSegment2).storeSnapshot(snapshot);
     }
 
-
+    @SuppressWarnings({"unchecked", "resource"})
     @Test
-    public void openStream() {
+    void openStream() {
         BlockingStream<TrackedEventMessage<?>> mockStream1 = mock(BlockingStream.class);
         BlockingStream<TrackedEventMessage<?>> mockStream2 = mock(BlockingStream.class);
         when(fixtureSegment1.openStream(any())).thenReturn(mockStream1);

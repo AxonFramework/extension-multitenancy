@@ -18,10 +18,10 @@ package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
-import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.springboot.autoconfig.AxonAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration;
@@ -33,15 +33,8 @@ import org.axonframework.springboot.autoconfig.ObjectMapperAutoConfiguration;
 import org.axonframework.springboot.autoconfig.TransactionAutoConfiguration;
 import org.axonframework.springboot.autoconfig.XStreamAutoConfiguration;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.*;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.context.annotation.EnableMBeanExport;
-import org.springframework.jmx.support.RegistrationPolicy;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,11 +43,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Stefan Dragisic
  */
-@ExtendWith(SpringExtension.class)
-@ContextConfiguration
-@EnableAutoConfiguration
-@EnableMBeanExport(registration = RegistrationPolicy.IGNORE_EXISTING)
-@TestPropertySource(properties = {"axon.axonserver.contexts=tenant-1,tenant-2"})
 class MultiTenancyAxonServerAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -77,6 +65,7 @@ class MultiTenancyAxonServerAutoConfigurationTest {
     void axonServerAutoConfiguration() {
         contextRunner.withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
                      .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
+                     .withPropertyValues("axon.axonserver.contexts=tenant-1,tenant-2")
                      .run(context -> {
                          assertThat(context).getBean("tenantEventSchedulerSegmentFactory")
                                             .isInstanceOf(TenantEventSchedulerSegmentFactory.class);
@@ -99,7 +88,7 @@ class MultiTenancyAxonServerAutoConfigurationTest {
 
     @Test
     void axonServerDisabled() {
-        contextRunner.withPropertyValues("axon.axonserver.enabled:false")
+        contextRunner.withPropertyValues("axon.axonserver.enabled:false", "axon.axonserver.contexts=tenant-1,tenant-2")
                      .run(context -> {
                          assertThat(context).doesNotHaveBean(TenantEventSchedulerSegmentFactory.class);
                          assertThat(context).doesNotHaveBean(TenantCommandSegmentFactory.class);

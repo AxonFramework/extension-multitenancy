@@ -55,7 +55,7 @@ class MultiTenantEventProcessorControlServiceTest {
     }
 
     @Test
-    public void testStart() {
+    void start() {
         AxonServerConnection connectionTenant1 = mock(AxonServerConnection.class);
         ControlChannel controlTenant1 = mock(ControlChannel.class);
         when(connectionTenant1.controlChannel()).thenReturn(controlTenant1);
@@ -88,7 +88,7 @@ class MultiTenantEventProcessorControlServiceTest {
     }
 
     @Test
-    public void testAddingNewTenantAfterStart() {
+    void addingNewTenantAfterStart() {
         AxonServerConnection connectionTenant1 = mock(AxonServerConnection.class);
         ControlChannel controlTenant1 = mock(ControlChannel.class);
         when(connectionTenant1.controlChannel()).thenReturn(controlTenant1);
@@ -126,7 +126,6 @@ class MultiTenantEventProcessorControlServiceTest {
                 mock(MultiTenantEventProcessor.class)
         ));
 
-        //noinspection resource
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("tenant-2"));
         verify(controlTenant2).registerEventProcessor(eq("tep@tenant-2"), any(), any());
     }

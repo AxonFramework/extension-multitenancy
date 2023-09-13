@@ -54,7 +54,7 @@ import static org.axonframework.config.EventProcessingConfigurer.PooledStreaming
 
 /**
  * An extension of the {@link EventProcessingModule} that allows for the creation of
- * {@link MultiTenantEventProcessor}s.
+ * {@link MultiTenantEventProcessor MultiTenantEventProcessors}.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
@@ -164,20 +164,24 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                          .name(name)
                                          .tenantSegmentFactory(
                                                  tenantDescriptor -> {
-                                                     SubscribableMessageSource<? extends EventMessage<?>> source =
-                                                             messageSource instanceof MultiTenantEventStore
-                                                                     ? ((MultiTenantEventStore) messageSource).tenantSegment(
-                                                                     tenantDescriptor)
-                                                                     : messageSource;
+                                                     SubscribableMessageSource<? extends EventMessage<?>> tenantSource =
+                                                             tenantSource(messageSource, tenantDescriptor);
 
                                                      return buildSep(
-                                                             tenantDescriptor, name, eventHandlerInvoker, source
+                                                             tenantDescriptor, name, eventHandlerInvoker, tenantSource
                                                      );
                                                  })
                                          .build();
-        //noinspection resource
         tenantProvider.subscribe(eventProcessor);
         return eventProcessor;
+    }
+
+    private static SubscribableMessageSource<? extends EventMessage<?>> tenantSource(
+            SubscribableMessageSource<? extends EventMessage<?>> messageSource, TenantDescriptor tenantDescriptor
+    ) {
+        return messageSource instanceof MultiTenantEventStore
+                ? ((MultiTenantEventStore) messageSource).tenantSegments().get(tenantDescriptor)
+                : messageSource;
     }
 
     private SubscribingEventProcessor buildSep(TenantDescriptor tenantDescriptor,
@@ -209,17 +213,12 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                          .tenantSegmentFactory(
                                                  tenantDescriptor -> {
                                                      StreamableMessageSource<TrackedEventMessage<?>> tenantSource =
-                                                             source instanceof MultiTenantEventStore
-                                                                     ? ((MultiTenantEventStore) source).tenantSegment(
-                                                                     tenantDescriptor)
-                                                                     : source;
-
-                                                     tenantSource = multiTenantStreamableMessageSourceProvider.build(
-                                                             tenantSource,
-                                                             name,
-                                                             tenantDescriptor,
-                                                             configuration
-                                                     );
+                                                             multiTenantStreamableMessageSourceProvider.build(
+                                                                     defaultSource(source, tenantDescriptor),
+                                                                     name,
+                                                                     tenantDescriptor,
+                                                                     configuration
+                                                             );
 
                                                      return buildTep(tenantDescriptor,
                                                                      name,
@@ -229,7 +228,6 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                  }
                                          )
                                          .build();
-        //noinspection resource
         tenantProvider.subscribe(eventProcessor);
         return eventProcessor;
     }
@@ -266,10 +264,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                          .tenantSegmentFactory(
                                                  tenantDescriptor -> {
                                                      StreamableMessageSource<TrackedEventMessage<?>> tenantSource =
-                                                             source instanceof MultiTenantEventStore
-                                                                     ? ((MultiTenantEventStore) source).tenantSegment(
-                                                                     tenantDescriptor)
-                                                                     : source;
+                                                             defaultSource(source, tenantDescriptor);
 
                                                      tenantSource = multiTenantStreamableMessageSourceProvider.build(
                                                              tenantSource,
@@ -297,9 +292,16 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                  }
                                          )
                                          .build();
-        //noinspection resource
         tenantProvider.subscribe(eventProcessor);
         return eventProcessor;
+    }
+
+    private static StreamableMessageSource<TrackedEventMessage<?>> defaultSource(
+            StreamableMessageSource<TrackedEventMessage<?>> source, TenantDescriptor tenantDescriptor
+    ) {
+        return source instanceof MultiTenantEventStore
+                ? ((MultiTenantEventStore) source).tenantSegments().get(tenantDescriptor)
+                : source;
     }
 
     private PooledStreamingEventProcessor.Builder psepBuilder(TenantDescriptor tenantDescriptor,

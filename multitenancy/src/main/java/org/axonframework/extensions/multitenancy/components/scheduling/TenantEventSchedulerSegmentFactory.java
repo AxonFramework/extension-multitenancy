@@ -21,7 +21,7 @@ import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import java.util.function.Function;
 
 /**
- * Factory for creating {@link EventScheduler} instances for a given {@link TenantDescriptor}.
+ * Factory for creating {@link EventScheduler} segments for a given {@link TenantDescriptor}.
  *
  * @author Stefan Dragisic
  * @since 4.9.0

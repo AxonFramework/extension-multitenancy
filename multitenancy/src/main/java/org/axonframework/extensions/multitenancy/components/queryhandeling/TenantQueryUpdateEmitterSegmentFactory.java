@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import org.axonframework.queryhandling.QueryUpdateEmitter;
 import java.util.function.Function;
 
 /**
- * Factory for creating {@link QueryUpdateEmitter} instances that are scoped to a specific {@link TenantDescriptor}.
+ * Factory for creating {@link QueryUpdateEmitter} segments for a given {@link TenantDescriptor}.
  *
  * @author Stefan Dragisic
  * @since 4.6.0

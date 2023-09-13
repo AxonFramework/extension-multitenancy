@@ -6,7 +6,7 @@
   ~ you may not use this file except in compliance with the License.
   ~ You may obtain a copy of the License at
   ~
-  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~    http://www.apache.org/licenses/LICENSE-2.0
   ~
   ~ Unless required by applicable law or agreed to in writing, software
   ~ distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,7 @@
     <packaging>pom</packaging>
 
     <modelVersion>4.0.0</modelVersion>
-    <name>Axon Framework - Multi-tenancy Extension</name>
+    <name>Axon Framework - Multi-Tenancy Extension</name>
     <description>
         An Axon Framework extension providing implementation to support multi-tenancy in Event Sourced and Event Driven
         systems.
@@ -62,8 +62,8 @@
         <slf4j.version>1.7.28</slf4j.version>
         <log4j.version>2.13.0</log4j.version>
 
-        <junit.jupiter.version>5.9.3</junit.jupiter.version>
-        <mockito.version>4.11.0</mockito.version>
+        <junit.jupiter.version>5.10.0</junit.jupiter.version>
+        <mockito.version>5.5.0</mockito.version>
 
         <projectreactor.version>3.5.10</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
@@ -72,7 +72,7 @@
         <maven-assembly.version>3.6.0</maven-assembly.version>
         <maven-clean.version>3.3.1</maven-clean.version>
         <maven-compiler.version>3.11.0</maven-compiler.version>
-        <maven-deploy.version>3.0.0</maven-deploy.version>
+        <maven-deploy.version>3.1.1</maven-deploy.version>
         <maven-enforcer.version>3.4.1</maven-enforcer.version>
         <maven-gpg.version>3.1.0</maven-gpg.version>
         <maven-install.version>3.1.1</maven-install.version>
@@ -80,7 +80,7 @@
         <maven-javadoc.version>3.5.0</maven-javadoc.version>
         <maven-release.version>3.0.1</maven-release.version>
         <maven-source.version>3.3.0</maven-source.version>
-        <maven-surefire.version>2.22.2</maven-surefire.version>
+        <maven-surefire.version>3.1.2</maven-surefire.version>
         <maven-resources.version>3.3.1</maven-resources.version>
     </properties>
 

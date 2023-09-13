@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,28 +29,29 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantDeadLetterProcessor}.
+ *
  * @author Stefan Dragisic
  */
 class MultiTenantDeadLetterProcessorTest {
 
-    private MultiTenantDeadLetterProcessor subject;
-
     private SequencedDeadLetterProcessor<EventMessage<?>> delegate;
+
+    private MultiTenantDeadLetterProcessor testSubject;
 
     @BeforeEach
     void setUp() {
+        //noinspection unchecked
         delegate = mock(SequencedDeadLetterProcessor.class);
-        subject = new MultiTenantDeadLetterProcessor(delegate);
+        testSubject = new MultiTenantDeadLetterProcessor(delegate);
     }
 
     @Test
     void forTenantMustBeCalled() {
-        assertThrows(IllegalStateException.class, () -> {
-            subject.process(t -> true);
-        });
+        assertThrows(IllegalStateException.class, () -> testSubject.process(t -> true));
 
-        subject.forTenant(TenantDescriptor.tenantWithId("tenantId"))
-               .processAny();
+        testSubject.forTenant(TenantDescriptor.tenantWithId("tenantId"))
+                   .processAny();
 
         verify(delegate).processAny();
     }
@@ -62,8 +63,8 @@ class MultiTenantDeadLetterProcessorTest {
                          TenantWrappedTransactionManager.getCurrentTenant());
             return true;
         };
-        subject.forTenant(TenantDescriptor.tenantWithId("tenantId"))
-               .process( predicate);
+        testSubject.forTenant(TenantDescriptor.tenantWithId("tenantId"))
+                   .process(predicate);
 
         verify(delegate).process(predicate);
     }

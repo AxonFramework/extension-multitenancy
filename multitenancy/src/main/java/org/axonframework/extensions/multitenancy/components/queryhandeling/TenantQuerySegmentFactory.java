@@ -22,7 +22,7 @@ import org.axonframework.queryhandling.QueryBus;
 import java.util.function.Function;
 
 /**
- * Factory for creating {@link QueryBus} instances for a given {@link TenantDescriptor}.
+ * Factory for creating {@link QueryBus} segments for a given {@link TenantDescriptor}.
  *
  * @author Stefan Dragisic
  * @since 4.6.0

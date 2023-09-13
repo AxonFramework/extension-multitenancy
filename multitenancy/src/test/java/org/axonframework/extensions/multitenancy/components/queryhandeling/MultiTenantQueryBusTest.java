@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ import org.axonframework.messaging.responsetypes.ResponseTypes;
 import org.axonframework.queryhandling.GenericQueryMessage;
 import org.axonframework.queryhandling.GenericStreamingQueryMessage;
 import org.axonframework.queryhandling.GenericSubscriptionQueryMessage;
+import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.SimpleQueryBus;
 import org.axonframework.queryhandling.StreamingQueryMessage;
@@ -41,13 +42,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantQueryBus}.
+ *
  * @author Stefan Dragisic
  */
+@SuppressWarnings("resource")
 class MultiTenantQueryBusTest {
 
+    private QueryBus fixtureSegment1;
+    private QueryBus fixtureSegment2;
+
     private MultiTenantQueryBus testSubject;
-    private SimpleQueryBus fixtureSegment1;
-    private SimpleQueryBus fixtureSegment2;
 
     @BeforeEach
     void setUp() {
@@ -71,7 +76,7 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void query() {
+    void query() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -82,7 +87,7 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void scatterGather() {
+    void scatterGather() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -93,7 +98,7 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void streamingQuery() {
+    void streamingQuery() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -104,7 +109,7 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void subscriptionQuery() {
+    void subscriptionQuery() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -114,6 +119,7 @@ class MultiTenantQueryBusTest {
                 ResponseTypes.multipleInstancesOf(String.class),
                 ResponseTypes.instanceOf(String.class)
         );
+
         testSubject.subscriptionQuery(queryMessage);
         testSubject.subscriptionQuery(queryMessage, 1);
         verify(fixtureSegment2).subscriptionQuery(queryMessage);
@@ -123,7 +129,7 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void registerTenantAfterCommandBusHaveBeenStarted() {
+    void registerTenantAfterCommandBusHaveBeenStarted() {
         when(fixtureSegment1.subscribe(anyString(), any(), any())).thenReturn(() -> true);
         when(fixtureSegment2.subscribe(anyString(), any(), any())).thenReturn(() -> true);
 
@@ -153,18 +159,18 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void unregister() {
+    void unregister() {
         NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
             QueryMessage<String, String> query = new GenericQueryMessage<>("Hello, World", instanceOf(String.class));
             testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2")).cancel();
             testSubject.query(query);
         });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
 
     @Test
-    public void registerDispatchInterceptor() {
+    void registerDispatchInterceptor() {
         when(fixtureSegment2.registerDispatchInterceptor(any())).thenReturn(() -> true);
         MessageDispatchInterceptor<QueryMessage<?, ?>> messageDispatchInterceptor = messages -> (a, b) -> b;
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
@@ -174,7 +180,7 @@ class MultiTenantQueryBusTest {
     }
 
     @Test
-    public void registerHandlerInterceptor() {
+    void registerHandlerInterceptor() {
         when(fixtureSegment2.registerHandlerInterceptor(any())).thenReturn(() -> true);
         MessageHandlerInterceptor<QueryMessage<?, ?>> messageHandlerInterceptor = (m, chain) -> chain.proceed();
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));

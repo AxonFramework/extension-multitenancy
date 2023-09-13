@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,12 +15,12 @@
  */
 package org.axonframework.extensions.multitenancy.components;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * A descriptor for a tenant, and is directly mapped to a context.
- * <p>
+ * A descriptor for tenants.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
@@ -28,32 +28,51 @@ import java.util.Objects;
 public class TenantDescriptor {
 
     protected String tenantId;
-
     protected Map<String, String> properties;
 
+    /**
+     * Constructs a {@link TenantDescriptor} with the given {@code tenantId}.
+     *
+     * @param tenantId The identifier of this {@link TenantDescriptor}.
+     */
     public TenantDescriptor(String tenantId) {
-        this.tenantId = tenantId;
+        this(tenantId, Collections.emptyMap());
     }
 
+    /**
+     * Constructs a {@link TenantDescriptor} with the given {@code tenantId} and {@code properties}.
+     *
+     * @param tenantId   The identifier of this {@link TenantDescriptor}.
+     * @param properties The properties of this {@link TenantDescriptor}.
+     */
     public TenantDescriptor(String tenantId, Map<String, String> properties) {
         this.tenantId = tenantId;
         this.properties = properties;
     }
 
     /**
-     * The tenant id. Directly mapped to the context name.
-     * <p>
+     * Constructs a {@link TenantDescriptor} with the given {@code tenantId}.
      *
-     * @return the tenant id
+     * @param tenantId The identifier of this {@link TenantDescriptor}.
+     * @return A {@link TenantDescriptor} with the given {@code tenantId}.
+     */
+    public static TenantDescriptor tenantWithId(String tenantId) {
+        return new TenantDescriptor(tenantId);
+    }
+
+    /**
+     * Returns the identifier of this tenant.
+     *
+     * @return The identifier of this tenant.
      */
     public String tenantId() {
         return tenantId;
     }
 
     /**
-     * The properties of the tenant. Directly mapped to the context properties.
+     * Returns the properties of this tenant.
      *
-     * @return
+     * @return The properties of this tenant.
      */
     public Map<String, String> properties() {
         return properties;
@@ -64,23 +83,23 @@ public class TenantDescriptor {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof TenantDescriptor)) {
+        if (o == null || getClass() != o.getClass()) {
             return false;
         }
         TenantDescriptor that = (TenantDescriptor) o;
-        return tenantId.equals(that.tenantId);
+        return Objects.equals(tenantId, that.tenantId) && Objects.equals(properties, that.properties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId);
+        return Objects.hash(tenantId, properties);
     }
 
-    /**
-     * @param id of the tenant
-     * @return the descriptor statically created representation of the descriptor bound to the given tenant id.
-     */
-    public static TenantDescriptor tenantWithId(String id) {
-        return new TenantDescriptor(id);
+    @Override
+    public String toString() {
+        return "TenantDescriptor{" +
+                "tenantId='" + tenantId + '\'' +
+                ", properties=" + properties +
+                '}';
     }
 }

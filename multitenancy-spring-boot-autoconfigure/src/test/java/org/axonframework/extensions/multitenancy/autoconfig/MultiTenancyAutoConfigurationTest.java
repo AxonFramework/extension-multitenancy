@@ -42,30 +42,17 @@ import org.axonframework.springboot.autoconfig.ObjectMapperAutoConfiguration;
 import org.axonframework.springboot.autoconfig.TransactionAutoConfiguration;
 import org.axonframework.springboot.autoconfig.XStreamAutoConfiguration;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.*;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.context.annotation.EnableMBeanExport;
-import org.springframework.jmx.support.RegistrationPolicy;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
-
 
 /**
  * Test class validating the multi-tenancy auto-configuration.
  *
  * @author Stefan Dragisic
  */
-@ExtendWith(SpringExtension.class)
-@ContextConfiguration
-@EnableAutoConfiguration
-@EnableMBeanExport(registration = RegistrationPolicy.IGNORE_EXISTING)
-@TestPropertySource(properties = {"axon.axonserver.contexts=tenant-1,tenant-2"})
 class MultiTenancyAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
@@ -87,6 +74,7 @@ class MultiTenancyAutoConfigurationTest {
     void multiTenancyAutoConfiguration() {
         contextRunner.withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
                      .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
+                     .withPropertyValues("axon.axonserver.contexts=tenant-1,tenant-2")
                      .run(context -> {
                          assertThat(context).getBean("tenantFilterPredicate")
                                             .isInstanceOf(TenantConnectPredicate.class);
@@ -113,7 +101,9 @@ class MultiTenancyAutoConfigurationTest {
 
     @Test
     void multiTenancyDisabled() {
-        contextRunner.withPropertyValues("axon.multi-tenancy.enabled:false")
+        contextRunner.withPropertyValues(
+                             "axon.multi-tenancy.enabled:false", "axon.axonserver.contexts=tenant-1,tenant-2"
+                     )
                      .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
                      .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
                      .run(context -> {
@@ -142,7 +132,10 @@ class MultiTenancyAutoConfigurationTest {
                                         .getOrDefault("USER_CORRELATION_KEY", "unknownTenant")
                 );
         contextRunner.withBean(TargetTenantResolver.class, () -> userResolver)
-                     .withPropertyValues("axon.multi-tenancy.use-metadata-helper:false")
+                     .withPropertyValues(
+                             "axon.multi-tenancy.use-metadata-helper:false",
+                             "axon.axonserver.contexts=tenant-1,tenant-2"
+                     )
                      .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
                      .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
                      .run(context -> {

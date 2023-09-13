@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,26 +23,27 @@ import org.axonframework.messaging.StreamableMessageSource;
 
 
 /**
- * A functional interface to provide a {@link StreamableMessageSource} for a given {@link TenantDescriptor} and processor name.
+ * A functional interface to provide a {@link StreamableMessageSource} for a given {@link TenantDescriptor} and
+ * processor name.
  *
  * @author Stefan Dragisic
  * @since 4.8.0
  */
 @FunctionalInterface
 public interface MultiTenantStreamableMessageSourceProvider {
-     
-     /**
-        * Provide a custom {@link StreamableMessageSource} for a given {@link TenantDescriptor} and processor name.
-        *
-        * @param defaultTenantSource the default {@link StreamableMessageSource} to be used if no tenant-specific source is configured
-        * @param processorName the name of the processor for which the {@link StreamableMessageSource} is built
-        * @param tenantDescriptor the {@link TenantDescriptor} for which the {@link StreamableMessageSource} is built
-        * @param configuration the {@link Configuration} used to build the {@link StreamableMessageSource}
-      */
-     StreamableMessageSource<TrackedEventMessage<?>> build(
-             StreamableMessageSource<TrackedEventMessage<?>> defaultTenantSource,
-             String processorName,
-             TenantDescriptor tenantDescriptor,
-             Configuration configuration);
 
+    /**
+     * Provide a custom {@link StreamableMessageSource} for a given {@link TenantDescriptor} and processor name.
+     *
+     * @param defaultTenantSource The default {@link StreamableMessageSource} to be used if no tenant-specific source is
+     *                            configured.
+     * @param processorName       The name of the processor for which the {@link StreamableMessageSource} is built.
+     * @param tenantDescriptor    The {@link TenantDescriptor} for which the {@link StreamableMessageSource} is built.
+     * @param configuration       The {@link Configuration} used to build the {@link StreamableMessageSource}.
+     */
+    StreamableMessageSource<TrackedEventMessage<?>> build(
+            StreamableMessageSource<TrackedEventMessage<?>> defaultTenantSource,
+            String processorName,
+            TenantDescriptor tenantDescriptor,
+            Configuration configuration);
 }

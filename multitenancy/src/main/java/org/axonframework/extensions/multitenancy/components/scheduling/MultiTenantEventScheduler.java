@@ -40,7 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 /**
- * Multi-tenant implementation of {@link EventScheduler} that delegates to a tenant-specific {@link EventScheduler}
+ * Tenant aware implementation of {@link EventScheduler} that delegates to a tenant-specific {@link EventScheduler}
  * based on the {@link TenantDescriptor} resolved by the {@link TargetTenantResolver}.
  * <p>
  * Compared to other {@code EventScheduler} implementations, this version requires <em>any</em> given {@code event} for
@@ -78,26 +78,20 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      * The {@link TenantEventSchedulerSegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b> and
      * as such should be provided.
      *
-     * @return a Builder to be able to create a {@link MultiTenantEventScheduler}
+     * @return A Builder to be able to create a {@link MultiTenantEventScheduler}.
      */
-    public static MultiTenantEventScheduler.Builder builder() {
-        return new MultiTenantEventScheduler.Builder();
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
-     * Schedule the given {@code event} for publication at the given {@code triggerDateTime}.
+     * {@inheritDoc}
      * </p>
      * It is <em>required</em> that the given {@code event} is of type {@link EventMessage}, containing a resolvable
      * {@link TenantDescriptor} from the {@link Message#getMetaData meta data}. Without a {@code TenantDescriptor}, the
      * `MultiTenantEventScheduler` is incapable of resolving the tenant-specific {@link EventScheduler}. Therefor, the
      * provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's
      * {@link MetaData}.
-     * <p>
-     * Convenience method around {@link #cancelSchedule(ScheduleToken)} and {@link #schedule(Duration, Object)}.
-     *
-     * @param instant The moment to trigger publication of the event.
-     * @param event   The event to publish.
-     * @return The token to use when canceling the schedule.
      */
     @Override
     public ScheduleToken schedule(Instant instant, Object event) {
@@ -105,17 +99,13 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     }
 
     /**
-     * Schedule the given {@code event} for publication after the given {@code duration}.
+     * {@inheritDoc}
      * <p>
      * It is <em>required</em> that the given {@code event} is of type {@link EventMessage}, containing a resolvable
      * {@link TenantDescriptor} from the {@link Message#getMetaData meta data}. Without a {@code TenantDescriptor}, the
      * `MultiTenantEventScheduler` is incapable of resolving the tenant-specific {@link EventScheduler}. Therefor, the
      * provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's
      * {@link MetaData}.
-     *
-     * @param duration The amount of time to wait before publishing the event.
-     * @param event    The event to publish.
-     * @return The token to use when cancelling the schedule.
      */
     @Override
     public ScheduleToken schedule(Duration duration, Object event) {
@@ -123,13 +113,12 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     }
 
     /**
-     * Cancel the publication of a scheduled event. Tries to extract {@link TenantDescriptor} from
-     * {@link TenantWrappedTransactionManager#getCurrentTenant()}.
+     * {@inheritDoc}
+     * <p>
+     * Tries to extract {@link TenantDescriptor} from {@link TenantWrappedTransactionManager#getCurrentTenant()}.
      * <p>
      * If the {@link TenantDescriptor} is not found, it tries to cancel the schedule token in all tenants until it finds
      * the correct one. See {@link #forTenant(TenantDescriptor)}.
-     *
-     * @param scheduleToken The token returned when the event was scheduled, used to cancel the schedule.
      */
     @Override
     public void cancelSchedule(ScheduleToken scheduleToken) {
@@ -155,18 +144,13 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     }
 
     /**
-     * Cancel a scheduled event and schedule another in its place.
+     * {@inheritDoc}
      * <p>
      * It is <em>required</em> that the given {@code event} is of type {@link EventMessage}, containing a resolvable
      * {@link TenantDescriptor} from the {@link Message#getMetaData meta data}. Without a {@code TenantDescriptor}, the
      * `MultiTenantEventScheduler` is incapable of resolving the tenant-specific {@link EventScheduler}. Therefor, the
      * provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's
      * {@link MetaData}.
-     *
-     * @param scheduleToken   The token returned when the event was scheduled, might be null.
-     * @param triggerDuration The amount of time to wait before publishing the event.
-     * @param event           The event to publish.
-     * @return The token to use when cancelling the schedule.
      */
     @Override
     public ScheduleToken reschedule(ScheduleToken scheduleToken, Duration triggerDuration, Object event) {
@@ -174,18 +158,13 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     }
 
     /**
-     * Cancel a scheduled event and schedule another in its place.
+     * {@inheritDoc}
      * <p>
      * It is <em>required</em> that the given {@code event} is of type {@link EventMessage}, containing a resolvable
      * {@link TenantDescriptor} from the {@link Message#getMetaData meta data}. Without a {@code TenantDescriptor}, the
      * `MultiTenantEventScheduler` is incapable of resolving the tenant-specific {@link EventScheduler}. Therefor, the
      * provided {@code event} should be of type {@code EventMessage} <em>with</em> a {@code TenantDescriptor} in it's
      * {@link MetaData}.
-     *
-     * @param scheduleToken The token returned when the event was scheduled, might be null.
-     * @param instant       The moment in time to wait before publishing the event.
-     * @param event         The event to publish.
-     * @return The token to use when cancelling the schedule.
      */
     @Override
     public ScheduleToken reschedule(ScheduleToken scheduleToken, Instant instant, Object event) {
@@ -193,7 +172,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
     }
 
     /**
-     * Shut down the scheduler, preventing it from scheduling any more tasks.
+     * {@inheritDoc}
      * <p>
      * Invoking shutdown, shuts down all tenant-specific {@link EventScheduler EventSchedulers}.
      */
@@ -224,12 +203,6 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
         return tenantSegments;
     }
 
-    /**
-     * Register a tenant specific event scheduler for given {@link TenantDescriptor}.
-     *
-     * @param tenantDescriptor The tenant to register an {@link EventScheduler} for.
-     * @return The {@link Registration} of the tenant segment, to unregister when necessary.
-     */
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
         EventScheduler tenantSegment = tenantSegmentFactory.apply(tenantDescriptor);
@@ -249,12 +222,6 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
         return eventScheduler;
     }
 
-    /**
-     * Register a tenant specific event scheduler for given {@link TenantDescriptor} and start it.
-     *
-     * @param tenantDescriptor The tenant to register an {@link EventScheduler} for.
-     * @return The {@link Registration} of the tenant segment, to unregister when necessary.
-     */
     @Override
     public Registration registerAndStartTenant(TenantDescriptor tenantDescriptor) {
         return registerTenant(tenantDescriptor);
@@ -285,8 +252,8 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
      */
     public static class Builder {
 
-        private TenantEventSchedulerSegmentFactory tenantSegmentFactory;
         private TargetTenantResolver<EventMessage<?>> targetTenantResolver;
+        private TenantEventSchedulerSegmentFactory tenantSegmentFactory;
 
         /**
          * Sets the {@link TenantEventSchedulerSegmentFactory} used to build {@link EventScheduler} segment for given
@@ -297,7 +264,7 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
          * @return The current Builder instance, for fluent interfacing.
          */
         public Builder tenantSegmentFactory(TenantEventSchedulerSegmentFactory tenantSegmentFactory) {
-            assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory, "The TenantEventSchedulerSegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
@@ -332,8 +299,10 @@ public class MultiTenantEventScheduler implements EventScheduler, MultiTenantAwa
          *                                    specifications.
          */
         protected void validate() {
-            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(tenantSegmentFactory, "The TenantEventProcessorSegmentFactory is a hard requirement");
+            assertNonNull(targetTenantResolver,
+                          "The TargetTenantResolver is a hard requirement and should be provided");
+            assertNonNull(tenantSegmentFactory,
+                          "The TenantEventSchedulerSegmentFactory is a hard requirement and should be provided");
         }
     }
 }

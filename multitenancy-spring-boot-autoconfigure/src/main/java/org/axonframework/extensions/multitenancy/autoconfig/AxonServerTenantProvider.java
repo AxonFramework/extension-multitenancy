@@ -44,7 +44,8 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /**
- * Axon Server implementation of {@link TenantProvider}
+ * Axon Server implementation of the {@link TenantProvider}. Uses Axon Server's multi-context support to construct
+ * tenant-specific segments of all {@link MultiTenantAwareComponent MultiTenantAwareComponents}.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
@@ -62,6 +63,15 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
     private final String ADMIN_CTX = "_admin";
     private ConcurrentHashMap<TenantDescriptor, List<Registration>> registrationMap = new ConcurrentHashMap<>();
 
+    /**
+     * Construct a {@link AxonServerTenantProvider}.
+     *
+     * @param preDefinedContexts          A comma-separated list of all the base contexts used for the tenants.
+     * @param tenantConnectPredicate      A {@link java.util.function.Predicate} used to filter out newly registered
+     *                                    contexts as tenants.
+     * @param axonServerConnectionManager The {@link AxonServerConnectionManager} used to retrieve all context-specific
+     *                                    changes through to make adjustments in the tenant-specific segments.
+     */
     public AxonServerTenantProvider(String preDefinedContexts,
                                     TenantConnectPredicate tenantConnectPredicate,
                                     AxonServerConnectionManager axonServerConnectionManager) {
@@ -70,6 +80,10 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
         this.axonServerConnectionManager = axonServerConnectionManager;
     }
 
+    /**
+     * Start this {@link TenantProvider}, by added all tenants and subscribing to the
+     * {@link AxonServerConnectionManager} for context updates.
+     */
     public void start() {
         tenantDescriptors.addAll(getInitialTenants());
         tenantDescriptors.forEach(this::addTenant);
@@ -78,7 +92,7 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
         }
     }
 
-    public List<TenantDescriptor> getInitialTenants() {
+    private List<TenantDescriptor> getInitialTenants() {
         List<TenantDescriptor> initialTenants = Collections.emptyList();
         try {
             if (StringUtils.nonEmptyOrNull(preDefinedContexts)) {
@@ -97,10 +111,9 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
 
     private void subscribeToUpdates() {
         try {
-            ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager
-                    .getConnection(ADMIN_CTX)
-                    .adminChannel()
-                    .subscribeToContextUpdates();
+            ResultStream<ContextUpdate> contextUpdatesStream = axonServerConnectionManager.getConnection(ADMIN_CTX)
+                                                                                          .adminChannel()
+                                                                                          .subscribeToContextUpdates();
 
             contextUpdatesStream.onAvailable(() -> {
                 try {
@@ -125,12 +138,11 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
 
     private void handleContextCreated(ContextUpdate contextUpdate) {
         try {
-            TenantDescriptor newTenant = toTenantDescriptor(axonServerConnectionManager.getConnection(
-                                                                                               ADMIN_CTX)
-                                                                                       .adminChannel()
-                                                                                       .getContextOverview(
-                                                                                               contextUpdate.getContext())
-                                                                                       .get());
+            TenantDescriptor newTenant =
+                    toTenantDescriptor(axonServerConnectionManager.getConnection(ADMIN_CTX)
+                                                                  .adminChannel()
+                                                                  .getContextOverview(contextUpdate.getContext())
+                                                                  .get());
             if (tenantConnectPredicate.test(newTenant) && !tenantDescriptors.contains(newTenant)) {
                 addTenant(newTenant);
             }
@@ -143,7 +155,6 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
     public List<TenantDescriptor> getTenants() {
         return new ArrayList<>(tenantDescriptors);
     }
-
 
     private List<TenantDescriptor> getTenantsAPI() {
         return axonServerConnectionManager.getConnection(ADMIN_CTX)

@@ -33,7 +33,7 @@ import org.axonframework.queryhandling.QueryBus;
 import org.axonframework.queryhandling.QueryMessage;
 import org.axonframework.queryhandling.QueryResponseMessage;
 import org.axonframework.queryhandling.QueryUpdateEmitter;
-import org.axonframework.test.server.AxonServerSEContainer;
+import org.axonframework.test.server.AxonServerContainer;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -42,7 +42,6 @@ import org.springframework.jmx.support.RegistrationPolicy;
 import org.springframework.test.context.ContextConfiguration;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -57,13 +56,14 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 class MultiTenancyIntegrationTest {
 
-    public static final DockerImageName AXON_SERVER_IMAGE =
-            DockerImageName.parse("axoniq/axonserver:latest");
+    // The tenantId is "default" as the used Axon Server test container only allows a single context.
+    private static final String TENANT_ID = "default";
 
     private ApplicationContextRunner testApplicationContext;
 
     @Container
-    private static final AxonServerSEContainer AXON_SERVER_CONTAINER = new AxonServerSEContainer(AXON_SERVER_IMAGE);
+    private static final AxonServerContainer AXON_SERVER_CONTAINER =
+            new AxonServerContainer("axoniq/axonserver:latest-dev");
 
     @BeforeEach
     void setUp() {
@@ -75,131 +75,136 @@ class MultiTenancyIntegrationTest {
 
     @Test
     void willUseRegisteredTenantForCommand() {
-        testApplicationContext
-                .run(context -> {
-                    CommandBus commandBus = context.getBean(CommandBus.class);
-                    assertNotNull(commandBus);
-                    assertTrue(commandBus instanceof MultiTenantCommandBus);
-                    registerTenant((MultiTenantCommandBus) commandBus);
-                    subscribeCommandHandler(commandBus);
-                    executeCommand(commandBus);
-                });
+        testApplicationContext.run(context -> {
+            CommandBus commandBus = context.getBean(CommandBus.class);
+            assertNotNull(commandBus);
+            assertTrue(commandBus instanceof MultiTenantCommandBus);
+            registerTenant((MultiTenantCommandBus) commandBus);
+            subscribeCommandHandler(commandBus);
+            executeCommand(commandBus);
+        });
     }
 
     @Test
     void commandFailsWhenNoTenantSet() {
-        testApplicationContext
-                .run(context -> {
-                    CommandBus commandBus = context.getBean(CommandBus.class);
-                    assertNotNull(commandBus);
-                    assertTrue(commandBus instanceof MultiTenantCommandBus);
-                    executeCommandWhileTenantNotSet(commandBus);
-                });
+        testApplicationContext.run(context -> {
+            CommandBus commandBus = context.getBean(CommandBus.class);
+            assertNotNull(commandBus);
+            assertTrue(commandBus instanceof MultiTenantCommandBus);
+            executeCommandWhileTenantNotSet(commandBus);
+        });
     }
 
     @Test
     void willUseRegisteredTenantForQuery() {
-        testApplicationContext
-                .run(context -> {
-                    QueryUpdateEmitter emitter = context.getBean(QueryUpdateEmitter.class);
-                    assertNotNull(emitter);
-                    assertTrue(emitter instanceof MultiTenantQueryUpdateEmitter);
-                    QueryBus queryBus = context.getBean(QueryBus.class);
-                    assertNotNull(queryBus);
-                    assertTrue(queryBus instanceof MultiTenantQueryBus);
-                    registerTenant((MultiTenantQueryUpdateEmitter) emitter, (MultiTenantQueryBus) queryBus);
-                    subscribeQueryHandler(queryBus);
-                    executeQuery(queryBus);
-                });
+        testApplicationContext.run(context -> {
+            QueryUpdateEmitter emitter = context.getBean(QueryUpdateEmitter.class);
+            assertNotNull(emitter);
+            assertTrue(emitter instanceof MultiTenantQueryUpdateEmitter);
+            QueryBus queryBus = context.getBean(QueryBus.class);
+            assertNotNull(queryBus);
+            assertTrue(queryBus instanceof MultiTenantQueryBus);
+            registerTenant(
+                    (MultiTenantQueryUpdateEmitter) emitter, (MultiTenantQueryBus) queryBus
+            );
+            subscribeQueryHandler(queryBus);
+            executeQuery(queryBus);
+        });
     }
 
     @Test
     void queryFailsWhenNoTenantSet() {
-        testApplicationContext
-                .run(context -> {
-                    QueryBus queryBus = context.getBean(QueryBus.class);
-                    assertNotNull(queryBus);
-                    assertTrue(queryBus instanceof MultiTenantQueryBus);
-                    executeQueryWhileTenantNotSet(queryBus);
-                });
+        testApplicationContext.run(context -> {
+            QueryBus queryBus = context.getBean(QueryBus.class);
+            assertNotNull(queryBus);
+            assertTrue(queryBus instanceof MultiTenantQueryBus);
+            executeQueryWhileTenantNotSet(queryBus);
+        });
     }
 
     @Test
     void heartBeatDisabled() {
-        testApplicationContext
-                .run(context -> {
-                    AxonServerConfiguration axonServerConfiguration = context.getBean(AxonServerConfiguration.class);
-                    assertNotNull(axonServerConfiguration);
-                    assertFalse(axonServerConfiguration.getHeartbeat().isEnabled());
-                });
+        testApplicationContext.run(context -> {
+            AxonServerConfiguration axonServerConfiguration = context.getBean(AxonServerConfiguration.class);
+            assertNotNull(axonServerConfiguration);
+            assertFalse(axonServerConfiguration.getHeartbeat().isEnabled());
+        });
     }
 
     @Test
     void heartBeatEnabled() {
-        testApplicationContext
-                .withPropertyValues("axon.axonserver.heartbeat.enabled=true")
-                .run(context -> {
-                    AxonServerConfiguration axonServerConfiguration = context.getBean(AxonServerConfiguration.class);
-                    assertNotNull(axonServerConfiguration);
-                    assertTrue(axonServerConfiguration.getHeartbeat().isEnabled());
-                });
+        testApplicationContext.withPropertyValues("axon.axonserver.heartbeat.enabled=true")
+                              .run(context -> {
+                                  AxonServerConfiguration axonServerConfiguration =
+                                          context.getBean(AxonServerConfiguration.class);
+                                  assertNotNull(axonServerConfiguration);
+                                  assertTrue(axonServerConfiguration.getHeartbeat().isEnabled());
+                              });
     }
 
     private void registerTenant(MultiTenantCommandBus commandBus) {
-        commandBus.registerTenant(TenantDescriptor.tenantWithId("testTenant"));
+        //noinspection resource
+        commandBus.registerTenant(TenantDescriptor.tenantWithId(TENANT_ID));
     }
 
     private void registerTenant(MultiTenantQueryUpdateEmitter emitter, MultiTenantQueryBus queryBus) {
-        emitter.registerTenant(TenantDescriptor.tenantWithId("testTenant"));
-        queryBus.registerTenant(TenantDescriptor.tenantWithId("testTenant"));
+        //noinspection resource
+        emitter.registerTenant(TenantDescriptor.tenantWithId(TENANT_ID));
+        //noinspection resource
+        queryBus.registerTenant(TenantDescriptor.tenantWithId(TENANT_ID));
     }
 
     private void subscribeCommandHandler(CommandBus commandBus) {
+        //noinspection resource
         commandBus.subscribe("testCommand", e -> "correct");
     }
 
     private void subscribeQueryHandler(QueryBus queryBus) {
+        //noinspection resource
         queryBus.subscribe("testQuery", String.class, e -> "correct");
     }
 
     private void executeCommand(CommandBus commandBus) {
-        Message message = new GenericMessage("hi");
+        Message<String> message = new GenericMessage<>("hi");
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put(TENANT_CORRELATION_KEY, "testTenant");
-        CommandMessage command = new GenericCommandMessage(message, "testCommand").withMetaData(metadata);
+        metadata.put(TENANT_CORRELATION_KEY, TENANT_ID);
+        CommandMessage<String> command = new GenericCommandMessage<>(message, "testCommand").withMetaData(metadata);
         AtomicReference<String> result = new AtomicReference<>();
-        commandBus.dispatch(command, (commandMessage, commandResultMessage) -> {
-            result.set((String) commandResultMessage.getPayload());
-        });
+        commandBus.dispatch(
+                command,
+                (commandMessage, commandResultMessage) -> result.set((String) commandResultMessage.getPayload())
+        );
         await().atMost(Duration.ofSeconds(5)).until(() -> result.get() != null);
         assertEquals("correct", result.get());
     }
 
     private void executeQuery(QueryBus queryBus) throws ExecutionException, InterruptedException {
-        Message message = new GenericMessage("hi");
+        Message<String> message = new GenericMessage<>("hi");
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put(TENANT_CORRELATION_KEY, "testTenant");
-        QueryMessage query =
-                new GenericQueryMessage(message, "testQuery", new InstanceResponseType(String.class))
+        metadata.put(TENANT_CORRELATION_KEY, TENANT_ID);
+        QueryMessage<String, String> query =
+                new GenericQueryMessage<>(message, "testQuery", new InstanceResponseType<>(String.class))
                         .withMetaData(metadata);
-        QueryResponseMessage<?> responseMessage = (QueryResponseMessage<?>) queryBus.query(query).get();
+        QueryResponseMessage<?> responseMessage = queryBus.query(query).get();
         assertEquals("correct", responseMessage.getPayload());
     }
 
     private void executeCommandWhileTenantNotSet(CommandBus commandBus) {
-        Message message = new GenericMessage("hi");
-        CommandMessage command = new GenericCommandMessage(message, "anotherCommand");
+        Message<String> message = new GenericMessage<>("hi");
+        CommandMessage<String> command = new GenericCommandMessage<>(message, "anotherCommand");
         AtomicReference<Throwable> result = new AtomicReference<>();
-        commandBus.dispatch(command, (commandMessage, commandResultMessage) -> {
-            result.set(commandResultMessage.exceptionResult());
-        });
+        commandBus.dispatch(
+                command,
+                (commandMessage, commandResultMessage) -> result.set(commandResultMessage.exceptionResult())
+        );
         await().atMost(Duration.ofSeconds(5)).until(() -> result.get() != null);
         assertTrue(result.get() instanceof NoSuchTenantException);
     }
 
-    private void executeQueryWhileTenantNotSet(QueryBus queryBus) throws ExecutionException, InterruptedException {
-        Message message = new GenericMessage("hi");
-        QueryMessage query = new GenericQueryMessage<>(message, "anotherQuery", new InstanceResponseType(String.class));
+    private void executeQueryWhileTenantNotSet(QueryBus queryBus) {
+        Message<String> message = new GenericMessage<>("hi");
+        QueryMessage<String, String> query =
+                new GenericQueryMessage<>(message, "anotherQuery", new InstanceResponseType<>(String.class));
         assertThrows(NoSuchTenantException.class, () -> queryBus.query(query));
     }
 

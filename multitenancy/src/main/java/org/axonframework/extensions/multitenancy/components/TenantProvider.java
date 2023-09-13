@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,8 +20,11 @@ import org.axonframework.common.Registration;
 import java.util.List;
 
 /**
- * Registers new and manages currently registered tenants and {@link MultiTenantAwareComponent} components. If
- * configured monitors tenants changes and updates the {@link MultiTenantAwareComponent} components accordingly.
+ * Contract towards a component that provisions the registered set of {@link TenantDescriptor tenants} and
+ * {@link MultiTenantAwareComponent MultiTenantAwareComponents}.
+ * <p>
+ * Depending on the implementation the provider can monitor tenant changes and update the
+ * {@code MultiTenantAwareComponents} accordingly.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
@@ -29,13 +32,17 @@ import java.util.List;
 public interface TenantProvider {
 
     /**
-     * @return the list of currently registered tenants.
-     */
-    List<TenantDescriptor> getTenants();
-
-    /**
+     * Subscribes the given {@code component} with this provider.
+     *
      * @param component to be subscribed {@link MultiTenantAwareComponent} for tenant changes.
      * @return the registration for the given component.
      */
     Registration subscribe(MultiTenantAwareComponent component);
+
+    /**
+     * Get the list of registered {@link TenantDescriptor tenants} with this provided.
+     *
+     * @return The list of registered {@link TenantDescriptor tenants}.
+     */
+    List<TenantDescriptor> getTenants();
 }

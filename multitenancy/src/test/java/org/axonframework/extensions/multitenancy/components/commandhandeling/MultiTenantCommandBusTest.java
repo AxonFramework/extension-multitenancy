@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.components.commandhandeling;
 
+import org.axonframework.commandhandling.CommandBus;
 import org.axonframework.commandhandling.CommandCallback;
 import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.GenericCommandMessage;
@@ -35,13 +36,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
+ * Test class validating the {@link MultiTenantCommandBus}.
+ *
  * @author Stefan Dragisic
  */
+@SuppressWarnings("resource")
 class MultiTenantCommandBusTest {
 
+    private CommandBus fixtureSegment1;
+    private CommandBus fixtureSegment2;
+
     private MultiTenantCommandBus testSubject;
-    private SimpleCommandBus fixtureSegment1;
-    private SimpleCommandBus fixtureSegment2;
 
     @BeforeEach
     void setUp() {
@@ -55,8 +60,8 @@ class MultiTenantCommandBusTest {
                 return fixtureSegment2;
             }
         };
-        TargetTenantResolver<CommandMessage<?>> targetTenantResolver = (m, tenants) -> TenantDescriptor.tenantWithId(
-                "fixtureTenant2");
+        TargetTenantResolver<CommandMessage<?>> targetTenantResolver =
+                (m, tenants) -> TenantDescriptor.tenantWithId("fixtureTenant2");
 
         testSubject = MultiTenantCommandBus.builder()
                                            .tenantSegmentFactory(tenantCommandSegmentFactory)
@@ -65,7 +70,7 @@ class MultiTenantCommandBusTest {
     }
 
     @Test
-    public void dispatch() {
+    void dispatch() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -76,7 +81,7 @@ class MultiTenantCommandBusTest {
     }
 
     @Test
-    public void dispatchWithCallback() {
+    void dispatchWithCallback() {
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant1"));
         testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
 
@@ -88,38 +93,38 @@ class MultiTenantCommandBusTest {
     }
 
     @Test
-    public void unknownTenant() {
+    void unknownTenant() {
         NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
             CommandMessage<Object> command = GenericCommandMessage.asCommandMessage("command");
             testSubject.dispatch(command);
         });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
     @Test
-    public void unknownTenantWithCallback() throws InterruptedException {
+    void unknownTenantWithCallback() throws InterruptedException {
         CountDownLatch lock = new CountDownLatch(1);
         CommandMessage<Object> command = GenericCommandMessage.asCommandMessage("command");
         testSubject.dispatch(command, (c, r) -> {
             assertTrue(r.isExceptional());
-            assertEquals("Unknown tenant: fixtureTenant2", r.exceptionResult().getMessage());
+            assertEquals("Tenant with identifier [fixtureTenant2] is unknown", r.exceptionResult().getMessage());
             lock.countDown();
         });
         lock.await();
     }
 
     @Test
-    public void unregister() {
+    void unregister() {
         NoSuchTenantException noSuchTenantException = assertThrows(NoSuchTenantException.class, () -> {
             CommandMessage<Object> command = GenericCommandMessage.asCommandMessage("command");
             testSubject.registerTenant(TenantDescriptor.tenantWithId("fixtureTenant2")).cancel();
             testSubject.dispatch(command);
         });
-        assertEquals("Unknown tenant: fixtureTenant2", noSuchTenantException.getMessage());
+        assertEquals("Tenant with identifier [fixtureTenant2] is unknown", noSuchTenantException.getMessage());
     }
 
     @Test
-    public void registerTenantAfterCommandBusHaveBeenStarted() {
+    void registerTenantAfterCommandBusHaveBeenStarted() {
         when(fixtureSegment1.subscribe(anyString(), any())).thenReturn(() -> true);
         when(fixtureSegment2.subscribe(anyString(), any())).thenReturn(() -> true);
 
@@ -149,7 +154,7 @@ class MultiTenantCommandBusTest {
     }
 
     @Test
-    public void registerDispatchInterceptor() {
+    void registerDispatchInterceptor() {
         when(fixtureSegment2.registerDispatchInterceptor(any())).thenReturn(() -> true);
         MessageDispatchInterceptor<CommandMessage<?>> messageDispatchInterceptor = messages -> (a, b) -> b;
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));
@@ -159,7 +164,7 @@ class MultiTenantCommandBusTest {
     }
 
     @Test
-    public void registerHandlerInterceptor() {
+    void registerHandlerInterceptor() {
         when(fixtureSegment2.registerHandlerInterceptor(any())).thenReturn(() -> true);
         MessageHandlerInterceptor<CommandMessage<?>> messageHandlerInterceptor = (m, chain) -> chain.proceed();
         testSubject.registerAndStartTenant(TenantDescriptor.tenantWithId("fixtureTenant2"));

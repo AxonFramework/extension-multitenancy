@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2022. Axon Framework
+ * Copyright (c) 2010-2023. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy.components.queryhandeling;
 
-import org.axonframework.common.BuilderUtils;
+import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.components.MultiTenantDispatchInterceptorSupport;
@@ -23,7 +23,6 @@ import org.axonframework.extensions.multitenancy.components.MultiTenantHandlerIn
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-import org.axonframework.messaging.Message;
 import org.axonframework.messaging.MessageDispatchInterceptor;
 import org.axonframework.messaging.MessageHandler;
 import org.axonframework.messaging.MessageHandlerInterceptor;
@@ -47,58 +46,73 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import javax.annotation.Nonnull;
 
 import static org.axonframework.common.BuilderUtils.assertNonNull;
 
 
 /**
- * Implementation of a {@link QueryBus} that is aware of multiple tenant instances of a QueryBus. Each QueryBus instance
- * is considered a "tenant".
- * <p/>
- * The MultiTenantQueryBus relies on a {@link TargetTenantResolver} to dispatch queries via resolved tenant segment of
- * the QueryBus. {@link TenantQuerySegmentFactory} is as factory to create the tenant segment.
+ * Implementation of a {@link QueryBus} that is aware of multiple tenant instances of a {@code QueryBus}. Each
+ * {@code QueryBus} instance is considered a "tenant".
+ * <p>
+ * The {@code MultiTenantQueryBus} relies on a {@link TargetTenantResolver} to dispatch queries via resolved tenant
+ * segment of the {@code QueryBus}. {@link TenantQuerySegmentFactory} is as factory to create the tenant segment.
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
  * @since 4.6.0
  */
-public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
+public class MultiTenantQueryBus implements
+        QueryBus,
+        MultiTenantAwareComponent,
         MultiTenantDispatchInterceptorSupport<QueryMessage<?, ?>, QueryBus>,
         MultiTenantHandlerInterceptorSupport<QueryMessage<?, ?>, QueryBus> {
 
-    private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
     private final Map<String, QuerySubscription<?>> handlers = new ConcurrentHashMap<>();
-
+    private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
+    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
     private final List<MessageDispatchInterceptor<? super QueryMessage<?, ?>>> dispatchInterceptors = new CopyOnWriteArrayList<>();
     private final Map<TenantDescriptor, List<Registration>> dispatchInterceptorsRegistration = new ConcurrentHashMap<>();
-
     private final List<MessageHandlerInterceptor<? super QueryMessage<?, ?>>> handlerInterceptors = new CopyOnWriteArrayList<>();
     private final Map<TenantDescriptor, List<Registration>> handlerInterceptorsRegistration = new ConcurrentHashMap<>();
-
-    private final Map<TenantDescriptor, Registration> subscribeRegistrations = new ConcurrentHashMap<>();
 
     private final TenantQuerySegmentFactory tenantSegmentFactory;
     private final TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver;
 
-    public MultiTenantQueryBus(Builder builder) {
+    /**
+     * Instantiate a {@link MultiTenantQueryBus} based on the given {@link Builder builder}.
+     *
+     * @param builder The {@link Builder} used to instantiate a {@link MultiTenantQueryBus} instance with.
+     */
+    protected MultiTenantQueryBus(Builder builder) {
         builder.validate();
         this.tenantSegmentFactory = builder.tenantSegmentFactory;
         this.targetTenantResolver = builder.targetTenantResolver;
     }
 
+    /**
+     * Instantiate a builder to be able to construct a {@link MultiTenantQueryBus}.
+     * <p>
+     * The {@link TenantQuerySegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b> and as such
+     * should be provided.
+     *
+     * @return A Builder to be able to create a {@link MultiTenantQueryBus}.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
     @Override
-    public <Q, R> CompletableFuture<QueryResponseMessage<R>> query(QueryMessage<Q, R> query) {
+    public <Q, R> CompletableFuture<QueryResponseMessage<R>> query(@Nonnull QueryMessage<Q, R> query) {
         QueryBus tenantQueryBus = resolveTenant(query);
         return tenantQueryBus.query(query);
     }
 
 
     @Override
-    public <Q, R> Stream<QueryResponseMessage<R>> scatterGather(QueryMessage<Q, R> query, long timeout, TimeUnit unit) {
+    public <Q, R> Stream<QueryResponseMessage<R>> scatterGather(@Nonnull QueryMessage<Q, R> query,
+                                                                long timeout,
+                                                                @Nonnull TimeUnit unit) {
         QueryBus tenantQueryBus = resolveTenant(query);
         return tenantQueryBus.scatterGather(query, timeout, unit);
     }
@@ -110,8 +124,9 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
     }
 
     @Override
-    public <R> Registration subscribe(String queryName, Type responseType,
-                                      MessageHandler<? super QueryMessage<?, R>> handler) {
+    public <R> Registration subscribe(@Nonnull String queryName,
+                                      @Nonnull Type responseType,
+                                      @Nonnull MessageHandler<? super QueryMessage<?, R>> handler) {
         handlers.computeIfAbsent(queryName, k -> {
             tenantSegments.forEach((tenant, segment) ->
                                            subscribeRegistrations.putIfAbsent(tenant,
@@ -135,7 +150,7 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
         };
     }
 
-    public QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {
+    private QueryBus unregisterTenant(TenantDescriptor tenantDescriptor) {
         List<Registration> registrations = handlerInterceptorsRegistration.remove(tenantDescriptor);
         if (registrations != null) {
             registrations.forEach(Registration::cancel);
@@ -171,9 +186,10 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
                                                         .add(tenantSegment.registerHandlerInterceptor(handlerInterceptor)));
 
             handlers.forEach((queryName, querySubscription) ->
-                                     subscribeRegistrations.putIfAbsent(tenantDescriptor, tenantSegment.subscribe(queryName,
-                                                                                                                  querySubscription.getResponseType(),
-                                                                                                                  querySubscription.getQueryHandler())));
+                                     subscribeRegistrations.putIfAbsent(tenantDescriptor,
+                                                                        tenantSegment.subscribe(queryName,
+                                                                                                querySubscription.getResponseType(),
+                                                                                                querySubscription.getQueryHandler())));
 
             return tenantSegment;
         });
@@ -185,13 +201,18 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
     }
 
     @Override
-    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(SubscriptionQueryMessage<Q, I, U> query) {
+    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(
+            @Nonnull SubscriptionQueryMessage<Q, I, U> query
+    ) {
         return resolveTenant(query)
                 .subscriptionQuery(query);
     }
 
     @Override
-    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(SubscriptionQueryMessage<Q, I, U> query, int updateBufferSize) {
+    public <Q, I, U> SubscriptionQueryResult<QueryResponseMessage<I>, SubscriptionQueryUpdateMessage<U>> subscriptionQuery(
+            @Nonnull SubscriptionQueryMessage<Q, I, U> query,
+            int updateBufferSize
+    ) {
         return resolveTenant(query)
                 .subscriptionQuery(query, updateBufferSize);
     }
@@ -212,8 +233,10 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
     }
 
     /**
-     * @param tenantDescriptor for which to get query update emitter
-     * @return a query update emitter for the given tenant.
+     * Returns a {@link QueryUpdateEmitter} referring to the given {@code tenantDescriptor}.
+     *
+     * @param tenantDescriptor The {@link TenantDescriptor} for which to get {@link QueryUpdateEmitter}.
+     * @return A {@link QueryUpdateEmitter} referring to the given {@code tenantDescriptor}.
      */
     public QueryUpdateEmitter queryUpdateEmitter(TenantDescriptor tenantDescriptor) {
         return tenantSegments.get(tenantDescriptor)
@@ -245,43 +268,64 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent,
         return dispatchInterceptorsRegistration;
     }
 
+    /**
+     * Builder class to instantiate a {@link MultiTenantQueryBus}.
+     * <p>
+     * The {@link TenantQuerySegmentFactory} and {@link TargetTenantResolver} are <b>hard requirements</b> and as such
+     * should be provided.
+     */
     public static class Builder {
 
-        public TenantQuerySegmentFactory tenantSegmentFactory;
-        public TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver;
+        protected TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver;
+        protected TenantQuerySegmentFactory tenantSegmentFactory;
 
         /**
-         * Sets the {@link TenantQuerySegmentFactory} used to build {@link QueryBus} segment for given {@link
-         * TenantDescriptor}.
+         * Sets the {@link TenantQuerySegmentFactory} used to build {@link QueryBus} segment for given
+         * {@link TenantDescriptor}.
          *
-         * @param tenantSegmentFactory tenant aware segment factory
-         * @return the current Builder instance, for fluent interfacing
+         * @param tenantSegmentFactory A tenant-aware {@link QueryBus} segment factory.
+         * @return The current builder instance, for fluent interfacing.
          */
         public Builder tenantSegmentFactory(TenantQuerySegmentFactory tenantSegmentFactory) {
-            BuilderUtils.assertNonNull(tenantSegmentFactory, "The TenantQuerySegmentFactory is a hard requirement");
+            assertNonNull(tenantSegmentFactory, "The TenantQuerySegmentFactory is a hard requirement");
             this.tenantSegmentFactory = tenantSegmentFactory;
             return this;
         }
 
         /**
-         * Sets the {@link TargetTenantResolver} used to resolve correct tenant segment based on {@link Message} message
+         * Sets the {@link TargetTenantResolver} used to resolve a {@link TenantDescriptor} based on a
+         * {@link QueryMessage}. Used to find the tenant-specific {@link QueryBus} segment.
          *
-         * @param targetTenantResolver used to resolve correct tenant segment based on {@link Message} message
-         * @return the current Builder instance, for fluent interfacing
+         * @param targetTenantResolver The resolver of a {@link TenantDescriptor} based on a {@link QueryMessage}. Used
+         *                             to find the tenant-specific {@link QueryBus} segment.
+         * @return The current builder instance, for fluent interfacing.
          */
         public Builder targetTenantResolver(TargetTenantResolver<QueryMessage<?, ?>> targetTenantResolver) {
-            BuilderUtils.assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
+            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;
         }
 
+        /**
+         * Initializes a {@link MultiTenantQueryBus} as specified through this Builder.
+         *
+         * @return a {@link MultiTenantQueryBus} as specified through this Builder.
+         */
         public MultiTenantQueryBus build() {
             return new MultiTenantQueryBus(this);
         }
 
+        /**
+         * Validate whether the fields contained in this Builder as set accordingly.
+         *
+         * @throws AxonConfigurationException If one field is asserted to be incorrect according to the Builder's
+         *                                    specifications.
+         */
         protected void validate() {
-            assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
-            assertNonNull(tenantSegmentFactory, "The TenantQuerySegmentFactory is a hard requirement");
+            assertNonNull(targetTenantResolver,
+                          "The TargetTenantResolver is a hard requirement and should be provided");
+            assertNonNull(tenantSegmentFactory,
+                          "The TenantQuerySegmentFactory is a hard requirement and should be provided");
         }
     }
 }

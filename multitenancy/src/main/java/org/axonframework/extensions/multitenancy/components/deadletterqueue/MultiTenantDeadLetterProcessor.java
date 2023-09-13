@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 
 package org.axonframework.extensions.multitenancy.components.deadletterqueue;
 
-import org.axonframework.common.transaction.NoTransactionManager;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -26,14 +25,14 @@ import org.axonframework.messaging.deadletter.SequencedDeadLetterProcessor;
 import java.util.function.Predicate;
 
 /**
- * Utility class, implementing a {@link SequencedDeadLetterProcessor} that invokes dead letter process operations on the correct tenant segment.
- * This implementation will delegate the method to the correct tenant segment based on the provided {@link TenantDescriptor}.
+ * Utility class, implementing a {@link SequencedDeadLetterProcessor} that invokes dead letter process operations on the
+ * correct tenant segment. This implementation will delegate the method to the correct tenant segment based on the
+ * provided {@link TenantDescriptor}.
  *
  * @author Stefan Dragisic
  * @since 4.8.0
  */
-public class MultiTenantDeadLetterProcessor
-        implements SequencedDeadLetterProcessor<EventMessage<?>> {
+public class MultiTenantDeadLetterProcessor implements SequencedDeadLetterProcessor<EventMessage<?>> {
 
     private TenantDescriptor tenantDescriptor;
 
@@ -49,11 +48,11 @@ public class MultiTenantDeadLetterProcessor
     }
 
     /**
-     * Creates a {@link MultiTenantDeadLetterProcessor}
-     * for the given {@link TenantDescriptor} and {@link SequencedDeadLetterProcessor} delegate.
+     * Creates a {@link MultiTenantDeadLetterProcessor} for the given {@link TenantDescriptor} and
+     * {@link SequencedDeadLetterProcessor} delegate.
      *
      * @param tenantDescriptor The {@link TenantDescriptor} used to determine the correct tenant segment
-     * @param delegate The {@link SequencedDeadLetterProcessor} delegate
+     * @param delegate         The {@link SequencedDeadLetterProcessor} delegate
      */
     private MultiTenantDeadLetterProcessor(TenantDescriptor tenantDescriptor,
                                            SequencedDeadLetterProcessor<EventMessage<?>> delegate) {
@@ -71,9 +70,6 @@ public class MultiTenantDeadLetterProcessor
         return new MultiTenantDeadLetterProcessor(tenantDescriptor, delegate);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean process(Predicate<DeadLetter<? extends EventMessage<?>>> sequenceFilter) {
         if (tenantDescriptor == null) {
@@ -83,15 +79,11 @@ public class MultiTenantDeadLetterProcessor
                 .fetchInTransaction(() -> delegate.process(sequenceFilter));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean processAny() {
         if (tenantDescriptor == null) {
             throw new IllegalStateException("Tenant descriptor is not set. Use forTenant method to set it.");
         }
-        return new TenantWrappedTransactionManager(tenantDescriptor)
-                .fetchInTransaction(delegate::processAny);
+        return new TenantWrappedTransactionManager(tenantDescriptor).fetchInTransaction(delegate::processAny);
     }
 }
