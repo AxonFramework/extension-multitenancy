@@ -98,7 +98,7 @@ Note that this works by using JPA multi-tenancy support, that means only SQL Dat
 If you wish to implement multi-tenancy for a different type of databases (e.g. NoSQL) make sure that your projection database supports multi-tenancy.
 While in transaction you may find out which tenant owns transaction by calling:` TenantWrappedTransactionManager.getCurrentTenant()`.
 
-For more hints how to enable multi-tenancy for NoSQL databases check on how JPA SQL version is [implemented](MultiTenantDataSourceManager.java)
+For more hints how to enable multi-tenancy for NoSQL databases check on how JPA SQL version is [implemented](https://github.com/AxonFramework/extension-multitenancy/blob/main/multitenancy-spring-boot-autoconfigure/src/main/java/org/axonframework/extensions/multitenancy/autoconfig/MultiTenantDataSourceManager.java)
 
 Important: In this case Liquibase or Flyway will not be able to initialise schemas for dynamic data sources. Any datasource that you use needs to have pre-initialized schema.
 
