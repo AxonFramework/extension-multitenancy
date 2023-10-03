@@ -98,7 +98,7 @@ Note that this works by using JPA multi-tenancy support, that means only SQL Dat
 If you wish to implement multi-tenancy for a different type of databases (e.g. NoSQL) make sure that your projection database supports multi-tenancy.
 While in transaction you may find out which tenant owns transaction by calling:` TenantWrappedTransactionManager.getCurrentTenant()`.
 
-For more hints how to enable multi-tenancy for NoSQL databases check on how JPA SQL version is [implemented](MultiTenantDataSourceManager.java)
+For more hints how to enable multi-tenancy for NoSQL databases check on how JPA SQL version is [implemented](https://github.com/AxonFramework/extension-multitenancy/blob/main/multitenancy-spring-boot-autoconfigure/src/main/java/org/axonframework/extensions/multitenancy/autoconfig/MultiTenantDataSourceManager.java)
 
 Important: In this case Liquibase or Flyway will not be able to initialise schemas for dynamic data sources. Any datasource that you use needs to have pre-initialized schema.
 
@@ -177,8 +177,6 @@ Not supported components are:
 
 - <span style="color:red">Deadline Manager</span>
 
-
-
 ### Disable extension
 
 By default, extension is automatically enabled.
@@ -186,14 +184,13 @@ If you wish to disable extension without removing extension use following proper
 
 `axon.multi-tenancy.enabled=false`
 
-
 ## Receiving help
 
 Are you having trouble using the extension?
 We'd like to help you out the best we can!
 There are a couple of things to consider when you're traversing anything Axon:
 
-* Checking the [reference guide](https://docs.axoniq.io/reference-guide/extensions/multitenancy) should be your first stop,
+* Checking the [reference guide](https://docs.axoniq.io/reference-guide/) should be your first stop,
   as the majority of possible scenarios you might encounter when using Axon should be covered there.
 * If the Reference Guide does not cover a specific topic you would've expected,
   we'd appreciate if you could file an [issue](https://github.com/AxonIQ/reference-guide/issues) about it for us.
