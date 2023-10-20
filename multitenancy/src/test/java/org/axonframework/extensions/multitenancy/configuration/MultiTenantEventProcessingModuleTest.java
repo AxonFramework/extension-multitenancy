@@ -19,6 +19,7 @@ package org.axonframework.extensions.multitenancy.configuration;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.Configurer;
 import org.axonframework.config.DefaultConfigurer;
+import org.axonframework.eventhandling.EventHandler;
 import org.axonframework.eventhandling.EventMessage;
 import org.axonframework.eventhandling.SubscribingEventProcessor;
 import org.axonframework.eventhandling.TrackedEventMessage;
@@ -385,7 +386,7 @@ class MultiTenantEventProcessingModuleTest {
                   .usingPooledStreamingEventProcessors()
                   .configureDefaultStreamableMessageSource(config -> mockedSource)
                   .byDefaultAssignTo("default")
-                  .registerEventHandler(config -> new Object())
+                  .registerEventHandler(config -> new TestEventHandler())
                   .registerTrackingEventProcessorConfiguration("tracking", config -> testTepConfig);
         Configuration configuration = configurer.start();
 
@@ -414,5 +415,13 @@ class MultiTenantEventProcessingModuleTest {
                      });
 
         verify(customSource, times(2)).createHeadToken();
+    }
+
+    private static class TestEventHandler {
+
+        @EventHandler
+        public void handle(String event) {
+
+        }
     }
 }
