@@ -92,7 +92,7 @@ public class TenantDescriptor {
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId, properties);
+        return Objects.hash(tenantId);
     }
 
     @Override

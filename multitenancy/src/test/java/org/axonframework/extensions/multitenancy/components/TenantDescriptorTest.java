@@ -32,21 +32,27 @@ class TenantDescriptorTest {
     private static final String TENANT_ID_ONE = "me";
     private static final String TENANT_ID_TWO = "you";
 
-    @Test
-    void equalsOnlyValidatesTenantId() {
-        HashMap<String, String> testPropertiesOne = new HashMap<>();
+    private HashMap<String, String> testPropertiesOne;
+    private HashMap<String, String> testPropertiesTwo;
+
+    private final TenantDescriptor testSubjectOne = TenantDescriptor.tenantWithId(TENANT_ID_ONE);
+    private final TenantDescriptor testSubjectTwo = TenantDescriptor.tenantWithId(TENANT_ID_TWO);
+    private final TenantDescriptor testSubjectThree = new TenantDescriptor(TENANT_ID_ONE, testPropertiesOne);
+    private final TenantDescriptor testSubjectFour = new TenantDescriptor(TENANT_ID_TWO, testPropertiesTwo);
+    private final TenantDescriptor testSubjectFive = new TenantDescriptor(TENANT_ID_ONE, testPropertiesTwo);
+
+    @BeforeEach
+    void setUp() {
+        testPropertiesOne = new HashMap<>();
         testPropertiesOne.put("key", "value");
         testPropertiesOne.put("key1", "value2");
-        HashMap<String, String> testPropertiesTwo = new HashMap<>();
+        testPropertiesTwo = new HashMap<>();
         testPropertiesOne.put("value", "key");
         testPropertiesOne.put("value2", "key1");
+    }
 
-        TenantDescriptor testSubjectOne = TenantDescriptor.tenantWithId(TENANT_ID_ONE);
-        TenantDescriptor testSubjectTwo = TenantDescriptor.tenantWithId(TENANT_ID_TWO);
-        TenantDescriptor testSubjectThree = new TenantDescriptor(TENANT_ID_ONE, testPropertiesOne);
-        TenantDescriptor testSubjectFour = new TenantDescriptor(TENANT_ID_TWO, testPropertiesTwo);
-        TenantDescriptor testSubjectFive = new TenantDescriptor(TENANT_ID_ONE, testPropertiesTwo);
-
+    @Test
+    void equalsOnlyValidatesTenantId() {
         // Validate test subject one, only matching on tenant id
         assertNotEquals(testSubjectOne, testSubjectTwo);
         assertEquals(testSubjectOne, testSubjectThree);
@@ -61,5 +67,23 @@ class TenantDescriptorTest {
         assertEquals(testSubjectThree, testSubjectFive);
         // Validate test subject four, only matching on tenant id
         assertNotEquals(testSubjectFour, testSubjectFive);
+    }
+
+    @Test
+    void hashOnlyHashesTenantId() {
+        // Validate test subject one, only matching on tenant id
+        assertNotEquals(testSubjectOne.hashCode(), testSubjectTwo.hashCode());
+        assertEquals(testSubjectOne.hashCode(), testSubjectThree.hashCode());
+        assertNotEquals(testSubjectOne.hashCode(), testSubjectFour.hashCode());
+        assertEquals(testSubjectOne.hashCode(), testSubjectFive.hashCode());
+        // Validate test subject two, only matching on tenant id
+        assertNotEquals(testSubjectTwo.hashCode(), testSubjectThree.hashCode());
+        assertEquals(testSubjectTwo.hashCode(), testSubjectFour.hashCode());
+        assertNotEquals(testSubjectTwo.hashCode(), testSubjectFive.hashCode());
+        // Validate test subject three, only matching on tenant id
+        assertNotEquals(testSubjectThree.hashCode(), testSubjectFour.hashCode());
+        assertEquals(testSubjectThree.hashCode(), testSubjectFive.hashCode());
+        // Validate test subject four, only matching on tenant id
+        assertNotEquals(testSubjectFour.hashCode(), testSubjectFive.hashCode());
     }
 }
