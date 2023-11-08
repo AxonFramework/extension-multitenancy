@@ -25,7 +25,7 @@
 
     <groupId>org.axonframework.extensions.multitenancy</groupId>
     <artifactId>axon-multitenancy-spring-boot-starter</artifactId>
-    <version>4.9.1</version>
+    <version>4.9.2-SNAPSHOT</version>
 
     <name>Spring Boot Starter module for Axon Framework Multi-Tenancy Extension</name>
     <description>Spring Boot Starter module for the Multi-Tenancy Extension of Axon Framework</description>
@@ -170,6 +170,6 @@
         <connection>scm:git:git://github.com/AxonFramework/extension-multitenancy.git</connection>
         <developerConnection>scm:git:git@github.com:AxonFramework/extension-multitenancy.git</developerConnection>
         <url>https://github.com/AxonFramework/extension-multitenancy</url>
-        <tag>axon-multi-tenancy-4.9.1</tag>
+        <tag>HEAD</tag>
     </scm>
 </project>
