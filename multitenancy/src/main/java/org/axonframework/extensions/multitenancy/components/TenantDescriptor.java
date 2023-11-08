@@ -87,12 +87,12 @@ public class TenantDescriptor {
             return false;
         }
         TenantDescriptor that = (TenantDescriptor) o;
-        return Objects.equals(tenantId, that.tenantId) && Objects.equals(properties, that.properties);
+        return Objects.equals(tenantId, that.tenantId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tenantId, properties);
+        return Objects.hash(tenantId);
     }
 
     @Override
