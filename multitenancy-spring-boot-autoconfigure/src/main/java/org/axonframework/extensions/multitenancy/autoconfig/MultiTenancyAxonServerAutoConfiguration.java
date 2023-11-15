@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -108,17 +108,21 @@ public class MultiTenancyAxonServerAutoConfiguration {
             AxonServerConfiguration axonServerConfig,
             AxonServerConnectionManager connectionManager
     ) {
-        return tenantDescriptor -> AxonServerCommandBus.builder()
-                                                       .localSegment(localSegment)
-                                                       .serializer(messageSerializer)
-                                                       .routingStrategy(routingStrategy)
-                                                       .priorityCalculator(priorityCalculator)
-                                                       .loadFactorProvider(loadFactorProvider)
-                                                       .targetContextResolver(targetContextResolver)
-                                                       .axonServerConnectionManager(connectionManager)
-                                                       .configuration(axonServerConfig)
-                                                       .defaultContext(tenantDescriptor.tenantId())
-                                                       .build();
+        return tenantDescriptor -> {
+            AxonServerCommandBus commandBus = AxonServerCommandBus.builder()
+                                                             .localSegment(localSegment)
+                                                             .serializer(messageSerializer)
+                                                             .routingStrategy(routingStrategy)
+                                                             .priorityCalculator(priorityCalculator)
+                                                             .loadFactorProvider(loadFactorProvider)
+                                                             .targetContextResolver(targetContextResolver)
+                                                             .axonServerConnectionManager(connectionManager)
+                                                             .configuration(axonServerConfig)
+                                                             .defaultContext(tenantDescriptor.tenantId())
+                                                             .build();
+            commandBus.start();
+            return commandBus;
+        };
     }
 
 
@@ -152,20 +156,23 @@ public class MultiTenancyAxonServerAutoConfiguration {
                     new CorrelationDataInterceptor<>(config.correlationDataProviders())
             );
 
-            return AxonServerQueryBus.builder()
-                                     .axonServerConnectionManager(axonServerConnectionManager)
-                                     .configuration(axonServerConfig)
-                                     .localSegment(simpleQueryBus)
-                                     .updateEmitter(
-                                             ((MultiTenantQueryUpdateEmitter) multiTenantQueryUpdateEmitter)
-                                                     .getTenant(tenantDescriptor)
-                                     )
-                                     .messageSerializer(messageSerializer)
-                                     .genericSerializer(genericSerializer)
-                                     .priorityCalculator(priorityCalculator)
-                                     .targetContextResolver(targetContextResolver)
-                                     .defaultContext(tenantDescriptor.tenantId())
-                                     .build();
+            AxonServerQueryBus queryBus = AxonServerQueryBus.builder()
+                                                         .axonServerConnectionManager(axonServerConnectionManager)
+                                                         .configuration(axonServerConfig)
+                                                         .localSegment(simpleQueryBus)
+                                                         .updateEmitter(
+                                                                 ((MultiTenantQueryUpdateEmitter) multiTenantQueryUpdateEmitter)
+                                                                         .getTenant(tenantDescriptor)
+                                                         )
+                                                         .messageSerializer(messageSerializer)
+                                                         .genericSerializer(genericSerializer)
+                                                         .priorityCalculator(priorityCalculator)
+                                                         .targetContextResolver(targetContextResolver)
+                                                         .defaultContext(tenantDescriptor.tenantId())
+                                                         .build();
+
+            queryBus.start();
+            return queryBus;
         };
     }
 
@@ -214,11 +221,15 @@ public class MultiTenancyAxonServerAutoConfiguration {
             AxonServerConnectionManager axonServerConnectionManager,
             Serializer serializer
     ) {
-        return tenant -> AxonServerEventScheduler.builder()
-                                                 .connectionManager(axonServerConnectionManager)
-                                                 .eventSerializer(serializer)
-                                                 .defaultContext(tenant.tenantId())
-                                                 .build();
+        return tenant -> {
+            AxonServerEventScheduler eventScheduler = AxonServerEventScheduler.builder()
+                                                                     .connectionManager(axonServerConnectionManager)
+                                                                     .eventSerializer(serializer)
+                                                                     .defaultContext(tenant.tenantId())
+                                                                     .build();
+            eventScheduler.start();
+            return eventScheduler;
+        };
     }
 
     @Bean
@@ -233,6 +244,7 @@ public class MultiTenancyAxonServerAutoConfiguration {
                     c.getComponent(AxonServerConfiguration.class)
             );
             tenantProvider.subscribe(controlService);
+            controlService.start();
             return controlService;
         });
     }
