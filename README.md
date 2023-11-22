@@ -160,6 +160,37 @@ public void retryDLQ(@RequestParam String tenant, @RequestParam String processin
 
 Only JPA Dead letter queue and In-Memory queues are supported.
 
+#### Deadline manager
+
+As of now, there is no plan to support deadline manager out of the box.
+None of deadline manager implementation support multi-tenancy.
+See Event scheduler section as alternative.
+
+#### Event scheduler
+
+You can use event scheduler to schedule events for specific tenant.
+To do so, you need to inject `EventScheduler` and use it to schedule events.
+
+    @Autowired
+    private EventScheduler eventScheduler;
+
+    @EventHandler
+    public void eventHandler(Event event) {
+        ScheduledToken token = eventScheduler.schedule(Instant.now().plusDays(10), event);
+        //example of cancelation
+        eventScheduler.cancelSchedule(token);
+    }
+
+If you use scheduler from any message handler, it will automatically pick up tenant from message metadata, you dont need to specify it.
+If you wish to use scheduler outside of message handlers, you need to wrap execution into tenant transaction where you specify tenant.
+
+            new TenantWrappedTransactionManager(
+                    TenantDescriptor.tenantWithId(tenantName))
+                    .executeInTransaction(() ->
+                        eventScheduler.cancelSchedule(token)
+                    );
+
+
 ### Supported multi-tenant components
 
 Currently, supported multi-tenants components are as follows:
