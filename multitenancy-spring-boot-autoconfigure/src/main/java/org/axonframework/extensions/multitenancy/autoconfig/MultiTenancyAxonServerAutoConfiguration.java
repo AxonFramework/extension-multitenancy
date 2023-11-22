@@ -244,7 +244,6 @@ public class MultiTenancyAxonServerAutoConfiguration {
                     c.getComponent(AxonServerConfiguration.class)
             );
             tenantProvider.subscribe(controlService);
-            controlService.start();
             return controlService;
         });
     }
