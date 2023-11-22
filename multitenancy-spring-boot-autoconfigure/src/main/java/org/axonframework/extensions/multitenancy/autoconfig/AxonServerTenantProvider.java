@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -215,5 +215,12 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
     @Override
     public void registerLifecycleHandlers(@Nonnull LifecycleRegistry lifecycle) {
         lifecycle.onStart(Phase.INSTRUCTION_COMPONENTS + 10, this::start);
+        lifecycle.onShutdown(Phase.INSTRUCTION_COMPONENTS + 10, this::shutdown);
+    }
+
+    private void shutdown() {
+        registrationMap.forEach((tenant, registrationList) -> {
+            registrationList.forEach(Registration::cancel);
+        });
     }
 }
