@@ -140,25 +140,97 @@ To select the tenant for which you want to process a dead letter, you need to ca
 From the `MultiTenantDeadLetterProcessor`, you need to use the `forTenant` method to select the tenant-specific `SequencedDeadLetterProcessor`.
 
 ```java
-SequencedDeadLetterProcessor deadLetterProcessor = configuration.sequencedDeadLetterProcessor();
-MultiTenantDeadLetterProcessor multiTenantDeadLetterProcessor = (MultiTenantDeadLetterProcessor) deadLetterProcessor;
-multiTenantDeadLetterProcessor.forTenant("tenant-1").process(deadLetterHandler);
+public class DlqManagement {
+    
+    private MultiTenantDeadLetterProcessor multiTenantDeadLetterProcessor;
+
+    // Axon Framework's org.axonframework.config.Configuration
+    public DlqManagement(Configuration configuration) {
+        SequencedDeadLetterProcessor deadLetterProcessor = configuration.sequencedDeadLetterProcessor();
+        this.multiTenantDeadLetterProcessor = (MultiTenantDeadLetterProcessor) deadLetterProcessor;
+    }
+    
+    public void processDeadLetterSequenceForTenant(String tenantId,
+                                                   Predicate<DeadLetter<? extends EventMessage<?>>> sequenceFilter) {
+        multiTenantDeadLetterProcessor.forTenant(tenantId)
+                                      .process(sequenceFilter);
+    }
+}
 ```
 Here is a full example of a REST endpoint to retry dead letters for a specific tenant:
 
-
 ```java
-@PostMapping(path = "/retry-dlq")
-public void retryDLQ(@RequestParam String tenant, @RequestParam String processingGroup) {
-    configuration.eventProcessingConfiguration()
-            .sequencedDeadLetterProcessor(processingGroup)
-            .map(p -> (MultiTenantDeadLetterProcessor) p)
-            .map(mp -> mp.forTenant(TenantDescriptor.tenantWithId(tenant)))
-            .ifPresent(SequencedDeadLetterProcessor::processAny);
+public class DlqManagementController {
+
+    // Axon Framework's org.axonframework.config.Configuration
+    private Configuration configuration;
+    
+    @PostMapping(path = "/retry-dlq")
+    public void retryDLQ(@RequestParam String tenant, @RequestParam String processingGroup) {
+        configuration.eventProcessingConfiguration()
+                     .sequencedDeadLetterProcessor(processingGroup)
+                     .map(p -> (MultiTenantDeadLetterProcessor) p)
+                     .map(mp -> mp.forTenant(TenantDescriptor.tenantWithId(tenant)))
+                     .ifPresent(SequencedDeadLetterProcessor::processAny);
+    }
 }
 ```
 
 Only JPA Dead letter queue and In-Memory queues are supported.
+
+#### Deadline manager
+
+As of now, there is no plan to support deadline manager out of the box.
+None of deadline manager implementation support multi-tenancy.
+See Event scheduler section as alternative.
+
+#### Event scheduler
+
+You can use the `MultiTenantEventScheduler` to schedule events for specific tenants.
+To do so, you can inject the `EventScheduler` and use it to schedule events:
+
+```java
+public class EventHandlingComponentSchedulingEvents {
+    
+    private EventScheduler eventScheduler;
+
+    @EventHandler
+    public void eventHandler(Event event) {
+        // Schedules the given event to be published in 10 days.
+        ScheduledToken token = eventScheduler.schedule(Instant.now().plusDays(10), event);
+        // The token returned by EventScheduler#schedule can be used to, for example, cancel the scheduled task.
+        eventScheduler.cancelSchedule(token);
+    }
+}
+```
+
+If you use the `EventScheduler` from any message handling method, it will automatically pick up tenant from `Message#metadata`.
+Hence, there is no need to specify the tenant you want to schedule an event for.
+If you wish to use the `EventScheduler` outside of message handlers, you are inclined to wrap the execution into a so-called `TenantWrappedTransactionManager`.
+Within this `TenantWrappedTransactionManager` you can schedule the event:  
+
+```java
+public class EventSchedulingComponent {
+
+    private EventScheduler eventScheduler;
+    
+    public void schedule(Event event) {
+        ScheduledToken token;
+        // Schedules the given event to be published in 10 days.
+        new TenantWrappedTransactionManager(
+                TenantDescriptor.tenantWithId(tenantName))
+                .executeInTransaction(
+                        () -> token = eventScheduler.schedule(Instant.now().plusDays(10), event)
+                );
+        // The token returned by EventScheduler#schedule can be used to, for example, cancel the scheduled task.
+        new TenantWrappedTransactionManager(
+                TenantDescriptor.tenantWithId(tenantName))
+                .executeInTransaction(
+                        () -> eventScheduler.cancelSchedule(token)
+                );
+    }
+}
+```
 
 ### Supported multi-tenant components
 

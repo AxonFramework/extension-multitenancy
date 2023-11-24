@@ -22,7 +22,8 @@ import org.axonframework.queryhandling.QueryBus;
 import java.util.function.Function;
 
 /**
- * Factory for creating {@link QueryBus} segments for a given {@link TenantDescriptor}.
+ * Factory for creating {@link QueryBus} segments for a given {@link TenantDescriptor}. After a segment is created, it
+ * may be started automatically by the factory.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
