@@ -67,6 +67,7 @@ class MultiTenancyIntegrationTest {
     @BeforeEach
     void setUp() {
         testApplicationContext = new ApplicationContextRunner()
+                .withSystemProperties("disable-axoniq-console-message=true")
                 .withPropertyValues("axon.axonserver.enabled=true")
                 .withPropertyValues("axon.axonserver.servers=" + AXON_SERVER_CONTAINER.getAxonServerAddress())
                 .withUserConfiguration(DefaultContext.class);
