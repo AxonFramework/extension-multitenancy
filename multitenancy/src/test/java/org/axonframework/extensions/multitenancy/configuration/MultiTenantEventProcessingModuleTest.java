@@ -40,6 +40,7 @@ import org.axonframework.messaging.deadletter.SequencedDeadLetterQueue;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
 
+import javax.sound.midi.Track;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -211,6 +212,39 @@ class MultiTenantEventProcessingModuleTest {
     }
 
     @Test
+    void trackingEventProcessorNonMultiTenant() {
+        //noinspection unchecked
+        StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider =
+                (source, processorName, tenantDescriptor, configuration) -> source;
+        configurer.registerModule(
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> false)
+        );
+
+        TrackingEventProcessorConfiguration testTepConfig =
+                TrackingEventProcessorConfiguration.forParallelProcessing(4);
+        configurer.eventProcessing()
+                .usingTrackingEventProcessors()
+                .configureDefaultStreamableMessageSource(config -> mockedSource)
+                .assignHandlerInstancesMatching("java.util.concurrent", "concurrent"::equals)
+                .registerEventHandler(c -> new Object()) // --> java.lang
+                .registerEventHandler(c -> "") // --> java.lang
+                .registerEventHandler(c -> "concurrent") // --> java.util.concurrent
+                .registerTrackingEventProcessorConfiguration("tracking", config -> testTepConfig);
+        Configuration configuration = configurer.start();
+
+
+        assertEquals(2, configuration.eventProcessingConfiguration().eventProcessors().size());
+        assertTrue(configuration.eventProcessingConfiguration()
+                .eventProcessor("java.util.concurrent", TrackingEventProcessor.class)
+                .isPresent());
+        assertTrue(configuration.eventProcessingConfiguration()
+                .eventProcessor("java.lang", TrackingEventProcessor.class)
+                .isPresent());
+    }
+
+    @Test
     void trackingEventProcessorCustomSource() {
         //noinspection unchecked
         StreamableMessageSource<TrackedEventMessage<?>> defaultSource = mock(StreamableMessageSource.class);
@@ -222,7 +256,7 @@ class MultiTenantEventProcessingModuleTest {
                 (source, processorName, tenantDescriptor, configuration) -> customSource;
 
         configurer.registerModule(
-                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null)
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> true)
         );
 
         TrackingEventProcessorConfiguration testTepConfig =
@@ -331,6 +365,32 @@ class MultiTenantEventProcessingModuleTest {
     }
 
     @Test
+    void subscribingEventProcessorNonMultiTenant() {
+        //noinspection unchecked
+        SubscribableMessageSource<EventMessage<?>> mockedSource = mock(SubscribableMessageSource.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider =
+                (source, processorName, tenantDescriptor, configuration) -> source;
+
+        configurer.registerModule(
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> false)
+        );
+
+        configurer.eventProcessing()
+                .usingSubscribingEventProcessors()
+                .configureDefaultSubscribableMessageSource(config -> mockedSource)
+                .byDefaultAssignTo("subscribing")
+                .registerSubscribingEventProcessor("subscribing", config -> mockedSource)
+                .registerEventHandler(config -> new Object());
+        Configuration configuration = configurer.start();
+
+        assertEquals(1, configuration.eventProcessingConfiguration().eventProcessors().size());
+        assertTrue(configuration.eventProcessingConfiguration()
+                .eventProcessor("subscribing", SubscribingEventProcessor.class)
+                .isPresent());
+    }
+
+    @Test
     void pooledStreamingEventProcessor() {
         //noinspection unchecked
         StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
@@ -367,6 +427,36 @@ class MultiTenantEventProcessingModuleTest {
     }
 
     @Test
+    void pooledStreamingEventProcessorNonMultiTenant() {
+        //noinspection unchecked
+        StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider =
+                (source, processorName, tenantDescriptor, configuration) -> source;
+
+        configurer.registerModule(
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> false)
+        );
+
+        TrackingEventProcessorConfiguration testTepConfig =
+                TrackingEventProcessorConfiguration.forParallelProcessing(4);
+        configurer.eventProcessing()
+                .usingPooledStreamingEventProcessors()
+                .configureDefaultStreamableMessageSource(config -> mockedSource)
+                .byDefaultAssignTo("default")
+                .registerEventHandler(config -> new Object())
+                .registerTrackingEventProcessorConfiguration("tracking", config -> testTepConfig);
+        Configuration configuration = configurer.start();
+
+
+
+        assertEquals(1, configuration.eventProcessingConfiguration().eventProcessors().size());
+        assertTrue(configuration.eventProcessingConfiguration()
+                .eventProcessor("default", PooledStreamingEventProcessor.class)
+                .isPresent());
+    }
+
+    @Test
     void pooledStreamingEventProcessorCustomSource() {
         //noinspection unchecked
         StreamableMessageSource<TrackedEventMessage<?>> mockedSource = mock(StreamableMessageSource.class);
@@ -379,7 +469,7 @@ class MultiTenantEventProcessingModuleTest {
         TenantProvider tenantProvider = mock(TenantProvider.class);
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
                                                                        multiTenantStreamableMessageSourceProvider,
-                                                                       multiTenantDeadLetterQueueFactory));
+                                                                       multiTenantDeadLetterQueueFactory, (name) -> true));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()

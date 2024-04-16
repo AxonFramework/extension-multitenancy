@@ -35,6 +35,7 @@ import org.axonframework.extensions.multitenancy.components.queryhandeling.Tenan
 import org.axonframework.extensions.multitenancy.components.scheduling.MultiTenantEventScheduler;
 import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
+import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessorPredicate;
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantStreamableMessageSourceProvider;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
@@ -188,13 +189,23 @@ public class MultiTenancyAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
+    public MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate() {
+        return (processorName) -> true;
+    }
+
+    @Bean
     public MultiTenantEventProcessingModule multiTenantEventProcessingModule(
             TenantProvider tenantProvider,
             MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider,
-            MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory
+            MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory,
+            MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate
     ) {
         return new MultiTenantEventProcessingModule(
-                tenantProvider, multiTenantStreamableMessageSourceProvider, multiTenantDeadLetterQueueFactory
+                tenantProvider,
+                multiTenantStreamableMessageSourceProvider,
+                multiTenantDeadLetterQueueFactory,
+                multiTenantEventProcessorPredicate
         );
     }
 
