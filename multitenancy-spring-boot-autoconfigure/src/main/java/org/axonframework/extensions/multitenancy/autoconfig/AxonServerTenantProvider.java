@@ -182,7 +182,7 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
                         .add(bus.registerAndStartTenant(tenantDescriptor)));
     }
 
-    protected void removeTenant(TenantDescriptor tenantDescriptor) {
+    public void removeTenant(TenantDescriptor tenantDescriptor) {
         if (tenantDescriptors.contains(tenantDescriptor) && tenantDescriptors.remove(tenantDescriptor)) {
             List<Registration> registrations = registrationMap.remove(tenantDescriptor);
             if (registrations != null && !registrations.isEmpty()) {
