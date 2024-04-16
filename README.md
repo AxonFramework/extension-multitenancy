@@ -232,6 +232,42 @@ public class EventSchedulingComponent {
 }
 ```
 
+### Advanced configuration
+
+#### Overriding default message source
+
+You can override default message source for each tenant by defining following bean:
+
+```
+    @Bean
+    public MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider(AxonServerEventStore customSource) {
+        return (defaultTenantSource, processorName, tenantDescriptor, configuration) -> {
+            if (tenantDescriptor.tenantId().startsWith("tenant-custom")) {
+                return customSource;
+            }
+            return defaultTenantSource;
+
+        };
+    }
+```
+
+Bean should return `StreamableMessageSource` that will be used for specific tenant. This lambda will be called for each tenant and each event processor, so be sure to return a default tenant source if you don't want to override it.
+
+#### Disable multi-tenancy for specific Event Processor
+
+In certain cases, you may want to disable multi-tenancy for specific Event Processor which does not have any tenants, such as when you have event processor that is consuming events from external context.
+Per default, each event processor is scaled, and duplicated for each tenant. To disable this behavior for a specific processing, you can define following bean:
+
+```
+    @Bean
+    public MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate() {
+        return (processorName) -> !processorName.equals("external-context");
+    }
+```
+
+This bean should return `true` for each processor that you want to be multi-tenant, and `false` for each processor that you want to be single tenant.
+
+
 ### Supported multi-tenant components
 
 Currently, supported multi-tenants components are as follows:
