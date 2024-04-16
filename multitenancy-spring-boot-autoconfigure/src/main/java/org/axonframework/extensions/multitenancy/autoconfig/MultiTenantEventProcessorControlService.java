@@ -158,10 +158,6 @@ public class MultiTenantEventProcessorControlService
                               .collect(toMap(Map.Entry::getKey, entry -> entry.getValue().getLoadBalancingStrategy()));
     }
 
-    private static String contextFromCombination(String processorAndContext) {
-        return processorAndContext.substring(processorAndContext.indexOf("@") + 1);
-    }
-
     private void registerInstructionHandler(ControlChannel controlChannel,
                                             String processorAndContext,
                                             EventProcessor processor) {
@@ -211,7 +207,14 @@ public class MultiTenantEventProcessorControlService
     }
 
     private static String processorNameFromCombination(String processorAndContext) {
-        return processorAndContext.substring(0, processorAndContext.indexOf("@"));
+        int index = processorAndContext.indexOf("@");
+        return index == -1 ? processorAndContext : processorAndContext.substring(0, index);
+    }
+
+    private static String contextFromCombination(String processorAndContext) {
+        int index = processorAndContext.indexOf("@");
+        //if there is no context name in the processorAndContext, return the _admin as default
+        return index == -1 ? "_admin" : processorAndContext.substring(index + 1);
     }
 
     @Override
