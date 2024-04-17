@@ -174,7 +174,7 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
         return new TenantDescriptor(context.getName(), metaDataMap);
     }
 
-    protected void addTenant(TenantDescriptor tenantDescriptor) {
+    public void addTenant(TenantDescriptor tenantDescriptor) {
         tenantDescriptors.add(tenantDescriptor);
         tenantAwareComponents
                 .forEach(bus -> registrationMap
