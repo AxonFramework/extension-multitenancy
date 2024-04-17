@@ -15,13 +15,15 @@
  */
 package org.axonframework.extensions.multitenancy.configuration;
 
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-
 import java.util.function.Predicate;
 
 /**
- * todo
+ * Represents a predicate to determine if an event processor should be multi-tenant.
+ *
+ * This interface extends {@link Predicate<String>} and is used to test whether a given event processor
+ * should be considered as multi-tenant. The input to the predicate is the name of the event processor.
+ *
+ * @author Stefan Dragisic
+ * @since 4.9.3
  */
-public interface MultiTenantEventProcessorPredicate extends Predicate<String> {
-
-}
+public interface MultiTenantEventProcessorPredicate extends Predicate<String> { }

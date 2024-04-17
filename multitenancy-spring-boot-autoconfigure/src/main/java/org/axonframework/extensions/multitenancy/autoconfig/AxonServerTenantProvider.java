@@ -174,6 +174,15 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
         return new TenantDescriptor(context.getName(), metaDataMap);
     }
 
+    /**
+     * Adds a new tenant to the system.
+     *
+     * This method adds the provided {@link TenantDescriptor} to the set of known tenants.
+     * Once added all {@link MultiTenantAwareComponent MultiTenantAwareComponents} are registered and started for the
+     * new tenant.
+     *
+     * @param tenantDescriptor the {@link TenantDescriptor} representing the tenant to be added.
+     */
     public void addTenant(TenantDescriptor tenantDescriptor) {
         tenantDescriptors.add(tenantDescriptor);
         tenantAwareComponents
@@ -182,6 +191,17 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
                         .add(bus.registerAndStartTenant(tenantDescriptor)));
     }
 
+    /**
+     * Removes a tenant from the system.
+     *
+     * This method checks if the provided {@link TenantDescriptor} is in the set of known tenants.
+     * If it is, the method removes the tenant and cancels all its registrations.
+     * {@link MultiTenantAwareComponent MultiTenantAwareComponents} are then unregistered in reverse order of their
+     * registration.
+     * It then disconnects the tenant from the Axon Server.
+     *
+     * @param tenantDescriptor the {@link TenantDescriptor} representing the tenant to be removed.
+     */
     public void removeTenant(TenantDescriptor tenantDescriptor) {
         if (tenantDescriptors.contains(tenantDescriptor) && tenantDescriptors.remove(tenantDescriptor)) {
             List<Registration> registrations = registrationMap.remove(tenantDescriptor);
