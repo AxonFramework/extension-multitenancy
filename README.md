@@ -255,7 +255,8 @@ This bean should return a `StreamableMessageSource` that will be used for specif
 
 #### Disable multi-tenancy for specific Event Processor
 
-In certain cases, you may want to disable multi-tenancy for specific Event Processor which does not have any tenants, such as when you have event processor that is consuming events from external context.
+In certain cases, you may want to disable multi-tenancy for specific Event Processor which does not have any tenants.
+For example, when you have an event processor that is consuming events from an external context.
 Per default, each event processor is scaled, and duplicated for each tenant. To disable this behavior for a specific processing, you can define following bean:
 
 ```
