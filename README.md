@@ -236,7 +236,7 @@ public class EventSchedulingComponent {
 
 #### Overriding default message source
 
-You can override default message source for each tenant by defining following bean:
+You can override the default message source for each tenant by defining the following bean:
 
 ```
     @Bean
