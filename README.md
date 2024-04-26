@@ -251,7 +251,7 @@ You can override the default message source for each tenant by defining the foll
     }
 ```
 
-Bean should return `StreamableMessageSource` that will be used for specific tenant. This lambda will be called for each tenant and each event processor, so be sure to return a default tenant source if you don't want to override it.
+This bean should return a `StreamableMessageSource` that will be used for specific tenants. This lambda will be called for each tenant and each event processor, so be sure to return a default tenant source if you don't want to override it.
 
 #### Disable multi-tenancy for specific Event Processor
 
