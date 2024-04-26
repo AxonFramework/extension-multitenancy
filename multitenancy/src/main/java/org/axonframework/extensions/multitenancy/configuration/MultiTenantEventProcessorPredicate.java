@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2024. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,4 +26,12 @@ import java.util.function.Predicate;
  * @author Stefan Dragisic
  * @since 4.9.3
  */
-public interface MultiTenantEventProcessorPredicate extends Predicate<String> { }
+public interface MultiTenantEventProcessorPredicate extends Predicate<String> {
+    static MultiTenantEventProcessorPredicate enableMultiTenancy() {
+        return name -> true;
+    }
+
+    static MultiTenantEventProcessorPredicate disableMultiTenancy() {
+        return name -> false;
+    }
+}

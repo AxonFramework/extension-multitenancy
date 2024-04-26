@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2024. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -215,7 +215,7 @@ class MultiTenantEventProcessingModuleTest {
         MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider =
                 (source, processorName, tenantDescriptor, configuration) -> source;
         configurer.registerModule(
-                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> false)
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, MultiTenantEventProcessorPredicate.disableMultiTenancy())
         );
 
         TrackingEventProcessorConfiguration testTepConfig =
@@ -252,7 +252,7 @@ class MultiTenantEventProcessingModuleTest {
                 (source, processorName, tenantDescriptor, configuration) -> customSource;
 
         configurer.registerModule(
-                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> true)
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, MultiTenantEventProcessorPredicate.enableMultiTenancy())
         );
 
         TrackingEventProcessorConfiguration testTepConfig =
@@ -369,7 +369,7 @@ class MultiTenantEventProcessingModuleTest {
                 (source, processorName, tenantDescriptor, configuration) -> source;
 
         configurer.registerModule(
-                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> false)
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, MultiTenantEventProcessorPredicate.disableMultiTenancy())
         );
 
         configurer.eventProcessing()
@@ -431,7 +431,7 @@ class MultiTenantEventProcessingModuleTest {
                 (source, processorName, tenantDescriptor, configuration) -> source;
 
         configurer.registerModule(
-                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, (name) -> false)
+                new MultiTenantEventProcessingModule(tenantProvider, multiTenantStreamableMessageSourceProvider, null, MultiTenantEventProcessorPredicate.disableMultiTenancy())
         );
 
         TrackingEventProcessorConfiguration testTepConfig =
@@ -465,7 +465,7 @@ class MultiTenantEventProcessingModuleTest {
         TenantProvider tenantProvider = mock(TenantProvider.class);
         configurer.registerModule(new MultiTenantEventProcessingModule(tenantProvider,
                                                                        multiTenantStreamableMessageSourceProvider,
-                                                                       multiTenantDeadLetterQueueFactory, (name) -> true));
+                                                                       multiTenantDeadLetterQueueFactory, MultiTenantEventProcessorPredicate.enableMultiTenancy()));
         TrackingEventProcessorConfiguration testTepConfig =
                 TrackingEventProcessorConfiguration.forParallelProcessing(4);
         configurer.eventProcessing()

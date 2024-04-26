@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2024. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -80,7 +80,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
         this.tenantProvider = tenantProvider;
         this.multiTenantDeadLetterQueueFactory = null;
         this.multiTenantStreamableMessageSourceProvider = ((defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource);
-        this.multiTenantEventProcessorPredicate = (name) -> true;
+        this.multiTenantEventProcessorPredicate = MultiTenantEventProcessorPredicate.enableMultiTenancy();
     }
 
     /**
@@ -100,7 +100,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
         this.tenantProvider = tenantProvider;
         this.multiTenantDeadLetterQueueFactory = multiTenantDeadLetterQueueFactory;
         multiTenantStreamableMessageSourceProvider = ((defaultSource, processorName, tenantDescriptor, configuration) -> defaultSource);
-        this.multiTenantEventProcessorPredicate = (name) -> true;
+        this.multiTenantEventProcessorPredicate = MultiTenantEventProcessorPredicate.enableMultiTenancy();
     }
 
     /**
@@ -198,15 +198,15 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
     private SubscribingEventProcessor buildSep(String name, EventHandlerInvoker eventHandlerInvoker, SubscribableMessageSource<? extends EventMessage<?>> source, TransactionManager transactionManager) {
         return SubscribingEventProcessor.builder()
-                .name(name)
-                .eventHandlerInvoker(eventHandlerInvoker)
-                .rollbackConfiguration(super.rollbackConfiguration(name))
-                .errorHandler(super.errorHandler(name))
-                .messageMonitor(super.messageMonitor(SubscribingEventProcessor.class, name))
-                .messageSource(source)
-                .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
-                .transactionManager(transactionManager)
-                .build();
+                                        .name(name)
+                                        .eventHandlerInvoker(eventHandlerInvoker)
+                                        .rollbackConfiguration(super.rollbackConfiguration(name))
+                                        .errorHandler(super.errorHandler(name))
+                                        .messageMonitor(super.messageMonitor(SubscribingEventProcessor.class, name))
+                                        .messageSource(source)
+                                        .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
+                                        .transactionManager(transactionManager)
+                                        .build();
     }
 
     private SubscribingEventProcessor buildSep(TenantDescriptor tenantDescriptor, String name, EventHandlerInvoker eventHandlerInvoker, SubscribableMessageSource<? extends EventMessage<?>> source) {
@@ -254,16 +254,16 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
     private TrackingEventProcessor buildTep(String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TransactionManager transactionManager, TrackingEventProcessorConfiguration config) {
         return TrackingEventProcessor.builder()
-                .name(name)
-                .eventHandlerInvoker(eventHandlerInvoker)
-                .rollbackConfiguration(super.rollbackConfiguration(name))
-                .errorHandler(super.errorHandler(name))
-                .messageMonitor(super.messageMonitor(TrackingEventProcessor.class, name))
-                .messageSource(source)
-                .tokenStore(super.tokenStore(name))
-                .transactionManager(transactionManager)
-                .trackingEventProcessorConfiguration(config)
-                .build();
+                                     .name(name)
+                                     .eventHandlerInvoker(eventHandlerInvoker)
+                                     .rollbackConfiguration(super.rollbackConfiguration(name))
+                                     .errorHandler(super.errorHandler(name))
+                                     .messageMonitor(super.messageMonitor(TrackingEventProcessor.class, name))
+                                     .messageSource(source)
+                                     .tokenStore(super.tokenStore(name))
+                                     .transactionManager(transactionManager)
+                                     .trackingEventProcessorConfiguration(config)
+                                     .build();
     }
 
     private TrackingEventProcessor buildTep(TenantDescriptor tenantDescriptor, String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TrackingEventProcessorConfiguration config) {
@@ -332,24 +332,24 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
 
     private PooledStreamingEventProcessor.Builder psepBuilder(String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TransactionManager transactionManager, Configuration config) {
         return PooledStreamingEventProcessor.builder()
-                .name(name)
-                .eventHandlerInvoker(eventHandlerInvoker)
-                .rollbackConfiguration(super.rollbackConfiguration(name))
-                .errorHandler(super.errorHandler(name))
-                .messageMonitor(super.messageMonitor(PooledStreamingEventProcessor.class, name))
-                .messageSource(source)
-                .tokenStore(super.tokenStore(name))
-                .transactionManager(transactionManager)
-                .coordinatorExecutor(processorName -> {
-                    ScheduledExecutorService coordinatorExecutor = defaultExecutor("Coordinator[" + processorName + "]");
-                    config.onShutdown(coordinatorExecutor::shutdown);
-                    return coordinatorExecutor;
-                })
-                .workerExecutor(processorName -> {
-                    ScheduledExecutorService workerExecutor = defaultExecutor("WorkPackage[" + processorName + "]");
-                    config.onShutdown(workerExecutor::shutdown);
-                    return workerExecutor;
-                });
+                                            .name(name)
+                                            .eventHandlerInvoker(eventHandlerInvoker)
+                                            .rollbackConfiguration(super.rollbackConfiguration(name))
+                                            .errorHandler(super.errorHandler(name))
+                                            .messageMonitor(super.messageMonitor(PooledStreamingEventProcessor.class, name))
+                                            .messageSource(source)
+                                            .tokenStore(super.tokenStore(name))
+                                            .transactionManager(transactionManager)
+                                            .coordinatorExecutor(processorName -> {
+                                                ScheduledExecutorService coordinatorExecutor = defaultExecutor("Coordinator[" + processorName + "]");
+                                                config.onShutdown(coordinatorExecutor::shutdown);
+                                                return coordinatorExecutor;
+                                            })
+                                            .workerExecutor(processorName -> {
+                                                ScheduledExecutorService workerExecutor = defaultExecutor("WorkPackage[" + processorName + "]");
+                                                config.onShutdown(workerExecutor::shutdown);
+                                                return workerExecutor;
+                                            });
     }
 
     private PooledStreamingEventProcessor.Builder psepBuilder(TenantDescriptor tenantDescriptor, String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, Configuration config) {
