@@ -56,7 +56,7 @@
 
         <axon.version>4.9.0-SNAPSHOT</axon.version>
 
-        <spring.version>5.3.34</spring.version>
+        <spring.version>5.3.35</spring.version>
         <spring.boot.version>2.7.18</spring.boot.version>
 
         <slf4j.version>1.7.28</slf4j.version>
@@ -65,7 +65,7 @@
         <junit.jupiter.version>5.10.1</junit.jupiter.version>
         <mockito.version>4.11.0</mockito.version>
 
-        <projectreactor.version>3.6.5</projectreactor.version>
+        <projectreactor.version>3.6.6</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
 
         <jacoco-maven.version>0.8.11</jacoco-maven.version>
