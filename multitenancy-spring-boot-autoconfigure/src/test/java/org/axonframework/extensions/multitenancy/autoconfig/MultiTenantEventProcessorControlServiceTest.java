@@ -27,6 +27,7 @@ import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.eventhandling.EventProcessor;
 import org.axonframework.eventhandling.tokenstore.TokenStore;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantEventProcessorControlSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
@@ -75,9 +76,12 @@ class MultiTenantEventProcessorControlServiceTest {
         AxonServerConfiguration axonServerConfig = mock(AxonServerConfiguration.class);
         mockAxonServerConfig(axonServerConfig);
 
+        TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory = TenantDescriptor::tenantId;
+
         testSubject = new MultiTenantEventProcessorControlService(axonServerConnectionManager,
                                                                   eventProcessingConfiguration,
-                                                                  axonServerConfig);
+                                                                  axonServerConfig,
+                                                                  tenantEventProcessorControlSegmentFactory);
     }
 
     private void mockConnectionManager() {
@@ -112,7 +116,7 @@ class MultiTenantEventProcessorControlServiceTest {
         when(axonServerConnectionManager.getConnection(contextCapture.capture()))
                 .thenAnswer(a -> {
                     String capturedValue = contextCapture.getValue();
-                    if (capturedValue.equals("tenant-1")) {
+                    if (capturedValue.equals("tenant-1") || capturedValue.equals("tenant-1-context")) {
                         return connectionTenant1;
                     } else if (capturedValue.equals("tenant-2")) {
                         return connectionTenant2;
@@ -217,5 +221,30 @@ class MultiTenantEventProcessorControlServiceTest {
         verify(adminTenant2).setAutoLoadBalanceStrategy(PROCESSOR_NAME, TOKEN_STORE_IDENTIFIER, expectedStrategy);
         verify(adminTenant1, never()).setAutoLoadBalanceStrategy(eq(processorNameWithoutSettings), any(), any());
         verify(adminTenant2, never()).setAutoLoadBalanceStrategy(eq(processorNameWithoutSettings), any(), any());
+    }
+
+    @Test
+    void testNonDefaultTenantEventProcessorControlSegmentFactory() {
+        AxonServerConfiguration axonServerConfig = mock(AxonServerConfiguration.class);
+        mockAxonServerConfig(axonServerConfig);
+        // Arrange
+        TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory = tenantId -> tenantId.tenantId() + "-context";
+        MultiTenantEventProcessorControlService testSubject = new MultiTenantEventProcessorControlService(
+                axonServerConnectionManager,
+                eventProcessingConfiguration,
+                axonServerConfig,
+                tenantEventProcessorControlSegmentFactory
+        );
+
+        when(eventProcessingConfiguration.eventProcessors()).thenReturn(ImmutableMap.of(
+                PROCESSOR_NAME + "@tenant-1", mock(EventProcessor.class)
+        ));
+
+        // Act
+        testSubject.start();
+
+        // Assert
+        verify(axonServerConnectionManager).getConnection("tenant-1-context");
+        verify(controlTenant1).registerEventProcessor(eq(PROCESSOR_NAME + "@tenant-1"), any(), any());
     }
 }
