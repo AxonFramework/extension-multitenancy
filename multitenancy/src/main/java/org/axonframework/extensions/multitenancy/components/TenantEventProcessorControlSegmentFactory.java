@@ -1,7 +1,5 @@
 package org.axonframework.extensions.multitenancy.components;
 
-import org.axonframework.eventsourcing.eventstore.EventStore;
-
 import java.util.function.Function;
 
 /**
