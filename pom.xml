@@ -54,7 +54,7 @@
             ${project.basedir}/../coverage-report/target/site/jacoco-aggregate/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
 
-        <axon.version>4.9.0-SNAPSHOT</axon.version>
+        <axon.version>4.10.0-SNAPSHOT</axon.version>
 
         <spring.version>5.3.37</spring.version>
         <spring.boot.version>2.7.18</spring.boot.version>
@@ -90,27 +90,27 @@
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-messaging</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-configuration</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-server-connector</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-spring</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-spring-boot-autoconfigure</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <!-- Reactor -->
             <dependency>

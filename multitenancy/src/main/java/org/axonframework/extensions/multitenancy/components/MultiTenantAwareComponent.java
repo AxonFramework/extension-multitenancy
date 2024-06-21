@@ -17,11 +17,16 @@ package org.axonframework.extensions.multitenancy.components;
 
 import org.axonframework.common.Registration;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Interface for components that can be registered with a {@link TenantProvider}.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
+ *
  */
 public interface MultiTenantAwareComponent {
 
