@@ -15,14 +15,15 @@
  */
 package org.axonframework.extensions.multitenancy.autoconfig;
 
-import io.axoniq.axonserver.connector.event.PersistentStreamProperties;
 import org.axonframework.axonserver.connector.AxonServerConfiguration;
 import org.axonframework.axonserver.connector.AxonServerConnectionManager;
 import org.axonframework.axonserver.connector.TargetContextResolver;
 import org.axonframework.axonserver.connector.command.AxonServerCommandBus;
 import org.axonframework.axonserver.connector.command.CommandLoadFactorProvider;
 import org.axonframework.axonserver.connector.command.CommandPriorityCalculator;
-import org.axonframework.axonserver.connector.event.axon.*;
+import org.axonframework.axonserver.connector.event.axon.AxonServerEventScheduler;
+import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore;
+import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
 import org.axonframework.axonserver.connector.query.AxonServerQueryBus;
 import org.axonframework.axonserver.connector.query.QueryPriorityCalculator;
 import org.axonframework.commandhandling.CommandBus;
@@ -30,7 +31,6 @@ import org.axonframework.commandhandling.CommandMessage;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
-import org.axonframework.config.ConfigurerModule;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
@@ -40,29 +40,20 @@ import org.axonframework.extensions.multitenancy.components.queryhandeling.Tenan
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
-import org.axonframework.queryhandling.QueryBus;
-import org.axonframework.queryhandling.QueryInvocationErrorHandler;
-import org.axonframework.queryhandling.QueryMessage;
-import org.axonframework.queryhandling.QueryUpdateEmitter;
-import org.axonframework.queryhandling.SimpleQueryBus;
-import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
+import org.axonframework.queryhandling.*;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.SpringAxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
-import org.axonframework.springboot.autoconfig.PersistentStreamMessageSourceFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.core.env.Environment;
-
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.BiFunction;
 
 /**
  * Autoconfiguration constructing the Axon Server specific tenant factories, with the {@link AxonServerTenantProvider}
@@ -74,7 +65,7 @@ import java.util.function.BiFunction;
 @AutoConfiguration
 @ConditionalOnClass(AxonServerConfiguration.class)
 @ConditionalOnProperty(value = {"axon.axonserver.enabled", "axon.multi-tenancy.enabled"}, matchIfMissing = true)
-@AutoConfigureAfter(AxonServerAutoConfiguration.class)
+@AutoConfigureBefore(AxonServerAutoConfiguration.class)
 @ComponentScan(excludeFilters = {
         @ComponentScan.Filter(
                 type = FilterType.REGEX,
@@ -252,71 +243,4 @@ public class MultiTenancyAxonServerAutoConfiguration {
         });
     }
 
-    @Bean
-    @Primary
-    public ConfigurerModule persistentStreamProcessorsConfigurerModule(
-            PersistentStreamMessageSourceFactory persistentStreamMessageSourceFactory,
-            AxonServerConfiguration axonServerConfiguration) {
-        return configurer -> configurer.eventProcessing(
-                processingConfigurer ->
-                        axonServerConfiguration.getEventhandling()
-                                .getPersistentStreamProcessors()
-                                .forEach((name, settings) -> {
-                                    // for DLQ enabled processors
-                                    processingConfigurer.registerSubscribingEventProcessor(
-                                            name,
-                                            configuration -> persistentStreamMessageSourceFactory.build(name,settings, configuration));
-                                    if (settings.getDlq().isEnabled()) {
-                                        processingConfigurer.registerSequencingPolicy(name,
-                                                new PersistentStreamSequencingPolicy(
-                                                        name,
-                                                        settings));
-                                        if (settings.getDlq().getCache().isEnabled()) {
-                                            processingConfigurer.registerDeadLetteringEventHandlerInvokerConfiguration(
-                                                    name,
-                                                    (c, builder) -> builder
-                                                            .enableSequenceIdentifierCache()
-                                                            .sequenceIdentifierCacheSize(settings.getDlq()
-                                                                    .getCache()
-                                                                    .getSize()));
-                                        }
-                                    }
-                                }));
-    }
-
-    @Bean
-    @Primary
-    public PersistentStreamMessageSourceFactory persistentStreamMessageSourceFactory(
-            TenantProvider tenantProvider,
-            @Qualifier("persistentStreamScheduler") ScheduledExecutorService scheduledExecutorService,
-            TenantPersistentStreamMessageSourceFactory tenantPersistentStreamMessageSourceFactory
-            ) {
-        return (name, settings, configuration) -> {
-            MultiTenantPersistentStreamMessageSource component = new MultiTenantPersistentStreamMessageSource(configuration,
-                    scheduledExecutorService,
-                    name, settings,
-                    tenantPersistentStreamMessageSourceFactory);
-            tenantProvider.subscribe(component);
-            return component;
-        };
-    }
-
-
-    @Bean
-    @ConditionalOnMissingBean
-    public TenantPersistentStreamMessageSourceFactory tenantPersistentStreamMessageSourceFactory(
-            ScheduledExecutorService scheduledExecutorService
-    ) {
-        return (processorName, settings, tenantDescriptor, configuration) -> new PersistentStreamMessageSource(processorName + "@" + tenantDescriptor.tenantId(),
-                configuration,
-                new PersistentStreamProperties(processorName + "@" + tenantDescriptor.tenantId(),
-                        settings.getInitialSegmentCount(),
-                        settings.getSequencingPolicy(),
-                        settings.getSequencingPolicyParameters(),
-                        settings.getInitial(),
-                        settings.getFilter()),
-                scheduledExecutorService,
-                settings.getBatchSize(),
-                tenantDescriptor.tenantId());
-    }
 }
