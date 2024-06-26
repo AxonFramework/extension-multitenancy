@@ -54,7 +54,7 @@ public class MultiTenantPersistentStreamAutoConfiguration {
     ) {
         return (processorName, settings, tenantDescriptor, configuration) -> new PersistentStreamMessageSource(processorName + "@" + tenantDescriptor.tenantId(),
                 configuration,
-                new PersistentStreamProperties(processorName + "@" + tenantDescriptor.tenantId(),
+                new PersistentStreamProperties(processorName,
                         settings.getInitialSegmentCount(),
                         settings.getSequencingPolicy(),
                         settings.getSequencingPolicyParameters(),
