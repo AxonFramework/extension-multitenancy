@@ -1,0 +1,9 @@
+:navtitle: Disable Extension
+= Disable Extension
+
+By default, extension is automatically enabled. If you wish to disable extension without removing extension use following property.
+
+[source,properties]
+----
+axon.multi-tenancy.enabled=false
+----
