@@ -31,19 +31,12 @@ import org.axonframework.extensions.multitenancy.components.scheduling.MultiTena
 import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.correlation.CorrelationDataProvider;
-import org.axonframework.springboot.autoconfig.AxonAutoConfiguration;
-import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
-import org.axonframework.springboot.autoconfig.AxonServerBusAutoConfiguration;
-import org.axonframework.springboot.autoconfig.AxonTracingAutoConfiguration;
-import org.axonframework.springboot.autoconfig.EventProcessingAutoConfiguration;
-import org.axonframework.springboot.autoconfig.InfraConfiguration;
-import org.axonframework.springboot.autoconfig.NoOpTransactionAutoConfiguration;
-import org.axonframework.springboot.autoconfig.ObjectMapperAutoConfiguration;
-import org.axonframework.springboot.autoconfig.TransactionAutoConfiguration;
-import org.axonframework.springboot.autoconfig.XStreamAutoConfiguration;
+import org.axonframework.springboot.autoconfig.*;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -96,6 +89,12 @@ class MultiTenancyAutoConfigurationTest {
                                             .isExactlyInstanceOf(MultiTenantEventScheduler.class);
                          assertThat(context).getBean("multiTenantQueryUpdateEmitter")
                                             .isInstanceOf(MultiTenantQueryUpdateEmitter.class);
+                         assertThat(context).getBean("multiTenantPersistentStreamScheduler")
+                                 .isInstanceOf(ScheduledExecutorService.class);
+                         assertThat(context).getBean("persistentStreamMessageSourceFactory")
+                                 .isInstanceOf(PersistentStreamMessageSourceFactory.class);
+                         assertThat(context).getBean("tenantPersistentStreamMessageSourceFactory")
+                                 .isInstanceOf(TenantPersistentStreamMessageSourceFactory.class);
                      });
     }
 
@@ -121,6 +120,8 @@ class MultiTenancyAutoConfigurationTest {
                          assertThat(context).doesNotHaveBean(MultiTenantDeadLetterQueueFactory.class);
                          assertThat(context).doesNotHaveBean(MultiTenantEventScheduler.class);
                          assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
+                         assertThat(context).doesNotHaveBean("multiTenantPersistentStreamScheduler");
+                         assertThat(context).doesNotHaveBean(TenantPersistentStreamMessageSourceFactory.class);
                      });
     }
 

@@ -18,24 +18,44 @@ import org.springframework.context.annotation.Primary;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+/**
+ * Auto-configuration class for multi-tenant persistent stream support in Axon Framework.
+ * This configuration is enabled when Axon Server and multi-tenancy are both enabled.
+ *
+ * @author Stefan Dragisic
+ * @since 4.10
+ */
 @AutoConfiguration
 @ConditionalOnProperty(value = {"axon.axonserver.enabled", "axon.multi-tenancy.enabled"}, matchIfMissing = true)
 @AutoConfigureBefore(AxonServerAutoConfiguration.class)
 public class MultiTenantPersistentStreamAutoConfiguration {
 
+    /**
+     * Creates a ScheduledExecutorService for multi-tenant persistent streams.
+     *
+     * @param axonServerConfiguration The Axon Server configuration.
+     * @return A ScheduledExecutorService for persistent streams.
+     */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnProperty(name = "axon.axonserver.event-store.enabled", matchIfMissing = true)
-    public ScheduledExecutorService multiTenantpersistentStreamScheduler(AxonServerConfiguration axonServerConfiguration) {
+    public ScheduledExecutorService multiTenantPersistentStreamScheduler(AxonServerConfiguration axonServerConfiguration) {
         return Executors.newScheduledThreadPool(axonServerConfiguration.getPersistentStreamThreads(),
                 new AxonThreadFactory("persistent-streams"));
     }
 
+    /**
+     * Creates a PersistentStreamMessageSourceFactory for multi-tenant environments.
+     *
+     * @param tenantProvider The TenantProvider for managing tenants.
+     * @param scheduledExecutorService The ScheduledExecutorService for persistent streams.
+     * @param tenantPersistentStreamMessageSourceFactory The factory for creating tenant-specific PersistentStreamMessageSources.
+     * @return A PersistentStreamMessageSourceFactory that supports multi-tenancy.
+     */
     @Bean
     @ConditionalOnMissingBean
     public PersistentStreamMessageSourceFactory persistentStreamMessageSourceFactory(
             TenantProvider tenantProvider,
-            @Qualifier("multiTenantpersistentStreamScheduler") ScheduledExecutorService scheduledExecutorService,
+            @Qualifier("multiTenantPersistentStreamScheduler") ScheduledExecutorService scheduledExecutorService,
             TenantPersistentStreamMessageSourceFactory tenantPersistentStreamMessageSourceFactory
     ) {
         return (name, settings, configuration) -> {
@@ -47,6 +67,13 @@ public class MultiTenantPersistentStreamAutoConfiguration {
             return component;
         };
     }
+
+    /**
+     * Creates a TenantPersistentStreamMessageSourceFactory for creating tenant-specific PersistentStreamMessageSources.
+     *
+     * @param scheduledExecutorService The ScheduledExecutorService for persistent streams.
+     * @return A TenantPersistentStreamMessageSourceFactory.
+     */
     @Bean
     @ConditionalOnMissingBean
     public TenantPersistentStreamMessageSourceFactory tenantPersistentStreamMessageSourceFactory(
