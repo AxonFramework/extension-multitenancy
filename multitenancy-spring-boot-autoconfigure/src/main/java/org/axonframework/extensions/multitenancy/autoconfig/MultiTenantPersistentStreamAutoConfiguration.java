@@ -24,7 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 public class MultiTenantPersistentStreamAutoConfiguration {
 
     @Bean
-    @Primary
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "axon.axonserver.event-store.enabled", matchIfMissing = true)
     public ScheduledExecutorService multiTenantpersistentStreamScheduler(AxonServerConfiguration axonServerConfiguration) {
         return Executors.newScheduledThreadPool(axonServerConfiguration.getPersistentStreamThreads(),
@@ -32,7 +32,7 @@ public class MultiTenantPersistentStreamAutoConfiguration {
     }
 
     @Bean
-    @Primary
+    @ConditionalOnMissingBean
     public PersistentStreamMessageSourceFactory persistentStreamMessageSourceFactory(
             TenantProvider tenantProvider,
             @Qualifier("multiTenantpersistentStreamScheduler") ScheduledExecutorService scheduledExecutorService,
