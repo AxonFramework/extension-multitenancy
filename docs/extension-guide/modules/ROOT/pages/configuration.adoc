@@ -212,7 +212,7 @@ public class EventSchedulingComponent {
 }
 ----
 
-=== Advanced Configuration
+=== Advanced configuration
 
 ==== Overriding default message source
 
@@ -233,7 +233,7 @@ public MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSo
 
 This bean should return a `StreamableMessageSource` that will be used for specific tenants. This lambda will be called for each tenant and each event processor, so be sure to return a default tenant source if you don't want to override it.
 
-==== Disable multi-tenancy for specific Event Processor
+==== Disable multi-tenancy for specific event processor
 
 In certain cases, you may want to disable multi-tenancy for specific Event Processor which does not have any tenants.
 For example, when you have an event processor that is consuming events from an external context.
