@@ -18,36 +18,34 @@ public class MultiTenantPersistentStreamMessageSource extends PersistentStreamMe
 
     private final String name;
 
-    private final AxonServerConfiguration.PersistentStreamProcessorSettings settings;
-
     private final Configuration configuration;
     private final TenantPersistentStreamMessageSourceFactory tenantPersistentStreamMessageSourceFactory;
     private final Map<TenantDescriptor, PersistentStreamMessageSource> tenantSegments = new ConcurrentHashMap<>();
 
-    public MultiTenantPersistentStreamMessageSource(Configuration configuration,
-                                                    ScheduledExecutorService scheduledExecutorService,
-                                                    String name,
-                                                    AxonServerConfiguration.PersistentStreamProcessorSettings settings,
+
+    private final PersistentStreamProperties persistentStreamProperties;
+    private final ScheduledExecutorService scheduler;
+    private final int batchSize;
+    private final String context;
+
+    public MultiTenantPersistentStreamMessageSource(String name, PersistentStreamProperties
+            persistentStreamProperties, ScheduledExecutorService scheduler, int batchSize, String context, Configuration configuration,
                                                     TenantPersistentStreamMessageSourceFactory tenantPersistentStreamMessageSourceFactory) {
 
-        super(name, configuration,
-                new PersistentStreamProperties(settings.getName(),
-                        settings.getInitialSegmentCount(),
-                        settings.getSequencingPolicy(),
-                        settings.getSequencingPolicyParameters(),
-                        settings.getInitial(),
-                        settings.getFilter()),
-                scheduledExecutorService,
-                settings.getBatchSize());
+        super(name, configuration, persistentStreamProperties, scheduler, batchSize, context);
         this.tenantPersistentStreamMessageSourceFactory = tenantPersistentStreamMessageSourceFactory;
-        this.settings = settings;
         this.name = name;
         this.configuration = configuration;
+        this.persistentStreamProperties = persistentStreamProperties;
+        this.scheduler = scheduler;
+        this.batchSize = batchSize;
+        this.context = context;
     }
 
     @Override
     public Registration registerTenant(TenantDescriptor tenantDescriptor) {
-        PersistentStreamMessageSource tenantSegment = tenantPersistentStreamMessageSourceFactory.build(name, settings, tenantDescriptor, configuration);
+        PersistentStreamMessageSource tenantSegment = tenantPersistentStreamMessageSourceFactory.build( name,
+                persistentStreamProperties,  scheduler,  batchSize,  context, configuration, tenantDescriptor);
         tenantSegments.putIfAbsent(tenantDescriptor, tenantSegment);
 
         return () -> {

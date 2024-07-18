@@ -16,6 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSourceFactory;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -89,8 +90,6 @@ class MultiTenancyAutoConfigurationTest {
                                             .isExactlyInstanceOf(MultiTenantEventScheduler.class);
                          assertThat(context).getBean("multiTenantQueryUpdateEmitter")
                                             .isInstanceOf(MultiTenantQueryUpdateEmitter.class);
-                         assertThat(context).getBean("multiTenantPersistentStreamScheduler")
-                                 .isInstanceOf(ScheduledExecutorService.class);
                          assertThat(context).getBean("persistentStreamMessageSourceFactory")
                                  .isInstanceOf(PersistentStreamMessageSourceFactory.class);
                          assertThat(context).getBean("tenantPersistentStreamMessageSourceFactory")
@@ -120,7 +119,6 @@ class MultiTenancyAutoConfigurationTest {
                          assertThat(context).doesNotHaveBean(MultiTenantDeadLetterQueueFactory.class);
                          assertThat(context).doesNotHaveBean(MultiTenantEventScheduler.class);
                          assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
-                         assertThat(context).doesNotHaveBean("multiTenantPersistentStreamScheduler");
                          assertThat(context).doesNotHaveBean(TenantPersistentStreamMessageSourceFactory.class);
                      });
     }
