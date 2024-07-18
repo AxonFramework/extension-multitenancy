@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2024. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,13 +65,13 @@ public class MultiTenantEventProcessorControlService
      * {@link EventProcessor#shutDown() shutdown} can be triggered through Axon Server. Furthermore, it sets the
      * configured load balancing strategies through the {@link AdminChannel}  of the {@code context}.
      *
-     * @param axonServerConnectionManager  A {@link AxonServerConnectionManager} from which to retrieve the
-     *                                     {@link ControlChannel} and {@link AdminChannel}.
-     * @param eventProcessingConfiguration The {@link EventProcessor} configuration of this application, used to
-     *                                     retrieve the registered event processors from.
-     * @param axonServerConfiguration      The {@link AxonServerConfiguration} used to retrieve the
-     *                                     {@link AxonServerConnectionManager#getDefaultContext() default context}
-     *                                     from.
+     * @param axonServerConnectionManager               A {@link AxonServerConnectionManager} from which to retrieve the
+     *                                                  {@link ControlChannel} and {@link AdminChannel}.
+     * @param eventProcessingConfiguration              The {@link EventProcessor} configuration of this application,
+     *                                                  used to retrieve the registered event processors from.
+     * @param axonServerConfiguration                   The {@link AxonServerConfiguration} used to retrieve the
+     *                                                  {@link AxonServerConnectionManager#getDefaultContext() default
+     *                                                  context} from.
      * @param tenantEventProcessorControlSegmentFactory The {@link TenantEventProcessorControlSegmentFactory} used to
      *                                                  retrieve the context name for the given tenant.
      */
