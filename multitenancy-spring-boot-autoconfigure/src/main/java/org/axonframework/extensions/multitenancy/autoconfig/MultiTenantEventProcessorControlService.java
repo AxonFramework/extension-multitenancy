@@ -26,6 +26,7 @@ import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.eventhandling.EventProcessor;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantEventProcessorControlSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
 import org.axonframework.lifecycle.Phase;
 import org.axonframework.lifecycle.StartHandler;
@@ -54,6 +55,7 @@ public class MultiTenantEventProcessorControlService
         implements MultiTenantAwareComponent {
 
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+    private final TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory;
 
     /**
      * Initialize a {@link MultiTenantEventProcessorControlService}.
@@ -70,40 +72,18 @@ public class MultiTenantEventProcessorControlService
      * @param axonServerConfiguration      The {@link AxonServerConfiguration} used to retrieve the
      *                                     {@link AxonServerConnectionManager#getDefaultContext() default context}
      *                                     from.
+     * @param tenantEventProcessorControlSegmentFactory The {@link TenantEventProcessorControlSegmentFactory} used to
+     *                                                  retrieve the context name for the given tenant.
      */
     public MultiTenantEventProcessorControlService(AxonServerConnectionManager axonServerConnectionManager,
                                                    EventProcessingConfiguration eventProcessingConfiguration,
-                                                   AxonServerConfiguration axonServerConfiguration) {
-        this(axonServerConnectionManager,
+                                                   AxonServerConfiguration axonServerConfiguration,
+                                                   TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory) {
+        super(axonServerConnectionManager,
              eventProcessingConfiguration,
              axonServerConfiguration.getContext(),
              axonServerConfiguration.getEventhandling().getProcessors());
-    }
-
-    /**
-     * Initialize a {@link MultiTenantEventProcessorControlService}.
-     * <p>
-     * This service adds processor instruction handlers to the {@link ControlChannel} of the given {@code context}, for
-     * every tenant. Doing so ensures operation like the {@link EventProcessor#start() start} and
-     * {@link EventProcessor#shutDown() shutdown} can be triggered through Axon Server. Furthermore, it sets the
-     * configured load balancing strategies through the {@link AdminChannel}  of the {@code context}.
-     *
-     * @param axonServerConnectionManager  A {@link AxonServerConnectionManager} from which to retrieve the
-     *                                     {@link ControlChannel} and {@link AdminChannel}.
-     * @param eventProcessingConfiguration The {@link EventProcessor} configuration of this application, used to
-     *                                     retrieve the registered event processors from.
-     * @param context                      The context of this application instance to retrieve the
-     *                                     {@link ControlChannel} and {@link AdminChannel} for.
-     * @param processorConfig              The processor configuration from the {@link AxonServerConfiguration}, used to
-     *                                     (for example) retrieve the load balancing strategies from.
-     */
-    public MultiTenantEventProcessorControlService(
-            AxonServerConnectionManager axonServerConnectionManager,
-            EventProcessingConfiguration eventProcessingConfiguration,
-            String context,
-            Map<String, AxonServerConfiguration.Eventhandling.ProcessorSettings> processorConfig
-    ) {
-        super(axonServerConnectionManager, eventProcessingConfiguration, context, processorConfig);
+        this.tenantEventProcessorControlSegmentFactory = tenantEventProcessorControlSegmentFactory;
     }
 
     @StartHandler(phase = Phase.INSTRUCTION_COMPONENTS)
@@ -142,7 +122,7 @@ public class MultiTenantEventProcessorControlService
                                // Filter out MultiTenantEventProcessors as those aren't registered with Axon Server anyhow.
                                .filter(entry -> !(entry.getValue() instanceof MultiTenantEventProcessor))
                                .map(Map.Entry::getKey)
-                               .map(MultiTenantEventProcessorControlService::processorNameFromCombination)
+                               .map(this::processorNameFromCombination)
                                .collect(Collectors.toList());
         return processorConfig.entrySet()
                               .stream()
@@ -156,10 +136,6 @@ public class MultiTenantEventProcessorControlService
                                   return true;
                               })
                               .collect(toMap(Map.Entry::getKey, entry -> entry.getValue().getLoadBalancingStrategy()));
-    }
-
-    private static String contextFromCombination(String processorAndContext) {
-        return processorAndContext.substring(processorAndContext.indexOf("@") + 1);
     }
 
     private void registerInstructionHandler(ControlChannel controlChannel,
@@ -210,8 +186,19 @@ public class MultiTenantEventProcessorControlService
                                            .retrieveStorageIdentifier();
     }
 
-    private static String processorNameFromCombination(String processorAndContext) {
-        return processorAndContext.substring(0, processorAndContext.indexOf("@"));
+    private String processorNameFromCombination(String processorAndTenantId) {
+        int index = processorAndTenantId.indexOf("@");
+        return index == -1 ? processorAndTenantId : processorAndTenantId.substring(0, index);
+    }
+
+    private String contextFromCombination(String processorAndTenantId) {
+        int index = processorAndTenantId.indexOf("@");
+        //if there is no context name in the processorAndContext, return the _admin as default
+        String tenantId = index == -1 ? "_admin" : processorAndTenantId.substring(index + 1);
+        if ("_admin".equals(tenantId)) {
+            return "_admin";
+        }
+        return tenantEventProcessorControlSegmentFactory.apply(TenantDescriptor.tenantWithId(tenantId));
     }
 
     @Override
@@ -230,7 +217,8 @@ public class MultiTenantEventProcessorControlService
             if (processor instanceof MultiTenantEventProcessor || !name.contains(tenantDescriptor.tenantId())) {
                 return;
             }
-            ControlChannel controlChannel = axonServerConnectionManager.getConnection(tenantDescriptor.tenantId())
+            String context = tenantEventProcessorControlSegmentFactory.apply(tenantDescriptor);
+            ControlChannel controlChannel = axonServerConnectionManager.getConnection(context)
                                                                        .controlChannel();
             AxonProcessorInstructionHandler instructionHandler = new AxonProcessorInstructionHandler(processor, name);
             controlChannel.registerEventProcessor(name, infoSupplier(processor), instructionHandler);

@@ -32,6 +32,8 @@ import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantEventProcessorControlSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
@@ -54,10 +56,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 
 /**
@@ -233,15 +237,26 @@ public class MultiTenancyAxonServerAutoConfiguration {
     }
 
     @Bean
+    @Primary
+    @ConditionalOnMissingBean
+    public TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory(
+
+    ) {
+        return TenantDescriptor::tenantId;
+    }
+
+    @Bean
     public EventProcessorInfoConfiguration processorInfoConfiguration(
             TenantProvider tenantProvider,
-            AxonServerConnectionManager connectionManager
+            AxonServerConnectionManager connectionManager,
+            TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory
     ) {
         return new EventProcessorInfoConfiguration(c -> {
             MultiTenantEventProcessorControlService controlService = new MultiTenantEventProcessorControlService(
                     connectionManager,
                     c.eventProcessingConfiguration(),
-                    c.getComponent(AxonServerConfiguration.class)
+                    c.getComponent(AxonServerConfiguration.class),
+                    tenantEventProcessorControlSegmentFactory
             );
             tenantProvider.subscribe(controlService);
             return controlService;

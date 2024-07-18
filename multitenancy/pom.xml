@@ -19,7 +19,7 @@
     <parent>
         <artifactId>axon-multitenancy-parent</artifactId>
         <groupId>org.axonframework.extensions.multitenancy</groupId>
-        <version>4.9.3-SNAPSHOT</version>
+        <version>4.9.4-SNAPSHOT</version>
     </parent>
 
     <artifactId>axon-multitenancy</artifactId>

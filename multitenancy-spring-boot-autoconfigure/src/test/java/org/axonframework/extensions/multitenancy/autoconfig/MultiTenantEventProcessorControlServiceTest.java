@@ -20,12 +20,14 @@ import com.google.common.collect.ImmutableMap;
 import io.axoniq.axonserver.connector.AxonServerConnection;
 import io.axoniq.axonserver.connector.admin.AdminChannel;
 import io.axoniq.axonserver.connector.control.ControlChannel;
+import io.axoniq.axonserver.grpc.admin.Admin;
 import org.axonframework.axonserver.connector.AxonServerConfiguration;
 import org.axonframework.axonserver.connector.AxonServerConnectionManager;
 import org.axonframework.config.EventProcessingConfiguration;
 import org.axonframework.eventhandling.EventProcessor;
 import org.axonframework.eventhandling.tokenstore.TokenStore;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.components.TenantEventProcessorControlSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
@@ -52,6 +54,9 @@ class MultiTenantEventProcessorControlServiceTest {
     private EventProcessingConfiguration eventProcessingConfiguration;
 
     private ControlChannel controlTenant1;
+    private ControlChannel controlAdmin;
+
+    private AdminChannel adminAdmin;
     private AdminChannel adminTenant1;
     private ControlChannel controlTenant2;
     private AdminChannel adminTenant2;
@@ -71,12 +76,24 @@ class MultiTenantEventProcessorControlServiceTest {
         AxonServerConfiguration axonServerConfig = mock(AxonServerConfiguration.class);
         mockAxonServerConfig(axonServerConfig);
 
+        TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory = TenantDescriptor::tenantId;
+
         testSubject = new MultiTenantEventProcessorControlService(axonServerConnectionManager,
                                                                   eventProcessingConfiguration,
-                                                                  axonServerConfig);
+                                                                  axonServerConfig,
+                                                                  tenantEventProcessorControlSegmentFactory);
     }
 
     private void mockConnectionManager() {
+        AxonServerConnection connectionAdmin = mock(AxonServerConnection.class);
+        controlAdmin = mock(ControlChannel.class);
+        adminAdmin = mock(AdminChannel.class);
+        when(connectionAdmin.controlChannel()).thenReturn(controlAdmin);
+        when(connectionAdmin.adminChannel()).thenReturn(adminAdmin);
+        when(adminAdmin.loadBalanceEventProcessor(any(), any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        when(adminAdmin.setAutoLoadBalanceStrategy(any(), any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(null));
         AxonServerConnection connectionTenant1 = mock(AxonServerConnection.class);
         controlTenant1 = mock(ControlChannel.class);
         when(connectionTenant1.controlChannel()).thenReturn(controlTenant1);
@@ -97,7 +114,18 @@ class MultiTenantEventProcessorControlServiceTest {
         when(connectionTenant2.adminChannel()).thenReturn(adminTenant2);
         ArgumentCaptor<String> contextCapture = ArgumentCaptor.forClass(String.class);
         when(axonServerConnectionManager.getConnection(contextCapture.capture()))
-                .thenAnswer(a -> contextCapture.getValue().equals("tenant-1") ? connectionTenant1 : connectionTenant2);
+                .thenAnswer(a -> {
+                    String capturedValue = contextCapture.getValue();
+                    if (capturedValue.equals("tenant-1") || capturedValue.equals("tenant-1-context")) {
+                        return connectionTenant1;
+                    } else if (capturedValue.equals("tenant-2")) {
+                        return connectionTenant2;
+                    } else if (capturedValue.equals("_admin")) {
+                        return connectionAdmin;
+                    } else {
+                        throw new IllegalArgumentException("Unexpected value: " + capturedValue);
+                    }
+                });
     }
 
     private static void mockAxonServerConfig(AxonServerConfiguration axonServerConfig) {
@@ -124,6 +152,17 @@ class MultiTenantEventProcessorControlServiceTest {
 
         verify(controlTenant1).registerEventProcessor(eq(PROCESSOR_NAME + "@tenant-1"), any(), any());
         verify(controlTenant2).registerEventProcessor(eq(PROCESSOR_NAME + "@tenant-2"), any(), any());
+    }
+
+    @Test
+    void registersInstructionHandlersWithoutTenantOnStart() {
+        when(eventProcessingConfiguration.eventProcessors()).thenReturn(ImmutableMap.of(
+                PROCESSOR_NAME , mock(EventProcessor.class)
+        ));
+
+        testSubject.start();
+
+        verify(controlAdmin).registerEventProcessor(eq(PROCESSOR_NAME), any(), any());
     }
 
     @Test
@@ -182,5 +221,30 @@ class MultiTenantEventProcessorControlServiceTest {
         verify(adminTenant2).setAutoLoadBalanceStrategy(PROCESSOR_NAME, TOKEN_STORE_IDENTIFIER, expectedStrategy);
         verify(adminTenant1, never()).setAutoLoadBalanceStrategy(eq(processorNameWithoutSettings), any(), any());
         verify(adminTenant2, never()).setAutoLoadBalanceStrategy(eq(processorNameWithoutSettings), any(), any());
+    }
+
+    @Test
+    void testNonDefaultTenantEventProcessorControlSegmentFactory() {
+        AxonServerConfiguration axonServerConfig = mock(AxonServerConfiguration.class);
+        mockAxonServerConfig(axonServerConfig);
+        // Arrange
+        TenantEventProcessorControlSegmentFactory tenantEventProcessorControlSegmentFactory = tenantId -> tenantId.tenantId() + "-context";
+        MultiTenantEventProcessorControlService testSubject = new MultiTenantEventProcessorControlService(
+                axonServerConnectionManager,
+                eventProcessingConfiguration,
+                axonServerConfig,
+                tenantEventProcessorControlSegmentFactory
+        );
+
+        when(eventProcessingConfiguration.eventProcessors()).thenReturn(ImmutableMap.of(
+                PROCESSOR_NAME + "@tenant-1", mock(EventProcessor.class)
+        ));
+
+        // Act
+        testSubject.start();
+
+        // Assert
+        verify(axonServerConnectionManager).getConnection("tenant-1-context");
+        verify(controlTenant1).registerEventProcessor(eq(PROCESSOR_NAME + "@tenant-1"), any(), any());
     }
 }
