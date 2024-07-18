@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,18 +19,29 @@ import java.util.function.Predicate;
 
 /**
  * Represents a predicate to determine if an event processor should be multi-tenant.
- *
- * This interface extends {@link Predicate<String>} and is used to test whether a given event processor
- * should be considered as multi-tenant. The input to the predicate is the name of the event processor.
+ * <p>
+ * This interface extends {@link Predicate<String>} and is used to test whether a given event processor should be
+ * considered as multi-tenant. The input to the predicate is the name of the event processor.
  *
  * @author Stefan Dragisic
  * @since 4.9.3
  */
 public interface MultiTenantEventProcessorPredicate extends Predicate<String> {
+
+    /**
+     * A {@link MultiTenantEventProcessorPredicate} resulting in {@link true} for any tenant name.
+     *
+     * @return A {@link MultiTenantEventProcessorPredicate} resulting in {@link true} for any tenant name.
+     */
     static MultiTenantEventProcessorPredicate enableMultiTenancy() {
         return name -> true;
     }
 
+    /**
+     * A {@link MultiTenantEventProcessorPredicate} resulting in {@link false} for any tenant name.
+     *
+     * @return A {@link MultiTenantEventProcessorPredicate} resulting in {@link false} for any tenant name.
+     */
     static MultiTenantEventProcessorPredicate disableMultiTenancy() {
         return name -> false;
     }
