@@ -8,18 +8,10 @@ import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 
 import java.util.concurrent.ScheduledExecutorService;
 
-/**
- * Factory interface for creating a PersistentStreamMessageSource for a given tenant.
- * <p>
- * This interface is used to create a PersistentStreamMessageSource for a given tenant, which is represented by a {@link TenantDescriptor}.
- Sure, here is the JavaDoc for the `TenantPersistentStreamMessageSourceFactory` interface:
 
- ```java
  /**
- * The created PersistentStreamMessageSource can be used to read a stream of events from an Axon Server for a specific processor and tenant.
  * Factory interface for creating a {@link PersistentStreamMessageSource} for a specific tenant.
- * <p>
- * <p>
+ * The created PersistentStreamMessageSource can be used to read a stream of events from an Axon Server for a specific processor and tenant.
  * The PersistentStreamMessageSource is configured with the provided processor name, settings, tenant descriptor, and Axon configuration.
  *
  * This interface is used to create a {@link PersistentStreamMessageSource} for a given tenant,
