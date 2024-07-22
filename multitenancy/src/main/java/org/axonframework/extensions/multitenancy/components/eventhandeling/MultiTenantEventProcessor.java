@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2024. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -193,7 +193,9 @@ public class MultiTenantEventProcessor implements
 
 
     /**
-     * Stops the given {@code tenant} and removes it from this processor.
+     * Stops the given {@code tenant} and removes it from this processor. Note that this does not remove any potentially
+     * persisted {@link org.axonframework.eventhandling.TrackingToken TrackingTokens} from
+     * {@link org.axonframework.eventhandling.StreamingEventProcessor} instances!
      *
      * @param tenantDescriptor The tenant to stop and remove from this processor.
      * @return A {@code boolean} indicating whether the tenant was removed.

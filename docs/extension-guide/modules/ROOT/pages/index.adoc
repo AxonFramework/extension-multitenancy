@@ -1,0 +1,15 @@
+:navtitle: Introduction
+= Introduction
+
+Axon Framework Multitenancy Extension provides your application ability to serve multiple tenants (event-stores) at once. Multi-tenancy is important in cloud computing and this extension will provide ability to connect to tenants dynamically, physical separate tenants data, scale tenants independently...
+
+== Requirements
+Currently, following requirements needs to be meet for extension to work:
+
+- Use *Spring Framework* together with *Axon Framework 4.6+*
+- Use *Axon Server EE 4.6+* or Axon Cloud as event store
+- This is not hard requirement but if you wish to enable multitenancy on projection side, only SQL databases are supported out-of-the box
+
+== Restrictions
+
+Only components that interact with Axon Server and or database via JPA are supported out of the box. If you wish to use other components, you need to implement multi-tenancy support for them.

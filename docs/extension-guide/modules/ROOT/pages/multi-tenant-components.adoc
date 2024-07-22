@@ -1,0 +1,17 @@
+:navtitle: Supported Multi-Tenant Components
+= Supported Multi-Tenant Components
+
+Currently, supported multi-tenants components are as follows:
+
+- `MultiTenantCommandBus`
+- `MultiTenantEventProcessor`
+- `MultiTenantEventStore`
+- `MultiTenantQueryBus`
+- `MultiTenantQueryUpdateEmitter`
+- `MultiTenantEventProcessorControlService`
+- `MultiTenantDataSourceManager`
+- `MultiTenantEventScheduler`
+
+Not supported components are:
+
+- Deadline Manager

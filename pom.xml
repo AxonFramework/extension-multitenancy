@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (c) 2010-2023. Axon Framework
+  ~ Copyright (c) 2010-2024. Axon Framework
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 
     <groupId>org.axonframework.extensions.multitenancy</groupId>
     <artifactId>axon-multitenancy-parent</artifactId>
-    <version>4.9.3-SNAPSHOT</version>
+    <version>4.10.0-SNAPSHOT</version>
     <modules>
         <module>multitenancy</module>
         <module>multitenancy-spring-boot-autoconfigure</module>
@@ -65,20 +65,20 @@
         <junit.jupiter.version>5.10.1</junit.jupiter.version>
         <mockito.version>4.11.0</mockito.version>
 
-        <projectreactor.version>3.6.7</projectreactor.version>
+        <projectreactor.version>3.6.8</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
 
         <jacoco-maven.version>0.8.11</jacoco-maven.version>
         <maven-assembly.version>3.7.1</maven-assembly.version>
-        <maven-clean.version>3.3.2</maven-clean.version>
+        <maven-clean.version>3.4.0</maven-clean.version>
         <maven-compiler.version>3.13.0</maven-compiler.version>
         <maven-deploy.version>3.1.1</maven-deploy.version>
         <maven-enforcer.version>3.5.0</maven-enforcer.version>
         <maven-gpg.version>3.2.4</maven-gpg.version>
         <maven-install.version>3.1.2</maven-install.version>
-        <maven-jar.version>3.4.1</maven-jar.version>
-        <maven-javadoc.version>3.7.0</maven-javadoc.version>
-        <maven-release.version>3.1.0</maven-release.version>
+        <maven-jar.version>3.4.2</maven-jar.version>
+        <maven-javadoc.version>3.8.0</maven-javadoc.version>
+        <maven-release.version>3.1.1</maven-release.version>
         <maven-source.version>3.3.1</maven-source.version>
         <maven-surefire.version>3.1.2</maven-surefire.version>
         <maven-resources.version>3.3.1</maven-resources.version>
