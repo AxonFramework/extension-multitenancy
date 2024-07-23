@@ -415,5 +415,4 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
         return Executors.newScheduledThreadPool(1, new AxonThreadFactory(factoryName));
     }
 
-
 }
