@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components.eventstore;
+package org.axonframework.extensions.multitenancy.autoconfig;
 
 import io.axoniq.axonserver.connector.event.PersistentStreamProperties;
 import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSource;
 import org.axonframework.config.Configuration;
-import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantPersistentStreamMessageSource;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.common.Registration;
-import org.axonframework.extensions.multitenancy.components.eventstore.TenantPersistentStreamMessageSourceFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;

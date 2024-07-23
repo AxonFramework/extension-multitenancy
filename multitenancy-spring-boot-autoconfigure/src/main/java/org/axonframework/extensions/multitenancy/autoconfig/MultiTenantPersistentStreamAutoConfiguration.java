@@ -19,8 +19,6 @@ import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessage
 import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSourceFactory;
 import org.axonframework.common.StringUtils;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
-import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantPersistentStreamMessageSource;
-import org.axonframework.extensions.multitenancy.components.eventstore.TenantPersistentStreamMessageSourceFactory;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;

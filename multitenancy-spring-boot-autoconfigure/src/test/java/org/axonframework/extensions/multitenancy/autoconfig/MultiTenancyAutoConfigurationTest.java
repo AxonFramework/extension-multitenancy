@@ -25,7 +25,6 @@ import org.axonframework.extensions.multitenancy.components.commandhandeling.Ten
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
-import org.axonframework.extensions.multitenancy.components.eventstore.TenantPersistentStreamMessageSourceFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
