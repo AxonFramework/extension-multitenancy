@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components;
+package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import java.util.Map;
 import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.messaging.SubscribableMessageSource;
 
 /**

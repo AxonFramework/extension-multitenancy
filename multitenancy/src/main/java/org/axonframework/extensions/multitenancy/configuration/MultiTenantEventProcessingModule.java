@@ -31,7 +31,7 @@ import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
-import org.axonframework.extensions.multitenancy.components.MultiTenantSubscribableMessageSource;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantSubscribableMessageSource;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterProcessor;

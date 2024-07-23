@@ -20,7 +20,6 @@ import io.axoniq.axonserver.connector.event.PersistentStreamProperties;
 import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSource;
 import org.axonframework.config.Configuration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.components.MultiTenantSubscribableMessageSource;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.common.Registration;
 
