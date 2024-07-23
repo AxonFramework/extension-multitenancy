@@ -31,6 +31,7 @@ import org.axonframework.eventhandling.TrackingEventProcessor;
 import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantSubscribableMessageSource;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterProcessor;
@@ -191,8 +192,8 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     private static SubscribableMessageSource<? extends EventMessage<?>> tenantSource(
             SubscribableMessageSource<? extends EventMessage<?>> messageSource, TenantDescriptor tenantDescriptor
     ) {
-        return messageSource instanceof MultiTenantEventStore
-                ? ((MultiTenantEventStore) messageSource).tenantSegments().get(tenantDescriptor)
+        return messageSource instanceof MultiTenantSubscribableMessageSource
+                ? ((MultiTenantSubscribableMessageSource<SubscribableMessageSource<EventMessage<?>>>) messageSource).tenantSegments().get(tenantDescriptor)
                 : messageSource;
     }
 
@@ -413,4 +414,5 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     private ScheduledExecutorService defaultExecutor(String factoryName) {
         return Executors.newScheduledThreadPool(1, new AxonThreadFactory(factoryName));
     }
+
 }

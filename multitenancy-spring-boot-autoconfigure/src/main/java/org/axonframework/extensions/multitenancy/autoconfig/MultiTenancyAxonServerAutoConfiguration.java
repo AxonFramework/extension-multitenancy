@@ -42,12 +42,7 @@ import org.axonframework.extensions.multitenancy.components.queryhandeling.Tenan
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
-import org.axonframework.queryhandling.QueryBus;
-import org.axonframework.queryhandling.QueryInvocationErrorHandler;
-import org.axonframework.queryhandling.QueryMessage;
-import org.axonframework.queryhandling.QueryUpdateEmitter;
-import org.axonframework.queryhandling.SimpleQueryBus;
-import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
+import org.axonframework.queryhandling.*;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.SpringAxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
@@ -55,6 +50,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -260,4 +256,5 @@ public class MultiTenancyAxonServerAutoConfiguration {
             return controlService;
         });
     }
+
 }

@@ -90,27 +90,27 @@
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-messaging</artifactId>
-                <version>4.9.3</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-configuration</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-server-connector</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-spring</artifactId>
-                <version>4.9.0</version>
+                <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
                 <artifactId>axon-spring-boot-autoconfigure</artifactId>
-                <version>4.9.3</version>
+                <version>${axon.version}</version>
             </dependency>
             <!-- Reactor -->
             <dependency>
