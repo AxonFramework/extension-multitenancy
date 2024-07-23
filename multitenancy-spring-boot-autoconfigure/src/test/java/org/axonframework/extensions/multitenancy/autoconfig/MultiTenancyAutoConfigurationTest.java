@@ -25,6 +25,7 @@ import org.axonframework.extensions.multitenancy.components.commandhandeling.Ten
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantPersistentStreamMessageSourceFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
@@ -36,8 +37,6 @@ import org.axonframework.springboot.autoconfig.*;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-
-import java.util.concurrent.ScheduledExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;

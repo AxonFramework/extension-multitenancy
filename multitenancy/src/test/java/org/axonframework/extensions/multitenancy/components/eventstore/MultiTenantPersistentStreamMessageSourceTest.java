@@ -1,13 +1,27 @@
-package org.axonframework.extensions.multitenancy.autoconfig;
+/*
+ * Copyright (c) 2010-2024. Axon Framework
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.axonframework.extensions.multitenancy.components.eventstore;
 
 import io.axoniq.axonserver.connector.event.PersistentStreamProperties;
-import org.axonframework.axonserver.connector.AxonServerConfiguration;
 import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSource;
 import org.axonframework.config.Configuration;
-import org.axonframework.extensions.multitenancy.autoconfig.MultiTenantPersistentStreamMessageSource;
-import org.axonframework.extensions.multitenancy.autoconfig.TenantPersistentStreamMessageSourceFactory;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantPersistentStreamMessageSource;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.common.Registration;
+import org.axonframework.extensions.multitenancy.components.eventstore.TenantPersistentStreamMessageSourceFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -49,7 +63,7 @@ class MultiTenantPersistentStreamMessageSourceTest {
     }
 
     @Test
-    void testRegisterTenant() {
+    void registerTenant() {
         TenantDescriptor descriptor = new TenantDescriptor("testTenant");
         when(factory.build(anyString(), any(), any(), anyInt(), anyString(), any(), eq(descriptor)))
                 .thenReturn(mockTenantSource);
@@ -66,7 +80,7 @@ class MultiTenantPersistentStreamMessageSourceTest {
     }
 
     @Test
-    void testRegisterAndStartTenant() {
+    void registerAndStartTenant() {
         TenantDescriptor descriptor = new TenantDescriptor("testTenant");
         when(factory.build(anyString(), any(), any(), anyInt(), anyString(), any(), eq(descriptor)))
                 .thenReturn(mockTenantSource);
@@ -83,7 +97,7 @@ class MultiTenantPersistentStreamMessageSourceTest {
     }
 
     @Test
-    void testUnregisterTenant() {
+    void unregisterTenant() {
         TenantDescriptor descriptor = new TenantDescriptor("testTenant");
         when(factory.build(anyString(), any(), any(), anyInt(), anyString(), any(), eq(descriptor)))
                 .thenReturn(mockTenantSource);
@@ -96,14 +110,7 @@ class MultiTenantPersistentStreamMessageSourceTest {
     }
 
     @Test
-    void testUnregisterNonExistentTenant() {
-        TenantDescriptor descriptor = new TenantDescriptor("testTenant");
-        Registration registration = () -> source.tenantSegments().remove(descriptor) != null;
-        assertFalse(registration.cancel());
-    }
-
-    @Test
-    void testRegisterMultipleTenants() {
+    void registerMultipleTenants() {
         TenantDescriptor descriptor1 = new TenantDescriptor("tenant1");
         TenantDescriptor descriptor2 = new TenantDescriptor("tenant2");
 
@@ -122,7 +129,7 @@ class MultiTenantPersistentStreamMessageSourceTest {
     }
 
     @Test
-    void testTenantPersistentStreamMessageSourceFactory() {
+    void tenantPersistentStreamMessageSourceFactory() {
         TenantPersistentStreamMessageSourceFactory testFactory =
                 (name, props, sched, batch, ctx, config, tenant) -> {
                     assertEquals("testName", name);

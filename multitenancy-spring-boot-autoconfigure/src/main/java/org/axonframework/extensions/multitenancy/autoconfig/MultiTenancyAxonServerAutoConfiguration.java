@@ -49,6 +49,7 @@ import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -69,7 +70,7 @@ import org.springframework.core.env.Environment;
 @AutoConfiguration
 @ConditionalOnClass(AxonServerConfiguration.class)
 @ConditionalOnProperty(value = {"axon.axonserver.enabled", "axon.multi-tenancy.enabled"}, matchIfMissing = true)
-@AutoConfigureBefore(AxonServerAutoConfiguration.class)
+@AutoConfigureAfter(AxonServerAutoConfiguration.class)
 @ComponentScan(excludeFilters = {
         @ComponentScan.Filter(
                 type = FilterType.REGEX,
