@@ -42,14 +42,18 @@ import org.axonframework.extensions.multitenancy.components.queryhandeling.Tenan
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
-import org.axonframework.queryhandling.*;
+import org.axonframework.queryhandling.QueryBus;
+import org.axonframework.queryhandling.QueryInvocationErrorHandler;
+import org.axonframework.queryhandling.QueryMessage;
+import org.axonframework.queryhandling.QueryUpdateEmitter;
+import org.axonframework.queryhandling.SimpleQueryBus;
+import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.SpringAxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -110,16 +114,16 @@ public class MultiTenancyAxonServerAutoConfiguration {
     ) {
         return tenantDescriptor -> {
             AxonServerCommandBus commandBus = AxonServerCommandBus.builder()
-                                                             .localSegment(localSegment)
-                                                             .serializer(messageSerializer)
-                                                             .routingStrategy(routingStrategy)
-                                                             .priorityCalculator(priorityCalculator)
-                                                             .loadFactorProvider(loadFactorProvider)
-                                                             .targetContextResolver(targetContextResolver)
-                                                             .axonServerConnectionManager(connectionManager)
-                                                             .configuration(axonServerConfig)
-                                                             .defaultContext(tenantDescriptor.tenantId())
-                                                             .build();
+                                                                  .localSegment(localSegment)
+                                                                  .serializer(messageSerializer)
+                                                                  .routingStrategy(routingStrategy)
+                                                                  .priorityCalculator(priorityCalculator)
+                                                                  .loadFactorProvider(loadFactorProvider)
+                                                                  .targetContextResolver(targetContextResolver)
+                                                                  .axonServerConnectionManager(connectionManager)
+                                                                  .configuration(axonServerConfig)
+                                                                  .defaultContext(tenantDescriptor.tenantId())
+                                                                  .build();
             commandBus.start();
             return commandBus;
         };
@@ -156,20 +160,21 @@ public class MultiTenancyAxonServerAutoConfiguration {
                     new CorrelationDataInterceptor<>(config.correlationDataProviders())
             );
 
-            AxonServerQueryBus queryBus = AxonServerQueryBus.builder()
-                                                         .axonServerConnectionManager(axonServerConnectionManager)
-                                                         .configuration(axonServerConfig)
-                                                         .localSegment(simpleQueryBus)
-                                                         .updateEmitter(
-                                                                 ((MultiTenantQueryUpdateEmitter) multiTenantQueryUpdateEmitter)
-                                                                         .getTenant(tenantDescriptor)
-                                                         )
-                                                         .messageSerializer(messageSerializer)
-                                                         .genericSerializer(genericSerializer)
-                                                         .priorityCalculator(priorityCalculator)
-                                                         .targetContextResolver(targetContextResolver)
-                                                         .defaultContext(tenantDescriptor.tenantId())
-                                                         .build();
+            AxonServerQueryBus queryBus =
+                    AxonServerQueryBus.builder()
+                                      .axonServerConnectionManager(axonServerConnectionManager)
+                                      .configuration(axonServerConfig)
+                                      .localSegment(simpleQueryBus)
+                                      .updateEmitter(
+                                              ((MultiTenantQueryUpdateEmitter) multiTenantQueryUpdateEmitter)
+                                                      .getTenant(tenantDescriptor)
+                                      )
+                                      .messageSerializer(messageSerializer)
+                                      .genericSerializer(genericSerializer)
+                                      .priorityCalculator(priorityCalculator)
+                                      .targetContextResolver(targetContextResolver)
+                                      .defaultContext(tenantDescriptor.tenantId())
+                                      .build();
 
             queryBus.start();
             return queryBus;
@@ -222,11 +227,12 @@ public class MultiTenancyAxonServerAutoConfiguration {
             Serializer serializer
     ) {
         return tenant -> {
-            AxonServerEventScheduler eventScheduler = AxonServerEventScheduler.builder()
-                                                                     .connectionManager(axonServerConnectionManager)
-                                                                     .eventSerializer(serializer)
-                                                                     .defaultContext(tenant.tenantId())
-                                                                     .build();
+            AxonServerEventScheduler eventScheduler =
+                    AxonServerEventScheduler.builder()
+                                            .connectionManager(axonServerConnectionManager)
+                                            .eventSerializer(serializer)
+                                            .defaultContext(tenant.tenantId())
+                                            .build();
             eventScheduler.start();
             return eventScheduler;
         };
@@ -256,5 +262,4 @@ public class MultiTenancyAxonServerAutoConfiguration {
             return controlService;
         });
     }
-
 }
