@@ -16,6 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSource;
 import org.axonframework.axonserver.connector.event.axon.PersistentStreamMessageSourceFactory;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
@@ -39,6 +40,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test class validating the multi-tenancy auto-configuration.
@@ -119,6 +121,22 @@ class MultiTenancyAutoConfigurationTest {
                          assertThat(context).doesNotHaveBean(MultiTenantQueryUpdateEmitter.class);
                          assertThat(context).doesNotHaveBean(TenantPersistentStreamMessageSourceFactory.class);
                      });
+    }
+
+    @Test
+    void multiTenancyAutoConfigurationMultiTenantPersistentStreamMessageSource() {
+        contextRunner
+                .withConfiguration(AutoConfigurations.of(AxonServerAutoConfiguration.class))
+
+                .withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(MultiTenantPersistentStreamAutoConfiguration.class))
+                .withPropertyValues("axon.axonserver.contexts=tenant-1,tenant-2")
+                .run(context -> {
+                    PersistentStreamMessageSourceFactory persistentStreamMessageSourceFactory =
+                            context.getBean("persistentStreamMessageSourceFactory", PersistentStreamMessageSourceFactory.class);
+                    PersistentStreamMessageSource persistentStreamMessageSource = persistentStreamMessageSourceFactory.build("testName", mock(), mock(), 100, "testContext", mock());
+                    assertThat(persistentStreamMessageSource).isInstanceOf(MultiTenantPersistentStreamMessageSource.class);
+                });
     }
 
     @Test
