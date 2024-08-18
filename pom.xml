@@ -56,7 +56,7 @@
 
         <axon.version>4.10.0</axon.version>
 
-        <spring.version>5.3.37</spring.version>
+        <spring.version>5.3.39</spring.version>
         <spring.boot.version>2.7.18</spring.boot.version>
 
         <slf4j.version>1.7.28</slf4j.version>
@@ -65,7 +65,7 @@
         <junit.jupiter.version>5.10.1</junit.jupiter.version>
         <mockito.version>4.11.0</mockito.version>
 
-        <projectreactor.version>3.6.8</projectreactor.version>
+        <projectreactor.version>3.6.9</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
 
         <jacoco-maven.version>0.8.11</jacoco-maven.version>
@@ -74,7 +74,7 @@
         <maven-compiler.version>3.13.0</maven-compiler.version>
         <maven-deploy.version>3.1.2</maven-deploy.version>
         <maven-enforcer.version>3.5.0</maven-enforcer.version>
-        <maven-gpg.version>3.2.4</maven-gpg.version>
+        <maven-gpg.version>3.2.5</maven-gpg.version>
         <maven-install.version>3.1.2</maven-install.version>
         <maven-jar.version>3.4.2</maven-jar.version>
         <maven-javadoc.version>3.8.0</maven-javadoc.version>
