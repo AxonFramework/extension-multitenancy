@@ -118,7 +118,6 @@ class MultiTenantDataSourceManagerTest {
                 .withAllowBeanDefinitionOverriding(true)
                 .withBean(TenantProvider.class, () -> tenantProvider)
                 .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
-                .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
                 .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
                 .run(context -> {
                     assertThat(context).hasSingleBean(MultiTenantDataSourceManager.class);
