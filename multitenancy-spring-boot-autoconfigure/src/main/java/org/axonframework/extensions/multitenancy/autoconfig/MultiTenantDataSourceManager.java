@@ -17,11 +17,7 @@ package org.axonframework.extensions.multitenancy.autoconfig;
 
 import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
-import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-import org.axonframework.extensions.multitenancy.components.TenantProvider;
+import org.axonframework.extensions.multitenancy.components.*;
 import org.axonframework.messaging.Message;
 import org.axonframework.messaging.unitofwork.CurrentUnitOfWork;
 import org.axonframework.messaging.unitofwork.UnitOfWork;
@@ -31,20 +27,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
-import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import javax.sql.DataSource;
 
 /**
  * Autoconfiguration for the MultiTenantDataSourceManager. Works in conjunction with the
@@ -69,6 +63,9 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
     private final TargetTenantResolver<Message<?>> tenantResolver;
     private final Function<TenantDescriptor, DataSourceProperties> dataSourcePropertyResolver;
 
+    private final Function<TenantDescriptor, DataSource> dataSourceResolver;
+
+
     /**
      * Constructs a {@link MultiTenantDataSourceManager}.
      *
@@ -83,10 +80,13 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
     public MultiTenantDataSourceManager(DataSourceProperties properties,
                                         TargetTenantResolver<Message<?>> tenantResolver,
                                         @Autowired(required = false)
-                                        Function<TenantDescriptor, DataSourceProperties> dataSourcePropertyResolver) {
+                                        Function<TenantDescriptor, DataSourceProperties> dataSourcePropertyResolver,
+                                        @Autowired(required = false)
+                                        Function<TenantDescriptor, DataSource> dataSourceResolver) {
         this.properties = properties;
         this.tenantResolver = tenantResolver;
         this.dataSourcePropertyResolver = dataSourcePropertyResolver;
+        this.dataSourceResolver = dataSourceResolver;
     }
 
     /**
@@ -114,19 +114,29 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         multiTenantDataSource.setTargetDataSources(Collections.unmodifiableMap(tenantDataSources));
         DataSource defaultDatasource = defaultDataSource();
         multiTenantDataSource.setDefaultTargetDataSource(defaultDatasource);
+        multiTenantDataSource.setLenientFallback(false);
         multiTenantDataSource.afterPropertiesSet();
 
         tenantProvider.subscribe(this);
         return multiTenantDataSource;
     }
 
-    private DataSource defaultDataSource() {
-        DriverManagerDataSource defaultDataSource = new DriverManagerDataSource();
-        defaultDataSource.setDriverClassName(properties.getDriverClassName());
-        defaultDataSource.setUrl(properties.getUrl());
-        defaultDataSource.setUsername(properties.getUsername());
-        defaultDataSource.setPassword(properties.getPassword());
-        return defaultDataSource;
+    /**
+     * Creates and configures a default DataSource using the properties set in the application.
+     *
+     * This method initializes a DriverManagerDataSource with the following configurations:
+     * - Driver class name
+     * - Database URL
+     * - Username
+     * - Password
+     *
+     * These configurations are obtained from the application properties.
+     *
+     * @return A configured DriverManagerDataSource to be used as the default DataSource.
+     * @throws IllegalStateException if any of the required properties are not set.
+     */
+    protected DataSource defaultDataSource() {
+        return properties.initializeDataSourceBuilder().build();
     }
 
     private boolean tenantIsAbsent(TenantDescriptor tenantDescriptor) {
@@ -151,7 +161,17 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
 
     private void register(TenantDescriptor tenant) {
         if (tenantIsAbsent(tenant)) {
-            if (dataSourcePropertyResolver != null) {
+            if (dataSourceResolver != null) {
+                DataSource dataSource;
+                try {
+                    dataSource = dataSourceResolver.apply(tenant);
+                    logger.debug("[d] Datasource properties resolved for tenant descriptor [{}]", tenant);
+                } catch (Exception e) {
+                    throw new NoSuchTenantException("Could not resolve the tenant!");
+                }
+                addTenant(tenant, dataSource);
+            }
+            else if (dataSourcePropertyResolver != null) {
                 DataSourceProperties dataSourceProperties;
                 try {
                     dataSourceProperties = dataSourcePropertyResolver.apply(tenant);
@@ -165,13 +185,28 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
         logger.debug("[d] Tenant [{}] set as current.", tenant);
     }
 
-    private void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
-        DataSource dataSource = DataSourceBuilder.create()
-                                                 .driverClassName(dataSourceProperties.getDriverClassName())
-                                                 .url(dataSourceProperties.getUrl())
-                                                 .username(dataSourceProperties.getUsername())
-                                                 .password(dataSourceProperties.getPassword())
-                                                 .build();
+    /**
+     * Adds a new tenant to the system using the provided tenant descriptor and data source properties.
+     * This method creates a new DataSource from the properties and then adds it to the system.
+     *
+     * @param tenant The descriptor of the tenant to be added.
+     * @param dataSourceProperties The properties used to create the DataSource for this tenant.
+     */
+    protected void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
+        DataSource dataSource = dataSourceProperties
+                .initializeDataSourceBuilder()
+                .build();
+        addTenant(tenant, dataSource);
+    }
+
+    /**
+     * Adds a new tenant to the system using the provided tenant descriptor and pre-configured DataSource.
+     * This method validates the DataSource, adds it to the tenant map, and performs necessary setup.
+     *
+     * @param tenant The descriptor of the tenant to be added.
+     * @param dataSource The pre-configured DataSource for this tenant.
+     */
+    protected void addTenant(TenantDescriptor tenant, DataSource dataSource) {
         try (Connection ignored = dataSource.getConnection()) {
             tenantDataSources.put(tenant, dataSource);
             multiTenantDataSource.afterPropertiesSet();
