@@ -26,6 +26,7 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import javax.sql.DataSource;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +92,42 @@ class MultiTenantDataSourceManagerTest {
                             .getResolvedDefaultDataSource();
 
                     assertSame(mockDataSource, actualDataSource);
+                });
+    }
+
+    @Test
+    void resolveTenantDataSource() {
+        DataSource mockDataSource = mock(DataSource.class);
+        AtomicBoolean dataSourceResolved = new AtomicBoolean(false);
+        Function<TenantDescriptor, DataSource> tenantDataSourceResolver =
+                (tenant) -> {
+            dataSourceResolved.set(true);
+            return mockDataSource;
+
+                };
+
+        DataSourceProperties defaultDataSourceProperties = mock(DataSourceProperties.class);
+        DataSourceBuilder mockBuilder = mock(DataSourceBuilder.class);
+        when(mockBuilder.build()).thenReturn(mockDataSource);
+        when(defaultDataSourceProperties.initializeDataSourceBuilder()).thenReturn(mockBuilder);
+
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        when(tenantProvider.subscribe(any())).thenReturn(() -> true);
+
+        this.contextRunner.withPropertyValues("axon.axonserver.contexts=default")
+                .withAllowBeanDefinitionOverriding(true)
+                .withBean(TenantProvider.class, () -> tenantProvider)
+                .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver, (beanDefinition) -> {
+                    beanDefinition.setPrimary(true);
+                })
+                .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
+                .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(MultiTenantDataSourceManager.class);
+                    MultiTenantDataSourceManager multiTenantDataSourceManager = context.getBean(MultiTenantDataSourceManager.class);
+                    verify(tenantProvider).subscribe(multiTenantDataSourceManager);
+                   multiTenantDataSourceManager.registerTenant(TenantDescriptor.tenantWithId("test"));
+                   assertThat(dataSourceResolved.get()).isTrue();
                 });
     }
 
