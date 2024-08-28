@@ -117,9 +117,7 @@ class MultiTenantDataSourceManagerTest {
         this.contextRunner.withPropertyValues("axon.axonserver.contexts=default")
                 .withAllowBeanDefinitionOverriding(true)
                 .withBean(TenantProvider.class, () -> tenantProvider)
-                .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver, (beanDefinition) -> {
-                    beanDefinition.setPrimary(true);
-                })
+                .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
                 .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
                 .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
                 .run(context -> {
