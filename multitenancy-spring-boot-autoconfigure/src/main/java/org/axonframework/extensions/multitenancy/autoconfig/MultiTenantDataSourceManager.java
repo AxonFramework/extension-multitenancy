@@ -65,6 +65,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
 
     private final Function<TenantDescriptor, DataSource> dataSourceResolver;
 
+    private final Function<DataSourceProperties, DataSource> dataSourceBuilder;
 
     /**
      * Constructs a {@link MultiTenantDataSourceManager}.
@@ -76,17 +77,26 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
      *                                   {@link DataSource} constructed by this class.
      * @param dataSourcePropertyResolver A lambda resolving the tenant-specific {@link DataSourceProperties} based on a
      *                                   given {@link TenantDescriptor tenant}.
+     * @param dataSourceResolver         A lambda resolving the tenant-specific {@link DataSource} based on a given
+     * @param dataSourceBuilder          A lambda that builds a {@link DataSource} from a given {@link DataSourceProperties}.
      */
     public MultiTenantDataSourceManager(DataSourceProperties properties,
                                         TargetTenantResolver<Message<?>> tenantResolver,
                                         @Autowired(required = false)
                                         Function<TenantDescriptor, DataSourceProperties> dataSourcePropertyResolver,
                                         @Autowired(required = false)
-                                        Function<TenantDescriptor, DataSource> dataSourceResolver) {
+                                        Function<TenantDescriptor, DataSource> dataSourceResolver,
+                                        @Autowired(required = false)
+                                        Function<DataSourceProperties, DataSource> dataSourceBuilder) {
         this.properties = properties;
         this.tenantResolver = tenantResolver;
         this.dataSourcePropertyResolver = dataSourcePropertyResolver;
         this.dataSourceResolver = dataSourceResolver;
+        if (dataSourceBuilder == null) {
+            this.dataSourceBuilder = p -> p.initializeDataSourceBuilder().build();
+        } else {
+            this.dataSourceBuilder = dataSourceBuilder;
+        }
     }
 
     /**
@@ -136,7 +146,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
      * @throws IllegalStateException if any of the required properties are not set.
      */
     protected DataSource defaultDataSource() {
-        return properties.initializeDataSourceBuilder().build();
+        return dataSourceBuilder.apply(properties);
     }
 
     private boolean tenantIsAbsent(TenantDescriptor tenantDescriptor) {
@@ -193,9 +203,7 @@ public class MultiTenantDataSourceManager implements MultiTenantAwareComponent {
      * @param dataSourceProperties The properties used to create the DataSource for this tenant.
      */
     protected void addTenant(TenantDescriptor tenant, DataSourceProperties dataSourceProperties) {
-        DataSource dataSource = dataSourceProperties
-                .initializeDataSourceBuilder()
-                .build();
+        DataSource dataSource = dataSourceBuilder.apply(dataSourceProperties);
         addTenant(tenant, dataSource);
     }
 
