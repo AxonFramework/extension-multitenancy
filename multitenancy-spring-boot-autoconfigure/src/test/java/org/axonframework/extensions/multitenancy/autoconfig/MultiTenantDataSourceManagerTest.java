@@ -77,6 +77,7 @@ class MultiTenantDataSourceManagerTest {
                 .withBean(TenantProvider.class, () -> tenantProvider)
                 .withBean("tenantDataSourceResolver", Function.class, () -> tenantDataSourceResolver)
                 .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
+                .withUserConfiguration(TestConfiguration.class)
                 .run(context -> {
                     assertThat(context).hasSingleBean(MultiTenantDataSourceManager.class);
                     MultiTenantDataSourceManager multiTenantDataSourceManager = context.getBean(MultiTenantDataSourceManager.class);
@@ -96,8 +97,9 @@ class MultiTenantDataSourceManagerTest {
         this.contextRunner
                 .withPropertyValues("axon.axonserver.contexts=default")
                 .withAllowBeanDefinitionOverriding(true)
-               // .withUserConfiguration(DataSourceResolverConfiguration.class)
                 .withBean(TenantProvider.class, () -> tenantProvider)
+                .withUserConfiguration(TestConfiguration.class)
+                .withUserConfiguration(DataSourceResolverConfiguration.class)
                 .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
                 .run(context -> {
                     assertThat(context).hasSingleBean(MultiTenantDataSourceManager.class);
@@ -108,7 +110,29 @@ class MultiTenantDataSourceManagerTest {
                 });
     }
 
-    @Configuration
+    @Test
+    void resolveTenantDataSourceProperties() {
+        DataSourceProperties defaultDataSourceProperties = mock(DataSourceProperties.class);
+
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        when(tenantProvider.subscribe(any())).thenReturn(() -> true);
+
+        this.contextRunner
+                .withPropertyValues("axon.axonserver.contexts=default")
+                .withAllowBeanDefinitionOverriding(true)
+                .withBean(TenantProvider.class, () -> tenantProvider)
+                .withUserConfiguration(TestConfiguration.class)
+                .withUserConfiguration(DataSourcePropertiesResolverConfiguration.class)
+                .withBean("properties", DataSourceProperties.class, () -> defaultDataSourceProperties)
+                .run(context -> {
+                    assertThat(context).hasSingleBean(MultiTenantDataSourceManager.class);
+                    MultiTenantDataSourceManager multiTenantDataSourceManager = context.getBean(MultiTenantDataSourceManager.class);
+                    verify(tenantProvider).subscribe(multiTenantDataSourceManager);
+                    multiTenantDataSourceManager.registerTenant(TenantDescriptor.tenantWithId("test"));
+                    assertThat(DataSourcePropertiesResolverConfiguration.dataSourcePropertiesResolved.get()).isTrue();
+                });
+    }
+
     static class TestConfiguration {
         public static AtomicBoolean dataSourceResolved = new AtomicBoolean(false);
         @Bean
@@ -120,7 +144,6 @@ class MultiTenantDataSourceManagerTest {
         }
     }
 
-    @Configuration
     static class  DataSourceResolverConfiguration {
 
         public static AtomicBoolean dataSourceResolved = new AtomicBoolean(false);
@@ -129,6 +152,17 @@ class MultiTenantDataSourceManagerTest {
             return tenant -> {
                 dataSourceResolved.set(true);
                 return mock(DataSource.class);
+            };
+        }
+    }
+    static class  DataSourcePropertiesResolverConfiguration {
+
+        public static AtomicBoolean dataSourcePropertiesResolved = new AtomicBoolean(false);
+        @Bean
+        public Function<TenantDescriptor, DataSourceProperties> tenantDataSourceResolver() {
+            return tenant -> {
+                dataSourcePropertiesResolved.set(true);
+                return mock(DataSourceProperties.class);
             };
         }
     }
