@@ -16,7 +16,11 @@
 
 package org.axonframework.extensions.multitenancy.autoconfig;
 
+import org.axonframework.axonserver.connector.command.AxonServerCommandBus;
 import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
+import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.commandhandling.SimpleCommandBus;
+import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
@@ -33,10 +37,13 @@ import org.axonframework.springboot.autoconfig.ObjectMapperAutoConfiguration;
 import org.axonframework.springboot.autoconfig.TransactionAutoConfiguration;
 import org.axonframework.springboot.autoconfig.XStreamAutoConfiguration;
 import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test class validating the autoconfiguration of Axon Server-specific multi-tenancy components.
@@ -84,6 +91,32 @@ class MultiTenancyAxonServerAutoConfigurationTest {
                          assertThat(context).getBean("tenantProvider")
                                             .isInstanceOf(AxonServerTenantProvider.class);
                      });
+    }
+
+    @Test
+    void tenantCommandSegmentFactoryUsesOwnSimpleCommandBus() {
+        contextRunner.withConfiguration(AutoConfigurations.of(MultiTenancyAxonServerAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(MultiTenancyAutoConfiguration.class))
+                .withUserConfiguration(SharedCommandBus.class)
+                .withPropertyValues("axon.axonserver.contexts=tenant-1,tenant-2")
+                .run(context -> {
+                    TenantCommandSegmentFactory factory = context.getBean(TenantCommandSegmentFactory.class);
+                    SimpleCommandBus sharedCommandBus = context.getBean("sharedSimpleCommandBus", SimpleCommandBus.class);
+
+                    AxonServerCommandBus commandBus = (AxonServerCommandBus) factory.apply(new TenantDescriptor("test-tenant"));
+                    CommandBus localSegment = commandBus.localSegment();
+
+                    assertThat(localSegment).isNotSameAs(sharedCommandBus);
+                });
+    }
+
+
+    static class SharedCommandBus {
+        @Qualifier("localSegment")
+        @Bean
+        public SimpleCommandBus sharedSimpleCommandBus() {
+            return mock(SimpleCommandBus.class);
+        }
     }
 
     @Test
