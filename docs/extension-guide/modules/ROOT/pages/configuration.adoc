@@ -257,20 +257,20 @@ The following tenant segment factories are available:
 
 ==== TenantCommandSegmentFactory
 
-This factory is responsible for creating a CommandBus instance for each tenant. By default, it creates an AxonServerCommandBus that uses a local SimpleCommandBus segment and connects to Axon Server. You can override this factory to provide a custom implementation of the CommandBus for specific tenants.
+This factory is responsible for creating a `CommandBus` instance for each tenant. By default, it creates an `AxonServerCommandBus` that uses a `SimpleCommandBus` as the local segment and connects to Axon Server. You can override this factory to provide a custom implementation of the `CommandBus` for specific tenants.
 
 ==== TenantQuerySegmentFactory
 
-This factory creates a QueryBus instance for each tenant. By default, it creates an AxonServerQueryBus that uses a local SimpleQueryBus segment and connects to Axon Server. You can override this factory to provide a custom implementation of the QueryBus for specific tenants.
+This factory creates a `QueryBus` instance for each tenant. By default, it creates an `AxonServerQueryBus` that uses a `SimpleQueryBus` as lhe local segment and connects to Axon Server. You can override this factory to provide a custom implementation of the `QueryBus` for specific tenants.
 
 ==== TenantEventSegmentFactory
 
-This factory is responsible for creating an EventStore instance for each tenant. By default, it creates an AxonServerEventStore that connects to Axon Server. You can override this factory to provide a custom implementation of the EventStore for specific tenants.
+This factory is responsible for creating an `EventStore` instance for each tenant. By default, it creates an `AxonServerEventStore` that connects to Axon Server. You can override this factory to provide a custom implementation of the `EventStore` for specific tenants.
 
 ==== TenantEventSchedulerSegmentFactory
 
-This factory creates an EventScheduler instance for each tenant. By default, it creates an AxonServerEventScheduler that connects to Axon Server. You can override this factory to provide a custom implementation of the EventScheduler for specific tenants.
+This factory creates an `EventScheduler` instance for each tenant. By default, it creates an `AxonServerEventScheduler` that connects to Axon Server. You can override this factory to provide a custom implementation of the `EventScheduler` for specific tenants.
 
 ==== TenantEventProcessorControlSegmentFactory
 
-This factory creates a TenantDescriptor for each event processor, which is used to identify the tenant associated with the event processor. By default, it uses the tenant ID as the TenantDescriptor. You can override this factory to provide a custom implementation of the TenantDescriptor for specific event processors.
+This factory creates a `TenantDescriptor` for each event processor, which is used to identify the tenant associated with the event processor. By default, it uses the tenant identifier as the `TenantDescriptor`. You can override this factory to provide a custom implementation of the `TenantDescriptor` for specific event processors.
