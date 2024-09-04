@@ -251,7 +251,7 @@ This bean should return `true` for each processor that you want to be multi-tena
 
 === Tenant Segment Factories
 
-Axon Server Connector provides several factory beans that are used to create tenant-specific segments for various Axon components, such as Command Bus, Query Bus, Event Store, and Event Scheduler. These factories allow you to configure and customize the behavior of these components for each tenant.
+This extension provides several factory interfaces that are used to create tenant-specific segments for various Axon components, such as Command Bus, Query Bus, Event Store, and Event Scheduler. These factories allow you to configure and customize the behavior of these components for each tenant.
 
 The following tenant segment factories are available:
 
