@@ -24,6 +24,7 @@ import io.axoniq.axonserver.grpc.admin.ContextUpdate;
 import io.axoniq.axonserver.grpc.admin.ContextUpdateType;
 import io.axoniq.axonserver.grpc.admin.ReplicationGroupOverview;
 import org.axonframework.axonserver.connector.AxonServerConnectionManager;
+import org.axonframework.common.Registration;
 import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
@@ -263,5 +264,41 @@ class AxonServerTenantProviderTest {
         public Optional<Throwable> getError() {
             return Optional.ofNullable(error);
         }
+    }
+
+    @Test
+    void whenShutdownThenDeregisterComponentsInReverseOrder() {
+        testSubject = new AxonServerTenantProvider("default, tenant-1, tenant-2",
+                tenantConnectPredicate,
+                axonServerConnectionManager);
+        testSubject.start();
+
+        MultiTenantAwareComponent component1 = mock(MultiTenantAwareComponent.class);
+        MultiTenantAwareComponent component2 = mock(MultiTenantAwareComponent.class);
+        MultiTenantAwareComponent component3 = mock(MultiTenantAwareComponent.class);
+
+        // Create mocked Registration objects
+        Registration registration1 = mock(Registration.class);
+        Registration registration2 = mock(Registration.class);
+        Registration registration3 = mock(Registration.class);
+
+        // Setup the mocks to return the registrations
+        when(component1.registerTenant(any())).thenReturn(() -> registration1.cancel());
+        when(component2.registerTenant(any())).thenReturn(() -> registration2.cancel());
+        when(component3.registerTenant(any())).thenReturn(() -> registration3.cancel());
+
+        // Subscribe components in order
+        testSubject.subscribe(component1);
+        testSubject.subscribe(component2);
+        testSubject.subscribe(component3);
+
+        // Shutdown the provider
+        testSubject.shutdown();
+
+        // Verify that cancellations happened in reverse order
+        InOrder inOrder = inOrder(registration3, registration2, registration1);
+        inOrder.verify(registration3).cancel();
+        inOrder.verify(registration2).cancel();
+        inOrder.verify(registration1).cancel();
     }
 }
