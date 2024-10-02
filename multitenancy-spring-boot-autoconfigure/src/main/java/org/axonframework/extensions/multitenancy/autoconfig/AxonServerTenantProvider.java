@@ -238,9 +238,29 @@ public class AxonServerTenantProvider implements TenantProvider, Lifecycle {
         lifecycle.onShutdown(Phase.INSTRUCTION_COMPONENTS + 10, this::shutdown);
     }
 
-    private void shutdown() {
-        registrationMap.forEach((tenant, registrationList) -> {
-            registrationList.forEach(Registration::cancel);
+    /**
+     * Shuts down the AxonServerTenantProvider by deregistering all subscribed components.
+     * This method is designed to be invoked by a lifecycle handler (e.g., a shutdown hook)
+     * to ensure proper cleanup when the application is shutting down.
+     * <p>
+     * The shutdown process involves the following steps:
+     * <ol>
+     *     <li>Iterates through all registered components for each tenant.</li>
+     *     <li>Reverses the order of registrations for each tenant to ensure
+     *         last-registered components are deregistered first.</li>
+     *     <li>Invokes the cancel method on each registration, effectively
+     *         deregistering the component from the tenant.</li>
+     * </ol>
+     * <p>
+     * This method ensures that all resources associated with tenant management are properly
+     * released and that components are given the opportunity to perform any necessary cleanup
+     * in the reverse order of their registration.
+     */
+    public void shutdown() {
+        registrationMap.values().forEach(registrationList -> {
+            ArrayList<Registration> reversed = new ArrayList<>(registrationList);
+            Collections.reverse(reversed);
+            reversed.forEach(Registration::cancel);
         });
     }
 }
