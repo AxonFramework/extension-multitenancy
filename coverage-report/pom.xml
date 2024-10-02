@@ -21,7 +21,7 @@
     <parent>
         <artifactId>axon-multitenancy-parent</artifactId>
         <groupId>org.axonframework.extensions.multitenancy</groupId>
-        <version>4.10.2-SNAPSHOT</version>
+        <version>4.10.3-SNAPSHOT</version>
     </parent>
 
     <artifactId>axon-coverage-report</artifactId>
