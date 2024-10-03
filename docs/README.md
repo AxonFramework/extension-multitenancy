@@ -4,7 +4,7 @@ This folder contains the docs related to the Multitenancy Extension for Axon Fra
 
 The following are the current documentation sources (folders):
 
-- `extension-guide` : [The Multitenancy Extension Guide](https://library.axoniq.io/multitenancy_extension_guide/main/index.html)
+- `extension-guide` : [The Multitenancy Extension Guide](https://library.axoniq.io/multitenancy-extension-reference/main/index.html)
 
 ## Contributing to the docs.
 

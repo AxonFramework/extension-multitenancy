@@ -1,6 +1,6 @@
 site:
   title: Multitenancy Extension docs PREVIEW
-  start_page: multitenancy_extension_guide::index.adoc
+  start_page: multitenancy-extension-reference::index.adoc
 
 content:
   sources:
