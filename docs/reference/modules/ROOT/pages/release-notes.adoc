@@ -1,0 +1,24 @@
+= Release notes multi-tenancy extension
+:navtitle: Release notes
+
+You can find the release notes for the MultiTenancy Extension of version 4.10.0 below.
+For earlier releases, please go to the link:https://legacydocs.axoniq.io/reference-guide/release-notes/rn-extensions/rn-multi-tenancy[legacy documentation].
+
+== Release 4.10.0
+
+Implements support for Persistent Streams, the new feature introduced in Axon Framework 4.10.0 in combination with Axon Server.
+
+See the link:https://github.com/AxonFramework/extension-multitenancy/releases/tag/axon-multi-tenancy-4.10.0[GitHub release notes] for an exhaustive list of all changes.
+
+== Patch Releases
+
+
+=== Release 4.10.2
+Enhances the flexibility and security of the MultiTenantDataSourceManager
+
+See the link:https://github.com/AxonFramework/extension-multitenancy/releases/tag/axon-multi-tenancy-4.10.2[GitHub release notes] for an exhaustive list of all changes.
+
+=== Release 4.10.1
+Fixes the Spring Boot Aut-configuration ordering
+
+See the link:https://github.com/AxonFramework/extension-multitenancy/releases/tag/axon-multi-tenancy-4.10.1[GitHub release notes] for an exhaustive list of all changes.
