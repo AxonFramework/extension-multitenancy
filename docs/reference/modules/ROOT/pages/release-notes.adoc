@@ -1,4 +1,4 @@
-= Release notes multi-tenancy extension
+= Release Notes Multi-Tenancy Extension
 :navtitle: Release notes
 
 You can find the release notes for the MultiTenancy Extension of version 4.10.0 below.
@@ -10,8 +10,7 @@ Implements support for Persistent Streams, the new feature introduced in Axon Fr
 
 See the link:https://github.com/AxonFramework/extension-multitenancy/releases/tag/axon-multi-tenancy-4.10.0[GitHub release notes] for an exhaustive list of all changes.
 
-== Patch Releases
-
+== Patch releases
 
 === Release 4.10.2
 Enhances the flexibility and security of the MultiTenantDataSourceManager
