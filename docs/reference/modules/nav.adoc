@@ -1,4 +1,3 @@
-* xref::index.adoc[]
 * xref::configuration.adoc[]
 * xref::multi-tenant-components.adoc[]
 * xref::disable.adoc[]
