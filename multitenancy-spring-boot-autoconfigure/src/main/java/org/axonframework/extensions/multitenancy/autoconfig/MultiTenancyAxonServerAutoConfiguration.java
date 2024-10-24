@@ -30,6 +30,7 @@ import org.axonframework.commandhandling.*;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
+import org.axonframework.eventhandling.EventBusSpanFactory;
 import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantEventProcessorControlSegmentFactory;
@@ -130,6 +131,7 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                                                   .routingStrategy(routingStrategy)
                                                                   .priorityCalculator(priorityCalculator)
                                                                   .loadFactorProvider(loadFactorProvider)
+                                                                  .spanFactory(axonConfiguration.getComponent(CommandBusSpanFactory.class))
                                                                   .targetContextResolver(targetContextResolver)
                                                                   .axonServerConnectionManager(connectionManager)
                                                                   .configuration(axonServerConfig)
@@ -163,6 +165,7 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                           QueryBus.class, "queryBus@" + tenantDescriptor
                                   ))
                                   .transactionManager(txManager)
+                                  .spanFactory(config.getComponent(QueryBusSpanFactory.class))
                                   .queryUpdateEmitter(multiTenantQueryUpdateEmitter)
                                   .errorHandler(queryInvocationErrorHandler)
                                   .build();
@@ -183,6 +186,7 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                       .messageSerializer(messageSerializer)
                                       .genericSerializer(genericSerializer)
                                       .priorityCalculator(priorityCalculator)
+                                      .spanFactory(config.getComponent(QueryBusSpanFactory.class))
                                       .targetContextResolver(targetContextResolver)
                                       .defaultContext(tenantDescriptor.tenantId())
                                       .build();
@@ -224,6 +228,7 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                        .platformConnectionManager(axonServerConnectionManager)
                                        .snapshotSerializer(snapshotSerializer)
                                        .eventSerializer(eventSerializer)
+                                       .spanFactory(config.getComponent(EventBusSpanFactory.class))
                                        .defaultContext(tenant.tenantId())
                                        .snapshotFilter(config.snapshotFilter())
                                        .upcasterChain(config.upcasterChain())

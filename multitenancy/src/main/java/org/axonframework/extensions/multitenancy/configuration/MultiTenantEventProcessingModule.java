@@ -21,14 +21,7 @@ import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.EventProcessingConfigurer;
 import org.axonframework.config.EventProcessingModule;
-import org.axonframework.eventhandling.DirectEventProcessingStrategy;
-import org.axonframework.eventhandling.EventHandlerInvoker;
-import org.axonframework.eventhandling.EventMessage;
-import org.axonframework.eventhandling.EventProcessor;
-import org.axonframework.eventhandling.SubscribingEventProcessor;
-import org.axonframework.eventhandling.TrackedEventMessage;
-import org.axonframework.eventhandling.TrackingEventProcessor;
-import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
+import org.axonframework.eventhandling.*;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantSubscribableMessageSource;
@@ -204,6 +197,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                         .rollbackConfiguration(super.rollbackConfiguration(name))
                                         .errorHandler(super.errorHandler(name))
                                         .messageMonitor(super.messageMonitor(SubscribingEventProcessor.class, name))
+                                        .spanFactory(super.configuration.getComponent(EventProcessorSpanFactory.class))
                                         .messageSource(source)
                                         .processingStrategy(DirectEventProcessingStrategy.INSTANCE)
                                         .transactionManager(transactionManager)
@@ -260,6 +254,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                      .rollbackConfiguration(super.rollbackConfiguration(name))
                                      .errorHandler(super.errorHandler(name))
                                      .messageMonitor(super.messageMonitor(TrackingEventProcessor.class, name))
+                                     .spanFactory(super.configuration.getComponent(EventProcessorSpanFactory.class))
                                      .messageSource(source)
                                      .tokenStore(super.tokenStore(name))
                                      .transactionManager(transactionManager)
@@ -339,6 +334,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                             .errorHandler(super.errorHandler(name))
                                             .messageMonitor(super.messageMonitor(PooledStreamingEventProcessor.class, name))
                                             .messageSource(source)
+                                            .spanFactory(super.configuration.getComponent(EventProcessorSpanFactory.class))
                                             .tokenStore(super.tokenStore(name))
                                             .transactionManager(transactionManager)
                                             .coordinatorExecutor(processorName -> {
