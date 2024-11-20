@@ -19,7 +19,7 @@
     <parent>
         <artifactId>axon-multitenancy-parent</artifactId>
         <groupId>org.axonframework.extensions.multitenancy</groupId>
-        <version>4.10.3</version>
+        <version>4.10.4-SNAPSHOT</version>
     </parent>
 
     <artifactId>axon-multitenancy-spring-boot-autoconfigure</artifactId>
