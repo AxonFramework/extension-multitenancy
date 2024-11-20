@@ -31,7 +31,7 @@
     <description>
         Module used to test the integration with Spring Boot 3
     </description>
-    <version>4.10.3-SNAPSHOT</version>
+    <version>4.10.4-SNAPSHOT</version>
 
     <packaging>jar</packaging>
 
