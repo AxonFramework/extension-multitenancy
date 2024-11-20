@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,10 +21,17 @@ import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
 import org.axonframework.config.EventProcessingConfigurer;
 import org.axonframework.config.EventProcessingModule;
-import org.axonframework.eventhandling.*;
+import org.axonframework.eventhandling.DirectEventProcessingStrategy;
+import org.axonframework.eventhandling.EventHandlerInvoker;
+import org.axonframework.eventhandling.EventMessage;
+import org.axonframework.eventhandling.EventProcessor;
+import org.axonframework.eventhandling.EventProcessorSpanFactory;
+import org.axonframework.eventhandling.SubscribingEventProcessor;
+import org.axonframework.eventhandling.TrackedEventMessage;
+import org.axonframework.eventhandling.TrackingEventProcessor;
+import org.axonframework.eventhandling.TrackingEventProcessorConfiguration;
 import org.axonframework.eventhandling.pooled.PooledStreamingEventProcessor;
 import org.axonframework.extensions.multitenancy.TenantWrappedTransactionManager;
-import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantSubscribableMessageSource;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.components.TenantProvider;
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterProcessor;
@@ -32,6 +39,7 @@ import org.axonframework.extensions.multitenancy.components.deadletterqueue.Mult
 import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
 import org.axonframework.extensions.multitenancy.components.eventhandeling.MultiTenantEventProcessor;
 import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
+import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantSubscribableMessageSource;
 import org.axonframework.messaging.StreamableMessageSource;
 import org.axonframework.messaging.SubscribableMessageSource;
 import org.axonframework.messaging.deadletter.SequencedDeadLetterProcessor;
@@ -162,7 +170,7 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                                     SubscribableMessageSource<? extends EventMessage<?>> messageSource) {
 
         if (!multiTenantEventProcessorPredicate.test(name)) {
-           return buildSep(name, eventHandlerInvoker, messageSource);
+            return buildSep(name, eventHandlerInvoker, messageSource);
         }
 
         MultiTenantEventProcessor eventProcessor =
@@ -190,7 +198,10 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                 : messageSource;
     }
 
-    private SubscribingEventProcessor buildSep(String name, EventHandlerInvoker eventHandlerInvoker, SubscribableMessageSource<? extends EventMessage<?>> source, TransactionManager transactionManager) {
+    private SubscribingEventProcessor buildSep(String name,
+                                               EventHandlerInvoker eventHandlerInvoker,
+                                               SubscribableMessageSource<? extends EventMessage<?>> source,
+                                               TransactionManager transactionManager) {
         return SubscribingEventProcessor.builder()
                                         .name(name)
                                         .eventHandlerInvoker(eventHandlerInvoker)
@@ -204,12 +215,18 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                         .build();
     }
 
-    private SubscribingEventProcessor buildSep(TenantDescriptor tenantDescriptor, String name, EventHandlerInvoker eventHandlerInvoker, SubscribableMessageSource<? extends EventMessage<?>> source) {
-        TransactionManager transactionManager = new TenantWrappedTransactionManager(super.transactionManager(name), tenantDescriptor);
+    private SubscribingEventProcessor buildSep(TenantDescriptor tenantDescriptor,
+                                               String name,
+                                               EventHandlerInvoker eventHandlerInvoker,
+                                               SubscribableMessageSource<? extends EventMessage<?>> source) {
+        TransactionManager transactionManager = new TenantWrappedTransactionManager(super.transactionManager(name),
+                                                                                    tenantDescriptor);
         return buildSep(getName(name, tenantDescriptor), eventHandlerInvoker, source, transactionManager);
     }
 
-    private SubscribingEventProcessor buildSep(String name, EventHandlerInvoker eventHandlerInvoker, SubscribableMessageSource<? extends EventMessage<?>> source) {
+    private SubscribingEventProcessor buildSep(String name,
+                                               EventHandlerInvoker eventHandlerInvoker,
+                                               SubscribableMessageSource<? extends EventMessage<?>> source) {
         return buildSep(name, eventHandlerInvoker, source, super.transactionManager(name));
     }
 
@@ -247,7 +264,11 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
         return eventProcessor;
     }
 
-    private TrackingEventProcessor buildTep(String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TransactionManager transactionManager, TrackingEventProcessorConfiguration config) {
+    private TrackingEventProcessor buildTep(String name,
+                                            EventHandlerInvoker eventHandlerInvoker,
+                                            StreamableMessageSource<TrackedEventMessage<?>> source,
+                                            TransactionManager transactionManager,
+                                            TrackingEventProcessorConfiguration config) {
         return TrackingEventProcessor.builder()
                                      .name(name)
                                      .eventHandlerInvoker(eventHandlerInvoker)
@@ -262,14 +283,23 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                                      .build();
     }
 
-    private TrackingEventProcessor buildTep(TenantDescriptor tenantDescriptor, String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TrackingEventProcessorConfiguration config) {
-        TransactionManager transactionManager = new TenantWrappedTransactionManager(super.transactionManager(name), tenantDescriptor);
+    private TrackingEventProcessor buildTep(TenantDescriptor tenantDescriptor,
+                                            String name,
+                                            EventHandlerInvoker eventHandlerInvoker,
+                                            StreamableMessageSource<TrackedEventMessage<?>> source,
+                                            TrackingEventProcessorConfiguration config) {
+        TransactionManager transactionManager = new TenantWrappedTransactionManager(super.transactionManager(name),
+                                                                                    tenantDescriptor);
         return buildTep(getName(name, tenantDescriptor), eventHandlerInvoker, source, transactionManager, config);
     }
 
-    private TrackingEventProcessor buildTep(String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TrackingEventProcessorConfiguration config) {
+    private TrackingEventProcessor buildTep(String name,
+                                            EventHandlerInvoker eventHandlerInvoker,
+                                            StreamableMessageSource<TrackedEventMessage<?>> source,
+                                            TrackingEventProcessorConfiguration config) {
         return buildTep(name, eventHandlerInvoker, source, super.transactionManager(name), config);
     }
+
     @Override
     public EventProcessor pooledStreamingEventProcessor(String name,
                                                         EventHandlerInvoker eventHandlerInvoker,
@@ -326,35 +356,50 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
                 : source;
     }
 
-    private PooledStreamingEventProcessor.Builder psepBuilder(String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, TransactionManager transactionManager, Configuration config) {
+    private PooledStreamingEventProcessor.Builder psepBuilder(String name,
+                                                              EventHandlerInvoker eventHandlerInvoker,
+                                                              StreamableMessageSource<TrackedEventMessage<?>> source,
+                                                              TransactionManager transactionManager,
+                                                              Configuration config) {
         return PooledStreamingEventProcessor.builder()
                                             .name(name)
                                             .eventHandlerInvoker(eventHandlerInvoker)
                                             .rollbackConfiguration(super.rollbackConfiguration(name))
                                             .errorHandler(super.errorHandler(name))
-                                            .messageMonitor(super.messageMonitor(PooledStreamingEventProcessor.class, name))
+                                            .messageMonitor(super.messageMonitor(PooledStreamingEventProcessor.class,
+                                                                                 name))
                                             .messageSource(source)
                                             .spanFactory(super.configuration.getComponent(EventProcessorSpanFactory.class))
                                             .tokenStore(super.tokenStore(name))
                                             .transactionManager(transactionManager)
                                             .coordinatorExecutor(processorName -> {
-                                                ScheduledExecutorService coordinatorExecutor = defaultExecutor("Coordinator[" + processorName + "]");
+                                                ScheduledExecutorService coordinatorExecutor = defaultExecutor(
+                                                        "Coordinator[" + processorName + "]");
                                                 config.onShutdown(coordinatorExecutor::shutdown);
                                                 return coordinatorExecutor;
                                             })
                                             .workerExecutor(processorName -> {
-                                                ScheduledExecutorService workerExecutor = defaultExecutor("WorkPackage[" + processorName + "]");
+                                                ScheduledExecutorService workerExecutor = defaultExecutor(
+                                                        "WorkPackage[" + processorName + "]");
                                                 config.onShutdown(workerExecutor::shutdown);
                                                 return workerExecutor;
                                             });
     }
 
-    private PooledStreamingEventProcessor.Builder psepBuilder(TenantDescriptor tenantDescriptor, String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, Configuration config) {
-        TransactionManager transactionManager = new TenantWrappedTransactionManager(super.transactionManager(name), tenantDescriptor);
+    private PooledStreamingEventProcessor.Builder psepBuilder(TenantDescriptor tenantDescriptor,
+                                                              String name,
+                                                              EventHandlerInvoker eventHandlerInvoker,
+                                                              StreamableMessageSource<TrackedEventMessage<?>> source,
+                                                              Configuration config) {
+        TransactionManager transactionManager = new TenantWrappedTransactionManager(super.transactionManager(name),
+                                                                                    tenantDescriptor);
         return psepBuilder(getName(name, tenantDescriptor), eventHandlerInvoker, source, transactionManager, config);
     }
 
-    private PooledStreamingEventProcessor.Builder psepBuilder(String name, EventHandlerInvoker eventHandlerInvoker, StreamableMessageSource<TrackedEventMessage<?>> source, Configuration config) {
+    private PooledStreamingEventProcessor.Builder psepBuilder(String name,
+                                                              EventHandlerInvoker eventHandlerInvoker,
+                                                              StreamableMessageSource<TrackedEventMessage<?>> source,
+                                                              Configuration config) {
         return psepBuilder(name, eventHandlerInvoker, source, super.transactionManager(name), config);
     }
 
@@ -410,5 +455,4 @@ public class MultiTenantEventProcessingModule extends EventProcessingModule {
     private ScheduledExecutorService defaultExecutor(String factoryName) {
         return Executors.newScheduledThreadPool(1, new AxonThreadFactory(factoryName));
     }
-
 }
