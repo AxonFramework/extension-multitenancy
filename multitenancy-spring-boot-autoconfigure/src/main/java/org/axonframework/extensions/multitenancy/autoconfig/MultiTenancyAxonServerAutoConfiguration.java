@@ -26,7 +26,11 @@ import org.axonframework.axonserver.connector.event.axon.AxonServerEventStore;
 import org.axonframework.axonserver.connector.event.axon.EventProcessorInfoConfiguration;
 import org.axonframework.axonserver.connector.query.AxonServerQueryBus;
 import org.axonframework.axonserver.connector.query.QueryPriorityCalculator;
-import org.axonframework.commandhandling.*;
+import org.axonframework.commandhandling.CommandBus;
+import org.axonframework.commandhandling.CommandBusSpanFactory;
+import org.axonframework.commandhandling.CommandMessage;
+import org.axonframework.commandhandling.DuplicateCommandHandlerResolver;
+import org.axonframework.commandhandling.SimpleCommandBus;
 import org.axonframework.commandhandling.distributed.RoutingStrategy;
 import org.axonframework.common.transaction.TransactionManager;
 import org.axonframework.config.Configuration;
@@ -42,7 +46,13 @@ import org.axonframework.extensions.multitenancy.components.queryhandeling.Tenan
 import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
 import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
 import org.axonframework.messaging.interceptors.CorrelationDataInterceptor;
-import org.axonframework.queryhandling.*;
+import org.axonframework.queryhandling.QueryBus;
+import org.axonframework.queryhandling.QueryBusSpanFactory;
+import org.axonframework.queryhandling.QueryInvocationErrorHandler;
+import org.axonframework.queryhandling.QueryMessage;
+import org.axonframework.queryhandling.QueryUpdateEmitter;
+import org.axonframework.queryhandling.SimpleQueryBus;
+import org.axonframework.queryhandling.SimpleQueryUpdateEmitter;
 import org.axonframework.serialization.Serializer;
 import org.axonframework.spring.config.SpringAxonConfiguration;
 import org.axonframework.springboot.autoconfig.AxonServerAutoConfiguration;
@@ -95,15 +105,16 @@ public class MultiTenancyAxonServerAutoConfiguration {
                                             axonServerConnectionManager);
     }
 
-    private SimpleCommandBus localCommandBus(TransactionManager txManager, Configuration axonConfiguration,
-                                       DuplicateCommandHandlerResolver duplicateCommandHandlerResolver) {
+    private SimpleCommandBus localCommandBus(TransactionManager txManager,
+                                             Configuration axonConfiguration,
+                                             DuplicateCommandHandlerResolver duplicateCommandHandlerResolver) {
         SimpleCommandBus commandBus =
                 SimpleCommandBus.builder()
-                        .transactionManager(txManager)
-                        .duplicateCommandHandlerResolver(duplicateCommandHandlerResolver)
-                        .spanFactory(axonConfiguration.getComponent(CommandBusSpanFactory.class))
-                        .messageMonitor(axonConfiguration.messageMonitor(CommandBus.class, "commandBus"))
-                        .build();
+                                .transactionManager(txManager)
+                                .duplicateCommandHandlerResolver(duplicateCommandHandlerResolver)
+                                .spanFactory(axonConfiguration.getComponent(CommandBusSpanFactory.class))
+                                .messageMonitor(axonConfiguration.messageMonitor(CommandBus.class, "commandBus"))
+                                .build();
         commandBus.registerHandlerInterceptor(
                 new CorrelationDataInterceptor<>(axonConfiguration.correlationDataProviders())
         );
@@ -124,19 +135,22 @@ public class MultiTenancyAxonServerAutoConfiguration {
             DuplicateCommandHandlerResolver duplicateCommandHandlerResolver
     ) {
         return tenantDescriptor -> {
-            SimpleCommandBus localCommandBus = localCommandBus(txManager, axonConfiguration, duplicateCommandHandlerResolver);
-            AxonServerCommandBus commandBus = AxonServerCommandBus.builder()
-                                                                  .localSegment(localCommandBus)
-                                                                  .serializer(messageSerializer)
-                                                                  .routingStrategy(routingStrategy)
-                                                                  .priorityCalculator(priorityCalculator)
-                                                                  .loadFactorProvider(loadFactorProvider)
-                                                                  .spanFactory(axonConfiguration.getComponent(CommandBusSpanFactory.class))
-                                                                  .targetContextResolver(targetContextResolver)
-                                                                  .axonServerConnectionManager(connectionManager)
-                                                                  .configuration(axonServerConfig)
-                                                                  .defaultContext(tenantDescriptor.tenantId())
-                                                                  .build();
+            SimpleCommandBus localCommandBus = localCommandBus(txManager,
+                                                               axonConfiguration,
+                                                               duplicateCommandHandlerResolver);
+            AxonServerCommandBus commandBus =
+                    AxonServerCommandBus.builder()
+                                        .localSegment(localCommandBus)
+                                        .serializer(messageSerializer)
+                                        .routingStrategy(routingStrategy)
+                                        .priorityCalculator(priorityCalculator)
+                                        .loadFactorProvider(loadFactorProvider)
+                                        .spanFactory(axonConfiguration.getComponent(CommandBusSpanFactory.class))
+                                        .targetContextResolver(targetContextResolver)
+                                        .axonServerConnectionManager(connectionManager)
+                                        .configuration(axonServerConfig)
+                                        .defaultContext(tenantDescriptor.tenantId())
+                                        .build();
             commandBus.start();
             return commandBus;
         };
