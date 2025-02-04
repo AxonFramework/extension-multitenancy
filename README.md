@@ -16,7 +16,7 @@ The main focus can thus become your business functionality.
 ## Getting started
 
 The [AxonIQ Library](https://library.axoniq.io) contains a section for the guides of all the Axon Framework extensions.
-The Multitenancy extension guide can be found [here](https://library.axoniq.io/home/guides/axon-framework.html).
+The Multitenancy extension guide can be found [here](https://docs.axoniq.io/multitenancy-extension-reference/4.10/).
 
 
 ## Receiving help
