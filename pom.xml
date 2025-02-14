@@ -19,7 +19,7 @@
 
     <groupId>org.axonframework.extensions.multitenancy</groupId>
     <artifactId>axon-multitenancy-parent</artifactId>
-    <version>4.11.0-SNAPSHOT</version>
+    <version>4.11.0</version>
     <modules>
         <module>multitenancy</module>
         <module>multitenancy-spring-boot-autoconfigure</module>
@@ -441,7 +441,7 @@
         <connection>scm:git:git://github.com/AxonFramework/extension-multitenancy.git</connection>
         <developerConnection>scm:git:git@github.com:AxonFramework/extension-multitenancy.git</developerConnection>
         <url>https://github.com/AxonFramework/extension-multitenancy</url>
-        <tag>HEAD</tag>
+        <tag>axon-multi-tenancy-4.11.0</tag>
     </scm>
 
     <developers>
