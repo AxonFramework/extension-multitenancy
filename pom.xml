@@ -66,7 +66,7 @@
         <junit.jupiter.version>5.13.1</junit.jupiter.version>
         <mockito.version>4.11.0</mockito.version>
 
-        <projectreactor.version>3.7.6</projectreactor.version>
+        <projectreactor.version>3.7.7</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
         <!-- Build / Plugin -->
         <central-publishing-maven-plugin.version>0.7.0</central-publishing-maven-plugin.version>
