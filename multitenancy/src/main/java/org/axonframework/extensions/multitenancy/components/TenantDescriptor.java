@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2025. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.util.Objects;
  * A descriptor for tenants.
  *
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @since 5.0.0
  */
 public class TenantDescriptor {
 

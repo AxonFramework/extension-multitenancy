@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2025. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy.components;
 
-import org.axonframework.messaging.Message;
+import org.axonframework.messaging.core.Message;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -26,9 +26,9 @@ import java.util.function.BiFunction;
  *
  * @param <M> The {@link Message} implementation this resolver acts on.
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @since 5.0.0
  */
-public interface TargetTenantResolver<M extends Message<?>>
+public interface TargetTenantResolver<M extends Message>
         extends BiFunction<M, Collection<TenantDescriptor>, TenantDescriptor> {
 
     /**

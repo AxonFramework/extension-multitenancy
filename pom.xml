@@ -19,7 +19,7 @@
 
     <groupId>org.axonframework.extensions.multitenancy</groupId>
     <artifactId>axon-multitenancy-parent</artifactId>
-    <version>4.12.1-SNAPSHOT</version>
+    <version>5.1.0-SNAPSHOT</version>
     <modules>
         <module>multitenancy</module>
         <module>multitenancy-spring-boot-autoconfigure</module>
@@ -54,16 +54,16 @@
             ${project.basedir}/../coverage-report/target/site/jacoco-aggregate/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
 
-        <axon.version>4.12.0</axon.version>
+        <axon.version>5.1.0-SNAPSHOT</axon.version>
 
-        <spring.version>5.3.39</spring.version>
-        <spring.boot.version>2.7.18</spring.boot.version>
+        <spring.version>6.2.15</spring.version>
+        <spring.boot.version>3.5.9</spring.boot.version>
 
-        <slf4j.version>1.7.28</slf4j.version>
-        <log4j.version>2.13.0</log4j.version>
+        <slf4j.version>2.0.16</slf4j.version>
+        <log4j.version>2.24.2</log4j.version>
 
         <junit.jupiter.version>5.13.3</junit.jupiter.version>
-        <mockito.version>4.11.0</mockito.version>
+        <mockito.version>5.14.2</mockito.version>
 
         <projectreactor.version>3.7.8</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
@@ -207,8 +207,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven-compiler.version}</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>21</source>
+                    <target>21</target>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
@@ -261,7 +261,7 @@
                 </configuration>
             </plugin>
             <plugin>
-                <!-- just to make sure deployed artifacts are always built (and tested) using JDK 8+ -->
+                <!-- just to make sure deployed artifacts are always built (and tested) using JDK 21+ -->
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <version>${maven-enforcer.version}</version>
                 <executions>
@@ -274,7 +274,7 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>1.8</version>
+                                    <version>21</version>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
                                     <version>3.5</version>
@@ -353,9 +353,9 @@
         </profile>
 
         <profile>
-            <id>java17-modules</id>
+            <id>java21-modules</id>
             <activation>
-                <jdk>[17,)</jdk>
+                <jdk>[21,)</jdk>
             </activation>
             <modules>
                 <module>multitenancy-spring-boot-3-integrationtests</module>
