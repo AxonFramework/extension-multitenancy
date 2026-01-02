@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components.eventstore;
+package org.axonframework.extensions.multitenancy.eventsourcing.eventstore;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -28,10 +28,8 @@ import org.axonframework.extensions.multitenancy.components.TargetTenantResolver
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
 import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.MessageStream;
-import org.axonframework.messaging.core.SubscribableEventSource;
 import org.axonframework.messaging.core.unitofwork.ProcessingContext;
 import org.axonframework.messaging.eventhandling.EventMessage;
-import org.axonframework.messaging.eventstreaming.StreamableEventSource;
 import org.axonframework.messaging.eventstreaming.StreamingCondition;
 import org.axonframework.messaging.eventhandling.processing.streaming.token.TrackingToken;
 
@@ -58,6 +56,11 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * @since 4.6.0
  */
 public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent {
+
+    /**
+     * The order in which the {@link MultiTenantEventStore} is applied as a decorator to the {@link EventStore}.
+     */
+    public static final int DECORATION_ORDER = Integer.MIN_VALUE + 50;
 
     private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
     private final List<BiFunction<List<? extends EventMessage>, ProcessingContext, CompletableFuture<?>>> eventsBatchConsumers =

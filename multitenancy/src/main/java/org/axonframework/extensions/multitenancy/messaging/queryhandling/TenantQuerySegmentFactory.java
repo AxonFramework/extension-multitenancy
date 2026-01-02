@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components.eventhandeling;
+
+package org.axonframework.extensions.multitenancy.messaging.queryhandling;
 
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-import org.axonframework.messaging.eventhandling.processing.EventProcessor;
+import org.axonframework.messaging.queryhandling.QueryBus;
 
 import java.util.function.Function;
 
 /**
- * Factory for creating {@link EventProcessor} segments for a given {@link TenantDescriptor}. After a segment is
- * created, it may be started automatically by the factory.
+ * Factory for creating {@link QueryBus} segments for a given {@link TenantDescriptor}. After a segment is created, it
+ * may be started automatically by the factory.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
  */
-public interface TenantEventProcessorSegmentFactory extends Function<TenantDescriptor, EventProcessor> {
+public interface TenantQuerySegmentFactory extends Function<TenantDescriptor, QueryBus> {
 
 }

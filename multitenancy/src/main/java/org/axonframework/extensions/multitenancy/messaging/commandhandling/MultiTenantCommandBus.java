@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components.commandhandeling;
+package org.axonframework.extensions.multitenancy.messaging.commandhandling;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -28,6 +28,7 @@ import org.axonframework.messaging.commandhandling.CommandBus;
 import org.axonframework.messaging.commandhandling.CommandHandler;
 import org.axonframework.messaging.commandhandling.CommandMessage;
 import org.axonframework.messaging.commandhandling.CommandResultMessage;
+import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.QualifiedName;
 import org.axonframework.messaging.core.unitofwork.ProcessingContext;
 
@@ -43,7 +44,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * {@code CommandBus} instance is considered a "tenant".
  * <p>
  * The {@code MultiTenantCommandBus} relies on a {@link TargetTenantResolver} to dispatch commands via resolved tenant
- * segment of the {@code CommandBus}. {@link TenantCommandSegmentFactory} is as factory to create tenant segments with.
+ * segment of the {@code CommandBus}. {@link TenantCommandSegmentFactory} is a factory to create tenant segments with.
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
@@ -51,11 +52,16 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  */
 public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareComponent {
 
+    /**
+     * The order in which the {@link MultiTenantCommandBus} is applied as a decorator to the {@link CommandBus}.
+     */
+    public static final int DECORATION_ORDER = Integer.MIN_VALUE + 50;
+
     private final Map<QualifiedName, CommandHandler> handlers = new ConcurrentHashMap<>();
     private final Map<TenantDescriptor, CommandBus> tenantSegments = new ConcurrentHashMap<>();
 
     private final TenantCommandSegmentFactory tenantSegmentFactory;
-    private final TargetTenantResolver<CommandMessage> targetTenantResolver;
+    private final TargetTenantResolver<Message> targetTenantResolver;
 
     /**
      * Instantiate a {@link MultiTenantCommandBus} based on the given {@link Builder builder}.
@@ -162,7 +168,7 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
     public static class Builder {
 
         protected TenantCommandSegmentFactory tenantSegmentFactory;
-        protected TargetTenantResolver<CommandMessage> targetTenantResolver;
+        protected TargetTenantResolver<Message> targetTenantResolver;
 
         /**
          * Sets the {@link TenantCommandSegmentFactory} used to build {@link CommandBus} segment for given
@@ -179,13 +185,13 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
 
         /**
          * Sets the {@link TargetTenantResolver} used to resolve a {@link TenantDescriptor} based on a
-         * {@link CommandMessage}. Used to find the tenant-specific {@link CommandBus} segment.
+         * {@link Message}. Used to find the tenant-specific {@link CommandBus} segment.
          *
-         * @param targetTenantResolver The resolver of a {@link TenantDescriptor} based on a {@link CommandMessage}.
+         * @param targetTenantResolver The resolver of a {@link TenantDescriptor} based on a {@link Message}.
          *                             Used to find the tenant-specific {@link CommandBus} segment.
          * @return The current builder instance, for fluent interfacing.
          */
-        public Builder targetTenantResolver(TargetTenantResolver<CommandMessage> targetTenantResolver) {
+        public Builder targetTenantResolver(TargetTenantResolver<Message> targetTenantResolver) {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;

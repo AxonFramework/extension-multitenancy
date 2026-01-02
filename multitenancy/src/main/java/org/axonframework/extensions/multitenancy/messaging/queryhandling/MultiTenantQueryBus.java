@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components.queryhandeling;
+package org.axonframework.extensions.multitenancy.messaging.queryhandling;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -24,6 +24,7 @@ import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComp
 import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
 import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.MessageStream;
 import org.axonframework.messaging.core.QualifiedName;
 import org.axonframework.messaging.core.unitofwork.ProcessingContext;
@@ -46,7 +47,7 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * {@code QueryBus} instance is considered a "tenant".
  * <p>
  * The {@code MultiTenantQueryBus} relies on a {@link TargetTenantResolver} to dispatch queries via resolved tenant
- * segment of the {@code QueryBus}. {@link TenantQuerySegmentFactory} is as factory to create the tenant segment.
+ * segment of the {@code QueryBus}. {@link TenantQuerySegmentFactory} is a factory to create the tenant segment.
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
@@ -54,11 +55,16 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  */
 public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent {
 
+    /**
+     * The order in which the {@link MultiTenantQueryBus} is applied as a decorator to the {@link QueryBus}.
+     */
+    public static final int DECORATION_ORDER = Integer.MIN_VALUE + 50;
+
     private final Map<QualifiedName, QueryHandler> handlers = new ConcurrentHashMap<>();
     private final Map<TenantDescriptor, QueryBus> tenantSegments = new ConcurrentHashMap<>();
 
     private final TenantQuerySegmentFactory tenantSegmentFactory;
-    private final TargetTenantResolver<QueryMessage> targetTenantResolver;
+    private final TargetTenantResolver<Message> targetTenantResolver;
 
     /**
      * Instantiate a {@link MultiTenantQueryBus} based on the given {@link Builder builder}.
@@ -122,24 +128,22 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
     public CompletableFuture<Void> emitUpdate(@Nonnull Predicate<QueryMessage> filter,
                                               @Nonnull Supplier<SubscriptionQueryUpdateMessage> updateSupplier,
                                               @Nullable ProcessingContext context) {
-        // Emit update to all tenant segments
-        CompletableFuture<?>[] futures = tenantSegments.values()
-                                                       .stream()
-                                                       .map(bus -> bus.emitUpdate(filter, updateSupplier, context))
-                                                       .toArray(CompletableFuture[]::new);
-        return CompletableFuture.allOf(futures);
+        try {
+            return resolveTenantFromContext(context).emitUpdate(filter, updateSupplier, context);
+        } catch (NoSuchTenantException | IllegalStateException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Nonnull
     @Override
     public CompletableFuture<Void> completeSubscriptions(@Nonnull Predicate<QueryMessage> filter,
                                                          @Nullable ProcessingContext context) {
-        // Complete subscriptions on all tenant segments
-        CompletableFuture<?>[] futures = tenantSegments.values()
-                                                       .stream()
-                                                       .map(bus -> bus.completeSubscriptions(filter, context))
-                                                       .toArray(CompletableFuture[]::new);
-        return CompletableFuture.allOf(futures);
+        try {
+            return resolveTenantFromContext(context).completeSubscriptions(filter, context);
+        } catch (NoSuchTenantException | IllegalStateException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Nonnull
@@ -147,12 +151,31 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
     public CompletableFuture<Void> completeSubscriptionsExceptionally(@Nonnull Predicate<QueryMessage> filter,
                                                                        @Nonnull Throwable cause,
                                                                        @Nullable ProcessingContext context) {
-        // Complete subscriptions exceptionally on all tenant segments
-        CompletableFuture<?>[] futures = tenantSegments.values()
-                                                       .stream()
-                                                       .map(bus -> bus.completeSubscriptionsExceptionally(filter, cause, context))
-                                                       .toArray(CompletableFuture[]::new);
-        return CompletableFuture.allOf(futures);
+        try {
+            return resolveTenantFromContext(context).completeSubscriptionsExceptionally(filter, cause, context);
+        } catch (NoSuchTenantException | IllegalStateException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private QueryBus resolveTenantFromContext(@Nullable ProcessingContext context) {
+        if (context == null) {
+            throw new IllegalStateException(
+                    "Cannot resolve tenant for subscription query update: ProcessingContext is required"
+            );
+        }
+        Message message = Message.fromContext(context);
+        if (message == null) {
+            throw new IllegalStateException(
+                    "Cannot resolve tenant for subscription query update: no message found in ProcessingContext"
+            );
+        }
+        TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(message, tenantSegments.keySet());
+        QueryBus tenantQueryBus = tenantSegments.get(tenantDescriptor);
+        if (tenantQueryBus == null) {
+            throw new NoSuchTenantException(tenantDescriptor.tenantId());
+        }
+        return tenantQueryBus;
     }
 
     @Override
@@ -226,7 +249,7 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
      */
     public static class Builder {
 
-        protected TargetTenantResolver<QueryMessage> targetTenantResolver;
+        protected TargetTenantResolver<Message> targetTenantResolver;
         protected TenantQuerySegmentFactory tenantSegmentFactory;
 
         /**
@@ -244,13 +267,13 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
 
         /**
          * Sets the {@link TargetTenantResolver} used to resolve a {@link TenantDescriptor} based on a
-         * {@link QueryMessage}. Used to find the tenant-specific {@link QueryBus} segment.
+         * {@link Message}. Used to find the tenant-specific {@link QueryBus} segment.
          *
-         * @param targetTenantResolver The resolver of a {@link TenantDescriptor} based on a {@link QueryMessage}. Used
+         * @param targetTenantResolver The resolver of a {@link TenantDescriptor} based on a {@link Message}. Used
          *                             to find the tenant-specific {@link QueryBus} segment.
          * @return The current builder instance, for fluent interfacing.
          */
-        public Builder targetTenantResolver(TargetTenantResolver<QueryMessage> targetTenantResolver) {
+        public Builder targetTenantResolver(TargetTenantResolver<Message> targetTenantResolver) {
             assertNonNull(targetTenantResolver, "The TargetTenantResolver is a hard requirement");
             this.targetTenantResolver = targetTenantResolver;
             return this;

@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.axonframework.extensions.multitenancy.components.commandhandeling;
+package org.axonframework.extensions.multitenancy.eventsourcing.eventstore;
 
+import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-import org.axonframework.messaging.commandhandling.CommandBus;
 
 import java.util.function.Function;
 
 /**
- * Factory for creating {@link CommandBus} segments for a given {@link TenantDescriptor}. After a segment is created, it
+ * Factory for creating {@link EventStore} segments for a given {@link TenantDescriptor}. After a segment is created, it
  * may be started automatically by the factory.
  *
  * @author Stefan Dragisic
  * @since 4.6.0
  */
-public interface TenantCommandSegmentFactory extends Function<TenantDescriptor, CommandBus> {
+public interface TenantEventSegmentFactory extends Function<TenantDescriptor, EventStore> {
 
 }
