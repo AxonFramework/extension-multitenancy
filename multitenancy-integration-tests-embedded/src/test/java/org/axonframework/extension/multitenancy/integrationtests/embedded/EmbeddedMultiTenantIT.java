@@ -34,6 +34,8 @@ import org.axonframework.extension.multitenancy.integrationtests.embedded.read.c
 import org.axonframework.extension.multitenancy.integrationtests.embedded.shared.CourseId;
 import org.axonframework.extension.multitenancy.integrationtests.embedded.write.createcourse.CreateCourse;
 import org.axonframework.extension.multitenancy.integrationtests.embedded.write.createcourse.CreateCourseConfiguration;
+import org.axonframework.extension.multitenancy.integrationtests.embedded.automation.CourseNotificationConfiguration;
+import org.axonframework.extension.multitenancy.integrationtests.embedded.automation.NotificationService;
 import org.axonframework.messaging.commandhandling.CommandBus;
 import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
 import org.axonframework.messaging.core.MessageType;
@@ -45,6 +47,7 @@ import org.axonframework.messaging.queryhandling.gateway.QueryGateway;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.axonframework.messaging.core.interception.DispatchInterceptorRegistry;
 import org.axonframework.messaging.core.MessageDispatchInterceptor;
@@ -337,5 +340,95 @@ class EmbeddedMultiTenantIT {
         );
         List<CoursesStats> dynamicTenantCourses = queryCoursesForTenant(dynamicTenant);
         assertThat(dynamicTenantCourses).hasSize(1);
+    }
+
+    // --- Tests for CommandDispatcher tenant propagation ---
+
+    private Map<String, NotificationService> notificationServices;
+
+    private void startAppWithNotifications() {
+        tenantProvider = new SimpleTenantProvider(List.of(TENANT_A, TENANT_B));
+        notificationServices = new ConcurrentHashMap<>();
+
+        EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+        MultiTenancyConfigurer multiTenancyConfigurer = MultiTenancyConfigurer.enhance(configurer)
+                .registerTenantProvider(config -> tenantProvider)
+                .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver());
+
+        // Domain modules
+        configurer = CreateCourseConfiguration.configure(configurer);
+        configurer = CourseStatsConfiguration.configure(configurer);
+        configurer = CourseNotificationConfiguration.configure(configurer);
+
+        // Tenant-scoped components
+        multiTenancyConfigurer.tenantComponent(CourseStatsRepository.class, tenant -> new InMemoryCourseStatsRepository());
+        multiTenancyConfigurer.tenantComponent(NotificationService.class, tenant -> {
+            var service = new NotificationService(tenant.tenantId());
+            notificationServices.put(tenant.tenantId(), service);
+            return service;
+        });
+
+        // Correlation provider for tenant propagation
+        configurer.messaging(mc -> mc.registerCorrelationDataProvider(config -> message -> {
+            Map<String, String> result = new HashMap<>();
+            if (message.metadata().containsKey("tenantId")) {
+                result.put("tenantId", message.metadata().get("tenantId"));
+            }
+            return result;
+        }));
+
+        configuration = configurer.start();
+        commandGateway = configuration.getComponent(CommandGateway.class);
+        queryGateway = configuration.getComponent(QueryGateway.class);
+    }
+
+    @Test
+    void commandDispatcherPropagatesTenantContext() {
+        startAppWithNotifications();
+
+        // Create courses for both tenants
+        CourseId courseIdA = CourseId.random();
+        CourseId courseIdB = CourseId.random();
+        createCourseForTenant(TENANT_A, courseIdA, "Course A", 20);
+        createCourseForTenant(TENANT_B, courseIdB, "Course B", 30);
+
+        // Wait for notifications to be sent via the automation
+        Awaitility.await().atMost(Duration.ofSeconds(10)).until(() -> {
+            var serviceA = notificationServices.get(TENANT_A.tenantId());
+            var serviceB = notificationServices.get(TENANT_B.tenantId());
+            return serviceA != null && !serviceA.getSentNotifications().isEmpty()
+                    && serviceB != null && !serviceB.getSentNotifications().isEmpty();
+        });
+
+        // Get the tenant-specific NotificationService instances
+        NotificationService tenantAService = notificationServices.get(TENANT_A.tenantId());
+        NotificationService tenantBService = notificationServices.get(TENANT_B.tenantId());
+
+        // Verify each service was constructed with the correct tenant ID
+        assertThat(tenantAService.getTenantId()).isEqualTo(TENANT_A.tenantId());
+        assertThat(tenantBService.getTenantId()).isEqualTo(TENANT_B.tenantId());
+
+        // Verify tenant A's service received ONLY tenant A's notification
+        assertThat(tenantAService.getSentNotifications())
+                .as("Tenant A's service should receive exactly 1 notification")
+                .hasSize(1);
+        assertThat(tenantAService.getSentNotifications().get(0).message())
+                .as("Tenant A's notification should be about Course A")
+                .contains("Course A");
+        assertThat(tenantAService.getSentNotifications().get(0).message())
+                .as("Tenant A's service should NOT have Course B's notification")
+                .doesNotContain("Course B");
+
+        // Verify tenant B's service received ONLY tenant B's notification
+        assertThat(tenantBService.getSentNotifications())
+                .as("Tenant B's service should receive exactly 1 notification")
+                .hasSize(1);
+        assertThat(tenantBService.getSentNotifications().get(0).message())
+                .as("Tenant B's notification should be about Course B")
+                .contains("Course B");
+        assertThat(tenantBService.getSentNotifications().get(0).message())
+                .as("Tenant B's service should NOT have Course A's notification")
+                .doesNotContain("Course A");
     }
 }
