@@ -1,4 +1,21 @@
-* xref::configuration.adoc[]
-* xref::multi-tenant-components.adoc[]
-* xref::disable.adoc[]
-* xref::release-notes.adoc[]
+* xref:ROOT:index.adoc[Introduction]
+
+* Setup Guides
+** xref:ROOT:setup/getting-started.adoc[Getting Started]
+** xref:ROOT:setup/axon-server.adoc[Axon Server Integration]
+** xref:ROOT:setup/spring-boot.adoc[Spring Boot Integration]
+** xref:ROOT:setup/spring-boot-axon-server.adoc[Spring Boot with Axon Server]
+
+* Concepts
+** xref:ROOT:tenant-management.adoc[Tenant Management]
+** xref:ROOT:message-routing.adoc[Message Routing]
+** xref:ROOT:infrastructure.adoc[Infrastructure]
+** xref:ROOT:projections.adoc[Projections]
+
+* Configuration Reference
+** xref:ROOT:configuration/tenant-resolution.adoc[Tenant Resolution]
+** xref:ROOT:configuration/event-processors.adoc[Event Processors]
+** xref:ROOT:configuration/tenant-components.adoc[Tenant Components]
+** xref:ROOT:configuration/dynamic-tenants.adoc[Dynamic Tenants]
+
+* xref:ROOT:release-notes.adoc[Release Notes]

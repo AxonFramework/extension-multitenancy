@@ -1,0 +1,271 @@
+:navtitle: Infrastructure
+= Multi-Tenant Infrastructure
+
+The extension provides multi-tenant versions of Axon Framework's core infrastructure components. These components route messages to tenant-specific segments while maintaining the same API as their single-tenant counterparts.
+
+== Architecture Overview
+
+Each multi-tenant component follows the same pattern:
+
+1. Wraps the standard component as a decorator
+2. Uses `TargetTenantResolver` to determine the tenant
+3. Delegates to tenant-specific segments
+4. Creates segments on-demand via factory
+
+[source]
+----
+MultiTenantCommandBus
+    ├── tenantSegments: Map<TenantDescriptor, CommandBus>
+    ├── segmentFactory: TenantCommandSegmentFactory
+    └── targetTenantResolver: TargetTenantResolver
+----
+
+== MultiTenantCommandBus
+
+Routes commands to tenant-specific command buses.
+
+=== How It Differs from Standard CommandBus
+
+|===
+|Standard CommandBus |MultiTenantCommandBus
+
+|Single instance handles all commands
+|Routes to per-tenant command bus instances
+
+|Handlers registered once
+|Handlers registered per tenant segment
+
+|Direct dispatch
+|Resolves tenant, then dispatches to segment
+|===
+
+=== With Axon Server
+
+When using Axon Server, the `MultiTenantAxonServerCommandBusConnector` handles routing at the connector level. Commands are sent to the correct Axon Server context without needing per-tenant bus instances locally.
+
+=== Embedded Mode
+
+Without Axon Server, each tenant gets a `SimpleCommandBus`. The default factory creates these automatically:
+
+[source,java]
+----
+// Default behavior - creates SimpleCommandBus per tenant
+// You get this for free, no configuration needed
+----
+
+To customize:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.messaging.commandhandling.TenantCommandSegmentFactory;
+import org.axonframework.messaging.commandhandling.CommandBus;
+
+@Bean
+public TenantCommandSegmentFactory commandBusFactory() {
+    return tenant -> {
+        // Custom command bus configuration per tenant
+        return SimpleCommandBus.builder()
+                // ... custom configuration
+                .build();
+    };
+}
+----
+
+== MultiTenantQueryBus
+
+Routes queries to tenant-specific query buses.
+
+=== Query Handlers
+
+Query handlers must use **method parameter injection** for tenant-scoped data access:
+
+[source,java]
+----
+@QueryHandler
+public List<Order> handle(FindOrdersQuery query, OrderRepository orderRepository) {
+    // Repository is resolved per-invocation based on query's tenant metadata
+    return orderRepository.findAll();
+}
+
+// Or with EntityManager
+@QueryHandler
+public List<Order> handle(FindOrdersQuery query, EntityManager entityManager) {
+    return entityManager.createQuery("SELECT o FROM Order o", Order.class)
+            .getResultList();
+}
+----
+
+IMPORTANT: Do NOT use field-injected repositories or EntityManagers. Field injection creates a single instance shared across all tenants, causing data leakage. Always use method parameter injection for tenant-scoped data access.
+
+=== Subscription Queries
+
+Subscription queries work per-tenant. Updates emitted on one tenant's bus don't reach subscribers on other tenants:
+
+[source,java]
+----
+// Subscription on tenant-1
+queryGateway.subscriptionQuery(
+    new FindOrdersQuery()
+        .andMetaData(Map.of("tenantId", "tenant-1")),
+    ...
+);
+
+// Updates emitted on tenant-1's QueryUpdateEmitter
+// Only reach tenant-1 subscribers
+----
+
+== MultiTenantEventStore
+
+Routes event operations to tenant-specific event stores.
+
+=== How It Differs from Standard EventStore
+
+|===
+|Operation |Standard EventStore |MultiTenantEventStore
+
+|`publish(events)`
+|Stores in single event store
+|Resolves tenant from event metadata, stores in tenant's event store
+
+|`source(condition)`
+|Sources from single store
+|Resolves tenant from entity ID's context, sources from tenant's store
+
+|`open(condition)` for streaming
+|Opens single stream
+|Not supported directly - use `tenantSegments().get(tenant).open()`
+|===
+
+=== Event Sourcing
+
+When sourcing an entity, the event store uses the entity identifier's context to determine the tenant:
+
+[source,java]
+----
+// Command with tenant metadata
+CreateOrderCommand cmd = new CreateOrderCommand(orderId, productId)
+    .andMetaData(Map.of("tenantId", "tenant-1"));
+
+// Events sourced from tenant-1's event store
+// Events publish to tenant-1's event store
+----
+
+=== Accessing Tenant Segments
+
+For operations that need direct access to a tenant's event store (like event processors):
+
+[source,java]
+----
+MultiTenantEventStore multiTenantStore = ...;
+
+// Get all tenant segments
+Map<TenantDescriptor, EventStore> segments = multiTenantStore.tenantSegments();
+
+// Access specific tenant's store
+EventStore tenant1Store = segments.get(TenantDescriptor.tenantWithId("tenant-1"));
+----
+
+== Segment Factories
+
+Segment factories create tenant-specific infrastructure:
+
+|===
+|Factory |Creates |Default Implementation
+
+|`TenantCommandSegmentFactory`
+|`CommandBus`
+|`SimpleCommandBus`
+
+|`TenantQuerySegmentFactory`
+|`QueryBus`
+|`SimpleQueryBus`
+
+|`TenantEventSegmentFactory`
+|`EventStore`
+|In-memory `StorageEngineBackedEventStore`
+|===
+
+=== Custom Segment Factory Example
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.eventsourcing.eventstore.TenantEventSegmentFactory;
+import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.eventsourcing.eventstore.jpa.JpaEventStorageEngine;
+
+@Bean
+public TenantEventSegmentFactory eventStoreFactory(EntityManagerFactory emf) {
+    return tenant -> {
+        // Create JPA-based event store per tenant
+        JpaEventStorageEngine engine = JpaEventStorageEngine.builder()
+                .entityManagerProvider(() -> createEntityManagerForTenant(tenant))
+                .build();
+
+        return new StorageEngineBackedEventStore(
+                engine,
+                new SimpleEventBus(),
+                new AnnotationBasedTagResolver()
+        );
+    };
+}
+----
+
+== Configuration
+
+=== Axon Framework
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+
+MultiTenancyConfigurer.enhance(messagingConfigurer)
+    .registerTenantProvider(config -> tenantProvider)
+    .registerTargetTenantResolver(config -> resolver)
+    // Custom factories (optional - defaults provided)
+    .registerCommandBusSegmentFactory(config -> tenant -> createCommandBus(tenant))
+    .registerQueryBusSegmentFactory(config -> tenant -> createQueryBus(tenant))
+    .registerEventStoreSegmentFactory(config -> tenant -> createEventStore(tenant))
+    .build();
+----
+
+=== Spring Boot
+
+With Spring Boot, just define beans for custom factories:
+
+[source,java]
+----
+@Configuration
+public class MultiTenantInfrastructureConfig {
+
+    @Bean
+    public TenantEventSegmentFactory eventStoreFactory() {
+        return tenant -> {
+            // Custom event store per tenant
+        };
+    }
+}
+----
+
+The default factories are used if you don't provide custom ones.
+
+== Axon Server Connector Module
+
+When using the `multitenancy-axon-server-connector` module, you get:
+
+|===
+|Component |Behavior
+
+|`AxonServerTenantProvider`
+|Discovers tenants from Axon Server contexts
+
+|`MultiTenantAxonServerCommandBusConnector`
+|Routes commands to correct Axon Server context
+
+|`MultiTenantAxonServerQueryBusConnector`
+|Routes queries to correct Axon Server context
+
+|`AxonServerTenantEventSegmentFactory`
+|Creates `AxonServerEventStore` per tenant
+|===
+
+These are registered via SPI and override the embedded defaults. No configuration needed - just add the dependency.

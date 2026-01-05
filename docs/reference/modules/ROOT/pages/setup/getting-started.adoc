@@ -1,0 +1,443 @@
+:navtitle: Getting Started
+= Getting Started
+
+This guide walks you through adding multi-tenancy to an existing Axon Framework application. We will transform a simple single-tenant Course management application into a multi-tenant system where each tenant has isolated data.
+
+== Prerequisites
+
+Before you begin, ensure you have:
+
+* **Axon Framework 5.0 or later** - This extension requires Axon Framework 5
+* **Java 17 or later** - Required by Axon Framework 5
+
+== Add the Dependency
+
+Add the Multitenancy Extension to your Maven project:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.axonframework.extensions.multitenancy</groupId>
+    <artifactId>axon-multitenancy</artifactId>
+    <version>${multitenancy.version}</version>
+</dependency>
+----
+
+NOTE: This guide covers the standard (non-Spring) setup with an embedded in-memory event store. For production deployments, see xref:setup/axon-server.adoc[Setting Up with Axon Server].
+
+== Before: Single-Tenant Application
+
+Let's start with a simple Course management application. This is a standard Axon Framework application without multi-tenancy.
+
+=== Domain Model
+
+First, the command and event:
+
+[source,java]
+----
+// Command to create a course
+public record CreateCourse(
+        @TargetEntityId
+        CourseId courseId,
+        String name,
+        int capacity
+) {}
+
+// Event published when a course is created
+@Event(name = "CourseCreated")
+public record CourseCreated(
+        @EventTag(key = "courseId")
+        CourseId courseId,
+        String name,
+        int capacity
+) {}
+----
+
+The `CourseId` value object:
+
+[source,java]
+----
+public record CourseId(String raw) {
+
+    public static CourseId random() {
+        return new CourseId(UUID.randomUUID().toString());
+    }
+
+    @Override
+    public String toString() {
+        return raw;
+    }
+}
+----
+
+=== State Entity
+
+The state entity reconstructs state from events. It only contains `@EventSourcingHandler` methods:
+
+[source,java]
+----
+@EventSourcedEntity(tagKey = "courseId")
+public class CourseState {
+
+    private CourseId id;
+    private boolean created = false;
+    private int capacity;
+
+    @EntityCreator
+    public CourseState() {}
+
+    @EventSourcingHandler
+    public void on(CourseCreated event) {
+        this.id = event.courseId();
+        this.created = true;
+        this.capacity = event.capacity();
+    }
+
+    public boolean isCreated() { return created; }
+    public int getCapacity() { return capacity; }
+}
+----
+
+=== Command Handler
+
+Command handlers are separate from state entities. They receive the state as a parameter for validation:
+
+[source,java]
+----
+public class CreateCourseHandler {
+
+    @CommandHandler
+    public void handle(CreateCourse command, CourseState state, EventAppender appender) {
+        // Validate against current state if needed
+        // For creation, state will be empty/null for new entities
+
+        appender.append(
+                new CourseCreated(
+                        command.courseId(),
+                        command.name(),
+                        command.capacity()
+                )
+        );
+    }
+}
+----
+
+=== Projection
+
+A simple projection to track course statistics:
+
+[source,java]
+----
+// Read model
+public record CourseStats(CourseId courseId, String name, int capacity) {}
+
+// Repository interface
+public interface CourseStatsRepository {
+    CourseStats save(CourseStats stats);
+    List<CourseStats> findAll();
+}
+
+// In-memory implementation
+public class InMemoryCourseStatsRepository implements CourseStatsRepository {
+    private final ConcurrentHashMap<CourseId, CourseStats> stats = new ConcurrentHashMap<>();
+
+    @Override
+    public CourseStats save(CourseStats stats) {
+        this.stats.put(stats.courseId(), stats);
+        return stats;
+    }
+
+    @Override
+    public List<CourseStats> findAll() {
+        return stats.values().stream().toList();
+    }
+}
+
+// Event handler
+public class CourseStatsProjector {
+
+    @EventHandler
+    void handle(CourseCreated event, CourseStatsRepository repository) {
+        repository.save(new CourseStats(
+                event.courseId(),
+                event.name(),
+                event.capacity()
+        ));
+    }
+}
+
+// Query and handler
+public record FindAllCourses() {
+    public record Result(List<CourseStats> courses) {}
+}
+
+public class FindAllCoursesQueryHandler {
+
+    @QueryHandler
+    FindAllCourses.Result handle(FindAllCourses query, CourseStatsRepository repository) {
+        return new FindAllCourses.Result(repository.findAll());
+    }
+}
+----
+
+=== Single-Tenant Configuration
+
+The standard configuration for a single-tenant application:
+
+[source,java]
+----
+public class SingleTenantApplication {
+
+    public static void main(String[] args) {
+        // Create base configurer
+        EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+        // Register the entity
+        var courseEntity = EventSourcedEntityModule
+                .autodetected(CourseId.class, CourseCreation.class);
+        configurer.registerEntity(courseEntity);
+
+        // Register event processor with projector
+        var processor = PooledStreamingEventProcessorModule
+                .create("CourseStats")
+                .eventHandlingComponents(c -> c
+                        .autodetected(cfg -> new CourseStatsProjector())
+                )
+                .notCustomized();
+        configurer.componentRegistry(cr -> cr.registerModule(processor.build()));
+
+        // Register query handler
+        QueryHandlingModule queryModule = QueryHandlingModule.named("CourseQueries")
+                .queryHandlers()
+                .annotatedQueryHandlingComponent(cfg -> new FindAllCoursesQueryHandler())
+                .build();
+        configurer.registerQueryHandlingModule(queryModule);
+
+        // Register repository as a component
+        InMemoryCourseStatsRepository repository = new InMemoryCourseStatsRepository();
+        configurer.componentRegistry(cr ->
+                cr.register(CourseStatsRepository.class, c -> repository)
+        );
+
+        // Start the application
+        AxonConfiguration configuration = configurer.start();
+        CommandGateway commandGateway = configuration.getComponent(CommandGateway.class);
+
+        // Send a command
+        commandGateway.sendAndWait(
+                new CreateCourse(CourseId.random(), "Introduction to Axon", 30)
+        );
+    }
+}
+----
+
+== After: Multi-Tenant Application
+
+Now let's transform this into a multi-tenant application. The key changes are:
+
+1. Enhance the configurer with `MultiTenancyConfigurer`
+2. Register a `TenantProvider` to define available tenants
+3. Register a `TargetTenantResolver` to determine which tenant a message belongs to
+4. Register a correlation data provider to propagate tenant ID from commands to events
+5. Register tenant-scoped components (like the repository)
+6. Send commands with tenant metadata
+
+=== Multi-Tenant Configuration
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.MetadataBasedTenantResolver;
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+import org.axonframework.extension.multitenancy.messaging.eventhandling.processing.MultiTenantPooledStreamingEventProcessorModule;
+
+public class MultiTenantApplication {
+
+    // Define tenants
+    private static final TenantDescriptor TENANT_A = TenantDescriptor.tenantWithId("tenant-a");
+    private static final TenantDescriptor TENANT_B = TenantDescriptor.tenantWithId("tenant-b");
+
+    public static void main(String[] args) {
+        // Create tenant provider with initial tenants
+        SimpleTenantProvider tenantProvider = new SimpleTenantProvider(
+                List.of(TENANT_A, TENANT_B)
+        );
+
+        // Create base configurer
+        EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+        // 1. Enhance with multi-tenancy
+        MultiTenancyConfigurer multiTenancyConfigurer = MultiTenancyConfigurer.enhance(configurer)
+                .registerTenantProvider(config -> tenantProvider)
+                .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver());
+
+        // 2. Register entity (same as before)
+        var courseEntity = EventSourcedEntityModule
+                .autodetected(CourseId.class, CourseCreation.class);
+        configurer.registerEntity(courseEntity);
+
+        // 3. Use MultiTenantPooledStreamingEventProcessorModule for projections
+        // Register tenant-scoped repository with the processor - each tenant gets its own instance
+        var processor = MultiTenantPooledStreamingEventProcessorModule
+                .create("CourseStats")
+                .eventHandlingComponents(c -> c
+                        .autodetected(cfg -> new CourseStatsProjector())
+                )
+                .tenantComponent(CourseStatsRepository.class, tenant -> new InMemoryCourseStatsRepository())
+                .notCustomized();
+        configurer.componentRegistry(cr -> cr.registerModule(processor.build()));
+
+        // 4. Register query handler (same as before)
+        QueryHandlingModule queryModule = QueryHandlingModule.named("CourseQueries")
+                .queryHandlers()
+                .annotatedQueryHandlingComponent(cfg -> new FindAllCoursesQueryHandler())
+                .build();
+        configurer.registerQueryHandlingModule(queryModule);
+
+        // 5. Register correlation data provider for tenant propagation
+        // This ensures tenantId flows from commands to events
+        configurer.messaging(mc -> mc.registerCorrelationDataProvider(config -> message -> {
+            Map<String, String> result = new HashMap<>();
+            if (message.metadata().containsKey("tenantId")) {
+                result.put("tenantId", message.metadata().get("tenantId"));
+            }
+            return result;
+        }));
+
+        // Start the application
+        AxonConfiguration configuration = configurer.start();
+        CommandGateway commandGateway = configuration.getComponent(CommandGateway.class);
+
+        // Send command WITH tenant metadata
+        // Note: .getResultMessage().join() blocks - necessary here to prevent main() from exiting
+        commandGateway.send(
+                new CreateCourse(CourseId.random(), "Introduction to Multi-Tenancy", 30),
+                Metadata.with("tenantId", "tenant-a")  // <1>
+        ).getResultMessage().join();
+    }
+}
+----
+<1> The `tenantId` metadata is required. Without it, the command will fail with `NoSuchTenantException`.
+
+=== What Changed
+
+[cols="1,1"]
+|===
+|Before (Single-Tenant) |After (Multi-Tenant)
+
+|`EventSourcingConfigurer.create()`
+|`MultiTenancyConfigurer.enhance(configurer)`
+
+|Single repository instance
+|`tenantComponent()` creates one per tenant
+
+|`PooledStreamingEventProcessorModule`
+|`MultiTenantPooledStreamingEventProcessorModule`
+
+|No tenant metadata needed
+|`Metadata.with("tenantId", "tenant-a")`
+|===
+
+=== Sending Commands with Tenant Metadata
+
+When sending commands, include the tenant ID in metadata:
+
+[source,java]
+----
+// Using CommandGateway with metadata
+// Note: .getResultMessage().join() blocks until completion - only needed in main() or tests.
+// In REST controllers, return CompletableFuture instead.
+commandGateway.send(
+        new CreateCourse(courseId, "Course Name", 25),
+        Metadata.with("tenantId", "tenant-a")
+).getResultMessage().join();
+----
+
+=== Querying with Tenant Metadata
+
+Queries also require tenant metadata:
+
+[source,java]
+----
+QueryMessage query = new GenericQueryMessage(
+        new MessageType(FindAllCourses.class),
+        new FindAllCourses()
+).andMetadata(Metadata.with("tenantId", "tenant-a"));
+
+List<CourseStats> courses = queryGateway.query(query, FindAllCourses.Result.class)
+        .thenApply(FindAllCourses.Result::courses)
+        .join();
+----
+
+== Key Points
+
+=== Tenant Isolation
+
+Each tenant has completely isolated infrastructure:
+
+* **Separate Event Stores** - Events from tenant A are never visible to tenant B
+* **Separate Command Buses** - Commands are routed to the correct tenant's command handlers
+* **Separate Query Buses** - Queries only return data from the specified tenant
+* **Separate Event Processors** - Each tenant has its own event processor instances
+
+=== Same Entity ID in Different Tenants
+
+The same entity ID can exist in multiple tenants without conflict:
+
+[source,java]
+----
+CourseId sharedId = CourseId.random();
+
+// Create course with this ID in tenant A
+commandGateway.send(
+        new CreateCourse(sharedId, "Course in Tenant A", 30),
+        Metadata.with("tenantId", "tenant-a")
+);
+
+// Create course with SAME ID in tenant B - no conflict!
+commandGateway.send(
+        new CreateCourse(sharedId, "Course in Tenant B", 25),
+        Metadata.with("tenantId", "tenant-b")
+);
+----
+
+=== Dynamic Tenant Registration
+
+You can add tenants at runtime:
+
+[source,java]
+----
+SimpleTenantProvider tenantProvider = new SimpleTenantProvider(List.of(TENANT_A));
+
+// Later, add a new tenant dynamically
+TenantDescriptor newTenant = TenantDescriptor.tenantWithId("tenant-c");
+tenantProvider.addTenant(newTenant);
+
+// Now commands to tenant-c will work
+----
+
+=== Missing Tenant Metadata
+
+If you send a command without tenant metadata, you will get a `NoSuchTenantException`:
+
+[source,java]
+----
+// This will throw NoSuchTenantException
+commandGateway.sendAndWait(new CreateCourse(courseId, "No Tenant", 10));
+----
+
+Always include tenant information in your message metadata.
+
+== Next Steps
+
+This guide demonstrated multi-tenancy with an embedded in-memory event store, suitable for development and testing. For production deployments:
+
+* xref:setup/axon-server.adoc[Setting Up with Axon Server] - Recommended for production. Provides persistent storage, clustering, and automatic tenant discovery from Axon Server contexts.
+
+For more details on specific features:
+
+* xref:tenant-management.adoc[Tenant Management] - Dynamic tenant registration and lifecycle
+* xref:message-routing.adoc[Message Routing] - How messages are routed to tenants
+* xref:projections.adoc[Projections] - Multi-tenant event handling and projections
+* xref:infrastructure.adoc[Infrastructure] - Multi-tenant infrastructure components

@@ -1,0 +1,481 @@
+:navtitle: Event Processors
+= Event Processor Configuration
+
+Multi-tenant event processing creates isolated event processors per tenant. This page covers how to configure multi-tenant event processors and their token stores.
+
+== Overview
+
+In a multi-tenant application, each tenant needs its own event processor to:
+
+* Process events from their own event store
+* Track progress independently via per-tenant token stores
+* Scale separately based on tenant workload
+
+[source]
+----
+MultiTenantEventProcessor ["courseProjection"]
+    |
+    +-- PooledStreamingEventProcessor ["courseProjection@stanford"]
+    |       └── TokenStore (stanford)
+    |
+    +-- PooledStreamingEventProcessor ["courseProjection@mit"]
+    |       └── TokenStore (mit)
+    |
+    +-- PooledStreamingEventProcessor ["courseProjection@berkeley"]
+            └── TokenStore (berkeley)
+----
+
+== MultiTenantPooledStreamingEventProcessorModule
+
+This module creates a `MultiTenantEventProcessor` that wraps per-tenant `PooledStreamingEventProcessor` instances.
+
+=== Basic Usage
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.messaging.eventhandling.processing.MultiTenantPooledStreamingEventProcessorModule;
+
+configurer.messaging(m -> m
+    .eventProcessing(ep -> ep
+        .pooledStreaming(ps -> ps
+            .processor(
+                MultiTenantPooledStreamingEventProcessorModule
+                    .create("courseProjection")
+                    .eventHandlingComponents(c -> c
+                        .autodetected(cfg -> new CourseProjector())
+                    )
+            )
+        )
+    )
+);
+----
+
+=== With Configuration Customization
+
+[source,java]
+----
+MultiTenantPooledStreamingEventProcessorModule
+    .create("courseProjection")
+    .eventHandlingComponents(c -> c
+        .autodetected(cfg -> new CourseProjector())
+    )
+    .customized((cfg, config) -> config
+        .batchSize(100)
+        .initialSegmentCount(4)
+        .maxClaimedSegments(2)
+    )
+----
+
+=== With Tenant Components
+
+Register tenant-scoped dependencies for injection into handlers:
+
+[source,java]
+----
+MultiTenantPooledStreamingEventProcessorModule
+    .create("courseProjection")
+    .eventHandlingComponents(c -> c
+        .autodetected(cfg -> new CourseProjector())
+    )
+    .tenantComponent(CourseRepository.class, tenant -> new InMemoryCourseRepository())
+    .tenantComponent(MetricsService.class, tenant -> new TenantMetrics(tenant.tenantId()))
+----
+
+== TenantTokenStoreFactory
+
+The `TenantTokenStoreFactory` creates per-tenant token stores for tracking event processing progress:
+
+[source,java]
+----
+@FunctionalInterface
+public interface TenantTokenStoreFactory extends Function<TenantDescriptor, TokenStore> {
+
+    @Override
+    TokenStore apply(TenantDescriptor tenant);
+}
+----
+
+=== Available Implementations
+
+==== InMemoryTenantTokenStoreFactory (Default)
+
+Creates in-memory token stores. Suitable for testing and development:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.messaging.eventhandling.processing.InMemoryTenantTokenStoreFactory;
+
+// Default factory - creates InMemoryTokenStore per tenant
+TenantTokenStoreFactory factory = new InMemoryTenantTokenStoreFactory();
+----
+
+WARNING: In-memory token stores lose all progress on restart. Use JPA or JDBC implementations for production.
+
+==== JpaTenantTokenStoreFactory
+
+Creates JPA-based token stores with tenant-specific `EntityManagerFactory`:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.messaging.eventhandling.processing.JpaTenantTokenStoreFactory;
+import org.axonframework.conversion.Converter;
+import jakarta.persistence.EntityManagerFactory;
+
+// Provider for tenant-specific EntityManagerFactory
+Function<TenantDescriptor, EntityManagerFactory> emfProvider = tenant -> {
+    // Return EMF configured for tenant's database
+    return createEntityManagerFactory(tenant);
+};
+
+// Create factory with converter from configuration
+Converter converter = config.getComponent(Converter.class);
+TenantTokenStoreFactory factory = new JpaTenantTokenStoreFactory(emfProvider, converter);
+----
+
+With custom JPA configuration:
+
+[source,java]
+----
+import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jpa.JpaTokenStoreConfiguration;
+
+JpaTokenStoreConfiguration jpaConfig = JpaTokenStoreConfiguration.builder()
+    .schema("tokens")
+    .build();
+
+TenantTokenStoreFactory factory = new JpaTenantTokenStoreFactory(
+    emfProvider,
+    converter,
+    jpaConfig
+);
+----
+
+==== Custom Implementation
+
+Create custom factories for other storage backends:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.messaging.eventhandling.processing.TenantTokenStoreFactory;
+import org.axonframework.messaging.eventhandling.processing.streaming.token.store.jdbc.JdbcTokenStore;
+
+public class JdbcTenantTokenStoreFactory implements TenantTokenStoreFactory {
+
+    private final Map<TenantDescriptor, TokenStore> tokenStores = new ConcurrentHashMap<>();
+    private final TenantDataSourceProvider dataSourceProvider;
+    private final Converter converter;
+
+    public JdbcTenantTokenStoreFactory(
+            TenantDataSourceProvider dataSourceProvider,
+            Converter converter) {
+        this.dataSourceProvider = dataSourceProvider;
+        this.converter = converter;
+    }
+
+    @Override
+    public TokenStore apply(TenantDescriptor tenant) {
+        return tokenStores.computeIfAbsent(tenant, this::createTokenStore);
+    }
+
+    private TokenStore createTokenStore(TenantDescriptor tenant) {
+        DataSource dataSource = dataSourceProvider.getDataSource(tenant);
+        ConnectionProvider connectionProvider = new DataSourceConnectionProvider(dataSource);
+        return JdbcTokenStore.builder()
+            .connectionProvider(connectionProvider)
+            .converter(converter)
+            .build();
+    }
+}
+----
+
+== Configuration
+
+=== Global Token Store Factory
+
+Configure a global factory used by all multi-tenant processors:
+
+==== Axon Framework
+
+[source,java]
+----
+configurer.componentRegistry(cr -> cr.registerComponent(
+    TenantTokenStoreFactory.class,
+    config -> new JpaTenantTokenStoreFactory(
+        tenant -> getEntityManagerFactory(tenant),
+        config.getComponent(Converter.class)
+    )
+));
+----
+
+==== Spring Boot
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.messaging.eventhandling.processing.TenantTokenStoreFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class EventProcessorConfiguration {
+
+    @Bean
+    public TenantTokenStoreFactory tenantTokenStoreFactory(
+            TenantDataSourceProvider dataSourceProvider,
+            Converter converter) {
+        return new JdbcTenantTokenStoreFactory(dataSourceProvider, converter);
+    }
+}
+----
+
+=== Per-Processor Token Store Factory
+
+Override the global factory for a specific processor:
+
+[source,java]
+----
+MultiTenantPooledStreamingEventProcessorModule
+    .create("auditLogProjection")
+    .eventHandlingComponents(c -> c.autodetected(cfg -> new AuditLogProjector()))
+    .customized((cfg, config) -> config
+        // Use dedicated token store for this processor
+        .tenantTokenStoreFactory(new JpaTenantTokenStoreFactory(
+            tenant -> getAuditEntityManagerFactory(tenant),
+            cfg.getComponent(Converter.class)
+        ))
+    )
+----
+
+== MultiTenantEventProcessorPredicate
+
+Control which processing groups use multi-tenant processors:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenantEventProcessorPredicate;
+
+// Enable multi-tenancy for all processors (default)
+MultiTenantEventProcessorPredicate.enableMultiTenancy()
+
+// Disable multi-tenancy for all processors
+MultiTenantEventProcessorPredicate.disableMultiTenancy()
+
+// Custom predicate - enable for specific processors
+MultiTenantEventProcessorPredicate predicate = processorName ->
+    processorName.startsWith("tenant-") || processorName.equals("courseProjection");
+----
+
+=== Spring Boot Configuration
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenantEventProcessorPredicate;
+import org.springframework.context.annotation.Bean;
+
+@Bean
+public MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate() {
+    return processorName -> {
+        // Only these processors are multi-tenant
+        Set<String> multiTenantProcessors = Set.of(
+            "courseProjection",
+            "enrollmentProjection",
+            "gradeProjection"
+        );
+        return multiTenantProcessors.contains(processorName);
+    };
+}
+----
+
+== Processing Group Configuration
+
+Each processing group becomes a multi-tenant event processor. Configure groups via annotations:
+
+[source,java]
+----
+import org.axonframework.messaging.eventhandling.annotation.EventHandler;
+import org.axonframework.messaging.eventhandling.annotation.ProcessingGroup;
+
+@ProcessingGroup("courseProjection")
+@Component
+public class CourseProjector {
+
+    @EventHandler
+    public void on(CourseCreated event, CourseRepository repository) {
+        repository.save(new CourseReadModel(
+            event.courseId(),
+            event.name(),
+            event.capacity()
+        ));
+    }
+}
+----
+
+Multiple handlers in the same group share the same multi-tenant processor:
+
+[source,java]
+----
+@ProcessingGroup("courseProjection")
+@Component
+public class CourseStatsProjector {
+
+    @EventHandler
+    public void on(StudentEnrolled event, CourseStatsRepository repository) {
+        repository.incrementEnrollmentCount(event.courseId());
+    }
+}
+----
+
+== Per-Tenant Processor Names
+
+The extension creates tenant-specific processor names by appending `@tenantId`:
+
+[source]
+----
+Processing Group: "courseProjection"
+
+Per-Tenant Processors:
+  - courseProjection@stanford
+  - courseProjection@mit
+  - courseProjection@berkeley
+----
+
+This naming convention helps with:
+
+* Logging and debugging
+* Metrics collection per tenant
+* Token store isolation
+
+== Lifecycle Management
+
+=== Starting Processors
+
+Multi-tenant processors start during application startup:
+
+[source,java]
+----
+// Lifecycle phases:
+// 1. TenantProvider registers tenants
+// 2. MultiTenantEventProcessor subscribes to TenantProvider
+// 3. Per-tenant processors created for each registered tenant
+// 4. All processors started
+----
+
+=== Dynamic Tenant Addition
+
+When a tenant is added at runtime:
+
+[source,java]
+----
+// Adding a new tenant
+tenantProvider.addTenant(TenantDescriptor.tenantWithId("caltech"));
+
+// Automatically triggers:
+// 1. New PooledStreamingEventProcessor created: "courseProjection@caltech"
+// 2. Token store created for caltech
+// 3. Processor started, begins processing from initial token
+----
+
+=== Tenant Removal
+
+When a tenant is removed:
+
+[source,java]
+----
+// Removing a tenant
+tenantProvider.removeTenant(TenantDescriptor.tenantWithId("caltech"));
+
+// Automatically triggers:
+// 1. Processor "courseProjection@caltech" stopped
+// 2. Resources cleaned up
+----
+
+== Spring Boot Auto-Configuration
+
+Spring Boot auto-configures multi-tenant event processing when enabled:
+
+[source,yaml]
+----
+# application.yml
+axon:
+  multi-tenancy:
+    enabled: true  # Default
+----
+
+The auto-configuration provides:
+
+* `MultiTenantMessageHandlerLookup` - Creates multi-tenant processors for `@EventHandler` components
+* `InMemoryTenantTokenStoreFactory` - Default token store factory (override for production)
+
+=== Overriding Auto-Configuration
+
+[source,java]
+----
+@Configuration
+public class CustomEventProcessorConfig {
+
+    // Override token store factory
+    @Bean
+    public TenantTokenStoreFactory tenantTokenStoreFactory(
+            TenantDataSourceProvider dataSourceProvider,
+            Converter converter) {
+        return new JpaTenantTokenStoreFactory(
+            tenant -> dataSourceProvider.getEntityManagerFactory(tenant),
+            converter
+        );
+    }
+
+    // Control which processors are multi-tenant
+    @Bean
+    public MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate() {
+        return processorName -> !processorName.equals("globalAuditProcessor");
+    }
+}
+----
+
+== Best Practices
+
+=== 1. Use Persistent Token Stores in Production
+
+[source,java]
+----
+// Development/Testing
+TenantTokenStoreFactory factory = new InMemoryTenantTokenStoreFactory();
+
+// Production
+TenantTokenStoreFactory factory = new JpaTenantTokenStoreFactory(
+    emfProvider, converter
+);
+----
+
+=== 2. Configure Appropriate Batch Sizes
+
+[source,java]
+----
+.customized((cfg, config) -> config
+    .batchSize(100)  // Balance throughput vs memory
+)
+----
+
+=== 3. Monitor Per-Tenant Processing
+
+Use metrics to track processing lag per tenant:
+
+[source,java]
+----
+.customized((cfg, config) -> config
+    .messageMonitor(new TenantAwareMetricsMonitor())
+)
+----
+
+=== 4. Handle Tenant-Specific Errors
+
+[source,java]
+----
+.customized((cfg, config) -> config
+    .errorHandler(new TenantAwareErrorHandler())
+)
+----
+
+== See Also
+
+* xref:tenant-components.adoc[Tenant Components] - Injecting tenant-scoped dependencies
+* xref:../event-processors.adoc[Event Processors Overview] - General event processor concepts
+* xref:dynamic-tenants.adoc[Dynamic Tenants] - Adding/removing tenants at runtime

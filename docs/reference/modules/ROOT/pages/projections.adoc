@@ -1,0 +1,309 @@
+:navtitle: Projections
+= Multi-Tenant Projections
+
+Projections (read models) in multi-tenant applications typically require tenant-specific database access. The extension provides two approaches for JPA-based projections:
+
+1. **EntityManager injection** - Direct JPA access for the current tenant
+2. **Spring Data Repository injection** - Higher-level repository abstraction (Spring Boot only)
+
+== Architecture
+
+Each tenant can have:
+
+* Separate database
+* Separate schema in shared database
+* Separate table prefix (not recommended)
+
+The extension manages `EntityManagerFactory` instances per tenant:
+
+[source]
+----
+TenantEntityManagerRegistry
+    ├── tenant-1: EntityManagerFactory → database-tenant-1
+    ├── tenant-2: EntityManagerFactory → database-tenant-2
+    └── tenant-3: EntityManagerFactory → database-tenant-3
+----
+
+When an event handler runs, it receives an `EntityManager` bound to the event's tenant.
+
+== EntityManager Injection
+
+=== Configuration
+
+First, provide a factory that creates `EntityManagerFactory` per tenant:
+
+==== Axon Framework
+
+[source,java]
+----
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+import org.axonframework.extension.multitenancy.projection.jpa.TenantEntityManagerFactoryProvider;
+
+MultiTenancyConfigurer.enhance(messagingConfigurer)
+    .registerTenantEntityManagerFactoryProvider(config -> tenant -> {
+        Map<String, Object> props = new HashMap<>();
+        props.put("hibernate.connection.url",
+            "jdbc:postgresql://localhost:5432/" + tenant.tenantId());
+        props.put("hibernate.connection.username", "postgres");
+        props.put("hibernate.connection.password", "postgres");
+
+        return Persistence.createEntityManagerFactory("tenant-pu", props);
+    })
+    .build();
+----
+
+==== Spring Boot
+
+[source,java]
+----
+import jakarta.persistence.EntityManagerFactory;
+import org.axonframework.extension.multitenancy.projection.jpa.TenantEntityManagerFactoryProvider;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.context.annotation.Bean;
+
+@Configuration
+public class JpaMultiTenancyConfig {
+
+    @Bean
+    public TenantEntityManagerFactoryProvider tenantEntityManagerFactoryProvider(
+            DataSource... tenantDataSources) {  // Your tenant data sources
+
+        return tenant -> {
+            LocalContainerEntityManagerFactoryBean factory =
+                new LocalContainerEntityManagerFactoryBean();
+            factory.setDataSource(getDataSourceForTenant(tenant));
+            factory.setPackagesToScan("com.example.projections");
+            factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+            factory.afterPropertiesSet();
+            return factory.getObject();
+        };
+    }
+}
+----
+
+=== Usage in Event Handlers
+
+[source,java]
+----
+import jakarta.persistence.EntityManager;
+import org.axonframework.eventsourcing.eventhandling.EventHandler;
+import org.axonframework.messaging.eventhandling.processing.ProcessingGroup;
+
+@ProcessingGroup("orders")
+public class OrderProjection {
+
+    @EventHandler
+    public void on(OrderCreatedEvent event, EntityManager entityManager) {
+        // EntityManager is automatically bound to the event's tenant
+        OrderEntity order = new OrderEntity(
+            event.getOrderId(),
+            event.getProductId(),
+            event.getQuantity()
+        );
+        entityManager.persist(order);
+    }
+
+    @EventHandler
+    public void on(OrderShippedEvent event, EntityManager entityManager) {
+        OrderEntity order = entityManager.find(OrderEntity.class, event.getOrderId());
+        if (order != null) {
+            order.setStatus("SHIPPED");
+            order.setShippedAt(event.getShippedAt());
+        }
+    }
+}
+----
+
+The `EntityManager` parameter is resolved by `TenantEntityManagerResolverFactory`, which:
+
+1. Extracts the tenant from the event's metadata
+2. Gets the `EntityManagerFactory` for that tenant
+3. Creates and provides an `EntityManager`
+
+== Spring Data Repository Injection
+
+For Spring Boot applications, you can inject tenant-scoped Spring Data repositories directly.
+
+=== Configuration
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.autoconfig.jpa.TenantRepositoryRegistry;
+import org.axonframework.extension.multitenancy.autoconfig.jpa.DefaultTenantRepositoryRegistry;
+import org.axonframework.extension.multitenancy.projection.jpa.TenantEntityManagerRegistry;
+import org.springframework.context.annotation.Bean;
+
+@Configuration
+public class RepositoryConfig {
+
+    @Bean
+    public TenantRepositoryRegistry tenantRepositoryRegistry(
+            TenantEntityManagerRegistry entityManagerRegistry) {
+
+        return new DefaultTenantRepositoryRegistry(entityManagerRegistry);
+    }
+}
+----
+
+=== Usage in Event Handlers
+
+[source,java]
+----
+import org.axonframework.eventsourcing.eventhandling.EventHandler;
+import org.axonframework.messaging.eventhandling.processing.ProcessingGroup;
+
+@ProcessingGroup("orders")
+public class OrderProjection {
+
+    @EventHandler
+    public void on(OrderCreatedEvent event, OrderRepository orderRepository) {
+        // Repository is automatically bound to the event's tenant
+        orderRepository.save(new OrderEntity(
+            event.getOrderId(),
+            event.getProductId(),
+            event.getQuantity()
+        ));
+    }
+
+    @EventHandler
+    public void on(OrderShippedEvent event, OrderRepository orderRepository) {
+        orderRepository.findById(event.getOrderId())
+            .ifPresent(order -> {
+                order.setStatus("SHIPPED");
+                order.setShippedAt(event.getShippedAt());
+                orderRepository.save(order);
+            });
+    }
+}
+----
+
+The `OrderRepository` is a standard Spring Data interface:
+
+[source,java]
+----
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface OrderRepository extends JpaRepository<OrderEntity, String> {
+    List<OrderEntity> findByStatus(String status);
+}
+----
+
+=== How It Works
+
+The `TenantScopedJpaRepositoryResolverFactory`:
+
+1. Detects Spring Data `Repository` interface parameters
+2. Extracts the tenant from the message context
+3. Creates a repository bound to that tenant's `EntityManager`
+
+This happens per-handler-invocation, so each event gets a repository for its tenant.
+
+== Database Schema Management
+
+The extension does not manage database schemas. You're responsible for:
+
+1. Creating tenant databases/schemas
+2. Running migrations (Flyway, Liquibase) per tenant
+3. Ensuring schema compatibility
+
+=== Schema-per-Tenant Strategy
+
+[source,java]
+----
+// Each tenant gets its own schema in a shared database
+TenantEntityManagerFactoryProvider provider = tenant -> {
+    Map<String, Object> props = new HashMap<>();
+    props.put("hibernate.connection.url", "jdbc:postgresql://localhost:5432/app");
+    props.put("hibernate.default_schema", tenant.tenantId());
+    return Persistence.createEntityManagerFactory("tenant-pu", props);
+};
+----
+
+=== Database-per-Tenant Strategy
+
+[source,java]
+----
+// Each tenant gets its own database
+TenantEntityManagerFactoryProvider provider = tenant -> {
+    Map<String, Object> props = new HashMap<>();
+    props.put("hibernate.connection.url",
+        "jdbc:postgresql://localhost:5432/" + tenant.tenantId());
+    return Persistence.createEntityManagerFactory("tenant-pu", props);
+};
+----
+
+== Query Handlers
+
+Query handlers can also receive tenant-scoped `EntityManager` or repositories:
+
+[source,java]
+----
+@QueryHandler
+public List<OrderSummary> handle(FindOrdersQuery query, EntityManager entityManager) {
+    return entityManager.createQuery(
+        "SELECT new OrderSummary(o.id, o.status) FROM OrderEntity o",
+        OrderSummary.class
+    ).getResultList();
+}
+
+// Or with repository
+@QueryHandler
+public List<OrderSummary> handle(FindOrdersQuery query, OrderRepository repository) {
+    return repository.findAll().stream()
+        .map(o -> new OrderSummary(o.getId(), o.getStatus()))
+        .toList();
+}
+----
+
+The tenant is resolved from the query message's metadata.
+
+== Critical: Method Parameter Injection
+
+In multi-tenant applications, you **must** use method parameter injection for all tenant-scoped resources:
+
+[source,java]
+----
+// WRONG - field injection is NOT tenant-aware
+@Component
+public class OrderProjection {
+    @Autowired
+    private OrderRepository orderRepository;  // Single instance for ALL tenants!
+
+    @EventHandler
+    public void on(OrderCreatedEvent event) {
+        orderRepository.save(...);  // Data goes to wrong tenant!
+    }
+}
+
+// CORRECT - method parameter injection
+@Component
+public class OrderProjection {
+
+    @EventHandler
+    public void on(OrderCreatedEvent event, OrderRepository orderRepository) {
+        orderRepository.save(...);  // Correct tenant's repository
+    }
+}
+----
+
+This applies to:
+
+* `EntityManager`
+* Spring Data repositories (`JpaRepository`, etc.)
+* Any tenant-scoped resource
+
+The parameter resolver extracts the tenant from the message's metadata and provides the correctly-scoped instance.
+
+== Best Practices
+
+1. **Use database-per-tenant for strong isolation**: Separate databases provide the strongest tenant isolation.
+
+2. **Cache EntityManagerFactory instances**: The `TenantEntityManagerRegistry` caches factories - don't create them on every request.
+
+3. **Handle missing tenants gracefully**: If a tenant's database doesn't exist, your factory should fail clearly.
+
+4. **Run migrations before tenant activation**: Ensure database schema is ready before adding a tenant to the provider.
+
+5. **Consider connection pooling**: Each tenant's `EntityManagerFactory` may have its own connection pool. Monitor total connections.
