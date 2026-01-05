@@ -22,10 +22,10 @@ import org.axonframework.common.Registration;
 import org.axonframework.common.infra.ComponentDescriptor;
 import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.axonframework.eventsourcing.eventstore.EventStoreTransaction;
-import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.core.NoSuchTenantException;
+import org.axonframework.extensions.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.MessageStream;
 import org.axonframework.messaging.core.unitofwork.ProcessingContext;
@@ -53,14 +53,18 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
-public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent {
+public class MultiTenantEventStore implements EventStore, MultiTenantAwareComponent, TenantEventStoreProvider {
 
     /**
      * The order in which the {@link MultiTenantEventStore} is applied as a decorator to the {@link EventStore}.
+     * <p>
+     * Uses a lower order than {@link InterceptingEventStore} (which is at {@code Integer.MIN_VALUE + 50})
+     * to ensure correlation data (including tenant info) is applied BEFORE multi-tenant routing.
      */
-    public static final int DECORATION_ORDER = Integer.MIN_VALUE + 50;
+    public static final int DECORATION_ORDER = Integer.MIN_VALUE + 25;
 
     private final Map<TenantDescriptor, EventStore> tenantSegments = new ConcurrentHashMap<>();
     private final List<BiFunction<List<? extends EventMessage>, ProcessingContext, CompletableFuture<?>>> eventsBatchConsumers =
@@ -136,11 +140,21 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         Message message = Message.fromContext(processingContext);
         if (message == null) {
             throw new IllegalStateException(
-                    "Cannot resolve tenant for transaction: no message found in ProcessingContext"
+                    "Cannot create multi-tenant EventStoreTransaction: no message found in ProcessingContext. "
+                    + "Ensure commands are dispatched through MultiTenantCommandBus, which adds the command "
+                    + "message to the context for tenant resolution. If you're using a custom setup, wrap your "
+                    + "CommandBus segments with TenantAwareCommandBus or manually add the message to the context "
+                    + "using Message.addToContext()."
             );
         }
-        EventStore tenantSegment = resolveTenant(message);
-        return tenantSegment.transaction(processingContext);
+
+        TenantDescriptor tenant = targetTenantResolver.resolveTenant(message, tenantSegments.keySet());
+        EventStore tenantEventStore = tenantSegments.get(tenant);
+        if (tenantEventStore == null) {
+            throw NoSuchTenantException.forTenantId(tenant.tenantId());
+        }
+
+        return tenantEventStore.transaction(processingContext);
     }
 
     @Override
@@ -213,7 +227,7 @@ public class MultiTenantEventStore implements EventStore, MultiTenantAwareCompon
         TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(message, tenantSegments.keySet());
         EventStore tenantEventStore = tenantSegments.get(tenantDescriptor);
         if (tenantEventStore == null) {
-            throw new NoSuchTenantException(tenantDescriptor.tenantId());
+            throw NoSuchTenantException.forTenantId(tenantDescriptor.tenantId());
         }
         return tenantEventStore;
     }

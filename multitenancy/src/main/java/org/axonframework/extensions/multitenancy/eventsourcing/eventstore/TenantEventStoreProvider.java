@@ -18,16 +18,24 @@ package org.axonframework.extensions.multitenancy.eventsourcing.eventstore;
 import org.axonframework.eventsourcing.eventstore.EventStore;
 import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 
-import java.util.function.Function;
+import java.util.Map;
 
 /**
- * Factory for creating {@link EventStore} segments for a given {@link TenantDescriptor}. After a segment is created, it
- * may be started automatically by the factory.
+ * Provides access to per-tenant {@link EventStore} segments.
+ * <p>
+ * This interface abstracts the storage of tenant-specific event stores, allowing components
+ * like event processors to access tenant segments without depending on concrete implementations.
+ * This design ensures that decorator chains around {@code EventStore} don't affect component lookups.
  *
- * @author Stefan Dragisic
  * @author Theo Emanuelsson
  * @since 5.0.0
  */
-public interface TenantEventSegmentFactory extends Function<TenantDescriptor, EventStore> {
+public interface TenantEventStoreProvider {
 
+    /**
+     * Returns the map of tenant descriptors to their corresponding {@link EventStore} segments.
+     *
+     * @return an unmodifiable view of the tenant segments map
+     */
+    Map<TenantDescriptor, EventStore> tenantSegments();
 }
