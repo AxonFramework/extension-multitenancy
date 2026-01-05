@@ -19,8 +19,8 @@ import jakarta.annotation.Nonnull;
 import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.Registration;
 import org.axonframework.common.infra.ComponentDescriptor;
-import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.eventhandling.processing.EventProcessor;
 
 import java.util.ArrayList;
@@ -37,8 +37,8 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  * Tenant aware implementation of {@link EventProcessor} that encapsulates the actual {@link EventProcessor}s, and
  * forwards corresponding actions to a tenant-specific segment.
  *
- * @author Stefan Dragisic
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
 public class MultiTenantEventProcessor implements EventProcessor, MultiTenantAwareComponent {
 

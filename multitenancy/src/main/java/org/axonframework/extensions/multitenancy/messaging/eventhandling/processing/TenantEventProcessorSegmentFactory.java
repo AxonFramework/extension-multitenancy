@@ -15,7 +15,7 @@
  */
 package org.axonframework.extensions.multitenancy.messaging.eventhandling.processing;
 
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.eventhandling.processing.EventProcessor;
 
 import java.util.function.Function;
@@ -25,7 +25,8 @@ import java.util.function.Function;
  * created, it may be started automatically by the factory.
  *
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
 public interface TenantEventProcessorSegmentFactory extends Function<TenantDescriptor, EventProcessor> {
 
