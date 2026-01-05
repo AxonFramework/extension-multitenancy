@@ -1,0 +1,9 @@
+axon:
+  multi-tenancy:
+    jpa:
+      tenant-repositories: true
+
+logging:
+  level:
+    org.axonframework: INFO
+    org.axonframework.extensions.multitenancy: DEBUG
