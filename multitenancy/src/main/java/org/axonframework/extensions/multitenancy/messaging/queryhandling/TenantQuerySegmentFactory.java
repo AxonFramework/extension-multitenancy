@@ -16,7 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.messaging.queryhandling;
 
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.queryhandling.QueryBus;
 
 import java.util.function.Function;
@@ -26,7 +26,8 @@ import java.util.function.Function;
  * may be started automatically by the factory.
  *
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
 public interface TenantQuerySegmentFactory extends Function<TenantDescriptor, QueryBus> {
 

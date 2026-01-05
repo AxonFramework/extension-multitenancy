@@ -20,10 +20,10 @@ import jakarta.annotation.Nullable;
 import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.Registration;
 import org.axonframework.common.infra.ComponentDescriptor;
-import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.core.NoSuchTenantException;
+import org.axonframework.extensions.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.commandhandling.CommandBus;
 import org.axonframework.messaging.commandhandling.CommandHandler;
 import org.axonframework.messaging.commandhandling.CommandMessage;
@@ -48,7 +48,8 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
 public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareComponent {
 
@@ -90,7 +91,11 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
     public CompletableFuture<CommandResultMessage> dispatch(@Nonnull CommandMessage command,
                                                             @Nullable ProcessingContext processingContext) {
         try {
-            return resolveTenant(command).dispatch(command, processingContext);
+            // Add command to context so downstream components (like EventStore) can resolve tenant
+            ProcessingContext contextWithMessage = processingContext != null
+                    ? Message.addToContext(processingContext, command)
+                    : null;
+            return resolveTenant(command).dispatch(command, contextWithMessage);
         } catch (NoSuchTenantException e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -149,7 +154,7 @@ public class MultiTenantCommandBus implements CommandBus, MultiTenantAwareCompon
         TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(commandMessage, tenantSegments.keySet());
         CommandBus tenantCommandBus = tenantSegments.get(tenantDescriptor);
         if (tenantCommandBus == null) {
-            throw new NoSuchTenantException(tenantDescriptor.tenantId());
+            throw NoSuchTenantException.forTenantId(tenantDescriptor.tenantId());
         }
         return tenantCommandBus;
     }

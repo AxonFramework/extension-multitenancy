@@ -20,10 +20,10 @@ import jakarta.annotation.Nullable;
 import org.axonframework.common.AxonConfigurationException;
 import org.axonframework.common.Registration;
 import org.axonframework.common.infra.ComponentDescriptor;
-import org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent;
-import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.MultiTenantAwareComponent;
+import org.axonframework.extensions.multitenancy.core.NoSuchTenantException;
+import org.axonframework.extensions.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.MessageStream;
 import org.axonframework.messaging.core.QualifiedName;
@@ -51,7 +51,8 @@ import static org.axonframework.common.BuilderUtils.assertNonNull;
  *
  * @author Stefan Dragisic
  * @author Steven van Beelen
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
 public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent {
 
@@ -173,7 +174,7 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
         TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(message, tenantSegments.keySet());
         QueryBus tenantQueryBus = tenantSegments.get(tenantDescriptor);
         if (tenantQueryBus == null) {
-            throw new NoSuchTenantException(tenantDescriptor.tenantId());
+            throw NoSuchTenantException.forTenantId(tenantDescriptor.tenantId());
         }
         return tenantQueryBus;
     }
@@ -231,7 +232,7 @@ public class MultiTenantQueryBus implements QueryBus, MultiTenantAwareComponent 
         TenantDescriptor tenantDescriptor = targetTenantResolver.resolveTenant(queryMessage, tenantSegments.keySet());
         QueryBus tenantQueryBus = tenantSegments.get(tenantDescriptor);
         if (tenantQueryBus == null) {
-            throw new NoSuchTenantException(tenantDescriptor.tenantId());
+            throw NoSuchTenantException.forTenantId(tenantDescriptor.tenantId());
         }
         return tenantQueryBus;
     }
