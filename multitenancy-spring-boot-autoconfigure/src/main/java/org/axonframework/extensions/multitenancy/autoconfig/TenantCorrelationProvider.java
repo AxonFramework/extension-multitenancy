@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2025. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,36 +15,55 @@
  */
 package org.axonframework.extensions.multitenancy.autoconfig;
 
-import org.axonframework.messaging.Message;
-import org.axonframework.messaging.correlation.CorrelationDataProvider;
+import jakarta.annotation.Nonnull;
+import org.axonframework.messaging.core.Message;
+import org.axonframework.messaging.core.Metadata;
+import org.axonframework.messaging.core.correlation.CorrelationDataProvider;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Default implementation of {@link CorrelationDataProvider} that provides the tenant identifier as a correlation.
+ * Implementation of {@link CorrelationDataProvider} that propagates the tenant identifier
+ * from incoming messages to outgoing messages.
+ * <p>
+ * This provider ensures that the tenant context is preserved when messages trigger
+ * new messages during processing (e.g., when a command handler publishes events,
+ * or when an event handler sends queries).
+ * <p>
+ * If the tenant key is not present in the incoming message's metadata, a default value
+ * of "unknownTenant" is used to ensure tenant information is always propagated.
  *
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
+ * @see CorrelationDataProvider
  */
 public class TenantCorrelationProvider implements CorrelationDataProvider {
+
+    private static final String UNKNOWN_TENANT = "unknownTenant";
 
     private final String tenantCorrelationKey;
 
     /**
-     * Construct a tenant-specific {@link CorrelationDataProvider} using the given {@code tenantCorrelationKey}.
+     * Constructs a tenant-specific {@link CorrelationDataProvider} using the given {@code tenantCorrelationKey}.
      *
      * @param tenantCorrelationKey The key used to store the tenant identifier in the
-     *                             {@link org.axonframework.messaging.MetaData}.
+     *                             {@link Metadata message metadata}.
      */
     public TenantCorrelationProvider(String tenantCorrelationKey) {
         this.tenantCorrelationKey = tenantCorrelationKey;
     }
 
+    @Nonnull
     @Override
-    public Map<String, ?> correlationDataFor(Message<?> message) {
-        Map<String, Object> result = new HashMap<>();
-        result.put(tenantCorrelationKey, message.getMetaData().getOrDefault(tenantCorrelationKey, "unknownTenant"));
+    public Map<String, String> correlationDataFor(@Nonnull Message message) {
+        Map<String, String> result = new HashMap<>();
+        Metadata metadata = message.metadata();
+        String tenantId = metadata.containsKey(tenantCorrelationKey)
+                ? metadata.get(tenantCorrelationKey)
+                : UNKNOWN_TENANT;
+        result.put(tenantCorrelationKey, tenantId);
         return result;
     }
 }

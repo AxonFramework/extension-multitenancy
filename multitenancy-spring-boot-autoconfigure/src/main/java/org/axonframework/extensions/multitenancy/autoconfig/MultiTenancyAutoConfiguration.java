@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2024. Axon Framework
+ * Copyright (c) 2010-2025. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,213 +15,139 @@
  */
 package org.axonframework.extensions.multitenancy.autoconfig;
 
-import org.axonframework.commandhandling.CommandBus;
-import org.axonframework.commandhandling.CommandMessage;
-import org.axonframework.eventhandling.EventMessage;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantConnectPredicate;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
-import org.axonframework.extensions.multitenancy.components.TenantProvider;
-import org.axonframework.extensions.multitenancy.components.commandhandeling.MultiTenantCommandBus;
-import org.axonframework.extensions.multitenancy.components.commandhandeling.TenantCommandSegmentFactory;
-import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueue;
-import org.axonframework.extensions.multitenancy.components.deadletterqueue.MultiTenantDeadLetterQueueFactory;
-import org.axonframework.extensions.multitenancy.components.eventstore.MultiTenantEventStore;
-import org.axonframework.extensions.multitenancy.components.eventstore.TenantEventSegmentFactory;
-import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryBus;
-import org.axonframework.extensions.multitenancy.components.queryhandeling.MultiTenantQueryUpdateEmitter;
-import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQuerySegmentFactory;
-import org.axonframework.extensions.multitenancy.components.queryhandeling.TenantQueryUpdateEmitterSegmentFactory;
-import org.axonframework.extensions.multitenancy.components.scheduling.MultiTenantEventScheduler;
-import org.axonframework.extensions.multitenancy.components.scheduling.TenantEventSchedulerSegmentFactory;
-import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessingModule;
-import org.axonframework.extensions.multitenancy.configuration.MultiTenantEventProcessorPredicate;
-import org.axonframework.extensions.multitenancy.configuration.MultiTenantStreamableMessageSourceProvider;
-import org.axonframework.messaging.Message;
-import org.axonframework.messaging.correlation.CorrelationDataProvider;
-import org.axonframework.queryhandling.QueryMessage;
-import org.axonframework.queryhandling.QueryUpdateEmitter;
-import org.axonframework.springboot.util.ConditionalOnMissingQualifiedBean;
+import org.axonframework.common.configuration.Configuration;
+import org.axonframework.eventsourcing.eventstore.EventStore;
+import org.axonframework.extensions.multitenancy.core.MetadataBasedTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TenantConnectPredicate;
+import org.axonframework.extensions.multitenancy.core.configuration.MultiTenantEventProcessorPredicate;
+import org.axonframework.messaging.core.Message;
+import org.axonframework.messaging.core.correlation.CorrelationDataProvider;
+import org.axonframework.messaging.eventhandling.EventSink;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.axonframework.extensions.multitenancy.autoconfig.TenantConfiguration.TENANT_CORRELATION_KEY;
-
 /**
- * Autoconfiguration constructing the
- * {@link org.axonframework.extensions.multitenancy.components.MultiTenantAwareComponent multi-tenant aware}
- * infrastructure components.
+ * Auto-configuration for multi-tenant Axon Framework support beans.
+ * <p>
+ * This configuration provides:
+ * <ul>
+ *     <li>Property binding via {@link MultiTenancyProperties}</li>
+ *     <li>Default {@link TargetTenantResolver} using message metadata</li>
+ *     <li>Default {@link TenantConnectPredicate} accepting all tenants</li>
+ *     <li>{@link CorrelationDataProvider} for tenant ID propagation</li>
+ *     <li>{@link MultiTenantEventProcessorPredicate} for event processor configuration</li>
+ * </ul>
+ * <p>
+ * The actual multi-tenant infrastructure components (MultiTenantCommandBus, MultiTenantQueryBus,
+ * MultiTenantEventStore) are created by the {@code MultiTenancyConfigurationDefaults} SPI enhancer
+ * in the core module. This autoconfiguration only provides the supporting beans that the SPI
+ * enhancer uses.
+ * <p>
+ * For Axon Server deployments, the {@code DistributedMultiTenancyConfigurationDefaults} in the
+ * {@code multitenancy-axon-server-connector} module provides additional components like
+ * {@code AxonServerTenantProvider} and multi-tenant connectors.
+ * <p>
+ * Multi-tenancy can be disabled by setting {@code axon.multi-tenancy.enabled=false}.
  *
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
+ * @see MultiTenancyProperties
+ * @see org.axonframework.extensions.multitenancy.core.configuration.MultiTenancyConfigurationDefaults
  */
 @AutoConfiguration
 @ConditionalOnProperty(value = "axon.multi-tenancy.enabled", matchIfMissing = true)
 @AutoConfigureAfter(MultiTenancyAxonServerAutoConfiguration.class)
+@EnableConfigurationProperties(MultiTenancyProperties.class)
 public class MultiTenancyAutoConfiguration {
 
+    /**
+     * Creates a default {@link TenantConnectPredicate} that accepts all tenants.
+     * <p>
+     * Users can override this bean to filter which tenants should be connected.
+     *
+     * @return a predicate that returns {@code true} for all tenants
+     */
     @Bean
     @ConditionalOnMissingBean
     public TenantConnectPredicate tenantFilterPredicate() {
         return tenant -> true;
     }
 
-    @Bean
-    @Primary
-    @ConditionalOnMissingQualifiedBean(qualifier = "!localSegment", beanClass = CommandBus.class)
-    public MultiTenantCommandBus multiTenantCommandBus(TenantCommandSegmentFactory tenantCommandSegmentFactory,
-                                                       TargetTenantResolver<?> targetTenantResolver,
-                                                       TenantProvider tenantProvider) {
-        //noinspection unchecked
-        MultiTenantCommandBus commandBus =
-                MultiTenantCommandBus.builder()
-                                     .tenantSegmentFactory(tenantCommandSegmentFactory)
-                                     .targetTenantResolver(
-                                             (TargetTenantResolver<CommandMessage<?>>) targetTenantResolver
-                                     )
-                                     .build();
-        tenantProvider.subscribe(commandBus);
-        return commandBus;
-    }
-
-    @Bean
-    @Primary
-    public MultiTenantQueryBus multiTenantQueryBus(TenantQuerySegmentFactory tenantQuerySegmentFactory,
-                                                   TargetTenantResolver<?> targetTenantResolver,
-                                                   TenantProvider tenantProvider) {
-        //noinspection unchecked
-        MultiTenantQueryBus queryBus =
-                MultiTenantQueryBus.builder()
-                                   .tenantSegmentFactory(tenantQuerySegmentFactory)
-                                   .targetTenantResolver(
-                                           (TargetTenantResolver<QueryMessage<?, ?>>) targetTenantResolver
-                                   )
-                                   .build();
-        tenantProvider.subscribe(queryBus);
-        return queryBus;
-    }
-
-    @Bean
-    @Primary
-    public QueryUpdateEmitter multiTenantQueryUpdateEmitter(
-            TenantQueryUpdateEmitterSegmentFactory tenantQueryUpdateEmitterSegmentFactory,
-            TargetTenantResolver<?> targetTenantResolver,
-            TenantProvider tenantProvider
-    ) {
-        //noinspection unchecked
-        MultiTenantQueryUpdateEmitter multiTenantQueryUpdateEmitter =
-                MultiTenantQueryUpdateEmitter.builder()
-                                             .tenantSegmentFactory(tenantQueryUpdateEmitterSegmentFactory)
-                                             .targetTenantResolver(
-                                                     (TargetTenantResolver<Message<?>>) targetTenantResolver
-                                             )
-                                             .build();
-        tenantProvider.subscribe(multiTenantQueryUpdateEmitter);
-        return multiTenantQueryUpdateEmitter;
-    }
-
-    @Bean
-    @Primary
-    public MultiTenantEventStore multiTenantEventStore(TenantEventSegmentFactory tenantEventSegmentFactory,
-                                                       TargetTenantResolver<?> targetTenantResolver,
-                                                       TenantProvider tenantProvider) {
-        //noinspection unchecked
-        MultiTenantEventStore multiTenantEventStore =
-                MultiTenantEventStore.builder()
-                                     .tenantSegmentFactory(tenantEventSegmentFactory)
-                                     .targetTenantResolver((TargetTenantResolver<Message<?>>) targetTenantResolver)
-                                     .build();
-        tenantProvider.subscribe(multiTenantEventStore);
-        return multiTenantEventStore;
-    }
-
-    @Bean
-    @Primary
-    public MultiTenantEventScheduler multiTenantEventScheduler(
-            TenantEventSchedulerSegmentFactory tenantEventSchedulerSegmentFactory,
-            TargetTenantResolver<?> targetTenantResolver,
-            TenantProvider tenantProvider
-    ) {
-        //noinspection unchecked
-        MultiTenantEventScheduler multiTenantEventScheduler =
-                MultiTenantEventScheduler.builder()
-                                         .tenantSegmentFactory(tenantEventSchedulerSegmentFactory)
-                                         .targetTenantResolver(
-                                                 (TargetTenantResolver<EventMessage<?>>) targetTenantResolver
-                                         )
-                                         .build();
-        tenantProvider.subscribe(multiTenantEventScheduler);
-        return multiTenantEventScheduler;
-    }
-
-    @Bean
-    public MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory(
-            TenantProvider tenantProvider,
-            TargetTenantResolver<?> targetTenantResolver
-    ) {
-        Map<String, MultiTenantDeadLetterQueue<EventMessage<?>>> multiTenantDeadLetterQueue = new ConcurrentHashMap<>();
-        return (processingGroup) -> multiTenantDeadLetterQueue.computeIfAbsent(processingGroup, (key) -> {
-            //noinspection unchecked
-            MultiTenantDeadLetterQueue<EventMessage<?>> deadLetterQueue =
-                    MultiTenantDeadLetterQueue.builder()
-                                              .targetTenantResolver(
-                                                      (TargetTenantResolver<EventMessage<?>>) targetTenantResolver
-                                              )
-                                              .processingGroup(processingGroup)
-                                              .build();
-            tenantProvider.subscribe(deadLetterQueue);
-            return deadLetterQueue;
-        });
-    }
-
-
-    @Bean
-    @ConditionalOnMissingBean
-    public MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider() {
-        return (defaultTenantSource, processorName, tenantDescriptor, configuration) -> defaultTenantSource;
-    }
-
+    /**
+     * Creates a predicate that determines whether multi-tenancy should be enabled
+     * for a given event processor.
+     * <p>
+     * By default, enables multi-tenancy for all processors. Users can override
+     * this bean to selectively enable/disable multi-tenancy per processor.
+     *
+     * @return a predicate that enables multi-tenancy for all processors
+     */
     @Bean
     @ConditionalOnMissingBean
     public MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate() {
         return MultiTenantEventProcessorPredicate.enableMultiTenancy();
     }
 
+    /**
+     * Creates the target tenant resolver that extracts the tenant from message metadata.
+     * <p>
+     * Uses the {@code tenantKey} property from {@link MultiTenancyProperties} to determine
+     * which metadata key contains the tenant identifier. Defaults to "tenantId".
+     * <p>
+     * This resolver is used by the SPI-registered multi-tenant components to route
+     * messages to the appropriate tenant.
+     *
+     * @param properties the multi-tenancy configuration properties
+     * @return the metadata-based tenant resolver
+     */
     @Bean
-    public MultiTenantEventProcessingModule multiTenantEventProcessingModule(
-            TenantProvider tenantProvider,
-            MultiTenantStreamableMessageSourceProvider multiTenantStreamableMessageSourceProvider,
-            MultiTenantDeadLetterQueueFactory<EventMessage<?>> multiTenantDeadLetterQueueFactory,
-            MultiTenantEventProcessorPredicate multiTenantEventProcessorPredicate
-    ) {
-        return new MultiTenantEventProcessingModule(
-                tenantProvider,
-                multiTenantStreamableMessageSourceProvider,
-                multiTenantDeadLetterQueueFactory,
-                multiTenantEventProcessorPredicate
-        );
+    @ConditionalOnMissingBean
+    public TargetTenantResolver<Message> targetTenantResolver(MultiTenancyProperties properties) {
+        return new MetadataBasedTenantResolver(properties.getTenantKey());
     }
 
+    /**
+     * Creates the correlation data provider that propagates tenant information
+     * to new messages dispatched during message handling.
+     * <p>
+     * Uses the {@code tenantKey} property from {@link MultiTenancyProperties} to determine
+     * which metadata key to propagate. This ensures that when a command handler dispatches
+     * events or other commands, the tenant ID is automatically included in the new messages.
+     *
+     * @param properties the multi-tenancy configuration properties
+     * @return the tenant correlation provider
+     */
     @Bean
-    @ConditionalOnProperty(name = "axon.multi-tenancy.use-metadata-helper", matchIfMissing = true)
-    public TargetTenantResolver<Message<?>> targetTenantResolver() {
-        return (message, tenants) ->
-                TenantDescriptor.tenantWithId(
-                        (String) message.getMetaData()
-                                        .getOrDefault(TENANT_CORRELATION_KEY, "unknownTenant")
-                );
+    @ConditionalOnMissingBean(TenantCorrelationProvider.class)
+    public CorrelationDataProvider tenantCorrelationProvider(MultiTenancyProperties properties) {
+        return new TenantCorrelationProvider(properties.getTenantKey());
     }
 
+    /**
+     * Provides the primary {@link EventSink} bean to resolve ambiguity when multiple beans
+     * implement {@code EventSink}.
+     * <p>
+     * This is necessary because when multi-tenancy is enabled, both the decorated
+     * {@link EventStore} and the {@code TenantEventStoreProvider} component are exposed
+     * as Spring beans by the {@code SpringComponentRegistry}. Since {@code MultiTenantEventStore}
+     * implements both interfaces, Spring sees duplicate candidates for {@code EventSink}.
+     * <p>
+     * This bean delegates to the Axon {@link Configuration}'s {@link EventStore}, ensuring
+     * the properly decorated event store is used as the primary {@code EventSink}.
+     *
+     * @param configuration the Axon configuration
+     * @return the primary event sink (the configured event store)
+     */
     @Bean
-    @ConditionalOnProperty(name = "axon.multi-tenancy.use-metadata-helper", matchIfMissing = true)
-    public CorrelationDataProvider tenantCorrelationProvider() {
-        return new TenantCorrelationProvider(TENANT_CORRELATION_KEY);
+    @Primary
+    public EventSink primaryEventSink(Configuration configuration) {
+        return configuration.getComponent(EventStore.class);
     }
 }

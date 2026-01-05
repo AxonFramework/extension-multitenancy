@@ -1,5 +1,8 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-  org.axonframework.extensions.multitenancy.autoconfig.MultiTenantPersistentStreamAutoConfiguration,\
   org.axonframework.extensions.multitenancy.autoconfig.MultiTenancyAutoConfiguration,\
-  org.axonframework.extensions.multitenancy.autoconfig.MultiTenancyAxonServerAutoConfiguration
+  org.axonframework.extensions.multitenancy.autoconfig.MultiTenancyAxonServerAutoConfiguration,\
+  org.axonframework.extensions.multitenancy.autoconfig.MultiTenancySpringDataJpaAutoConfiguration,\
+  org.axonframework.extensions.multitenancy.autoconfig.MultiTenantEventProcessingAutoConfiguration
 
+org.springframework.boot.autoconfigure.AutoConfigurationImportFilter=\
+  org.axonframework.extensions.multitenancy.autoconfig.MultiTenancyAutoConfigurationImportFilter

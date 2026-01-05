@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2023. Axon Framework
+ * Copyright (c) 2010-2025. Axon Framework
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,26 @@
 package org.axonframework.extensions.multitenancy.autoconfig;
 
 /**
- * Enables static access to default {@code TENANT_CORRELATION_KEY} used to correlate tenant identifiers within
- * {@link org.axonframework.messaging.MetaData}.
+ * Configuration constants for multi-tenancy.
+ * <p>
+ * Provides static access to the default tenant correlation key used to identify
+ * tenant information within message metadata.
  *
  * @author Stefan Dragisic
- * @since 4.6.0
+ * @author Theo Emanuelsson
+ * @since 5.0.0
  */
 public class TenantConfiguration {
 
+    private TenantConfiguration() {
+        // Utility class
+    }
+
     /**
-     * The tenant correlation key used within {@link org.axonframework.messaging.MetaData}.
+     * The default metadata key used to store and retrieve the tenant identifier.
+     * <p>
+     * This key is used by {@link TenantCorrelationProvider} to propagate tenant
+     * information between messages.
      */
     public static final String TENANT_CORRELATION_KEY = "tenantId";
 }

@@ -77,7 +77,7 @@ import org.slf4j.LoggerFactory;
  *
  * @param <T> the type of component this factory creates, typically the implementing class itself
  * @author Theo Emanuelsson
- * @since 5.1.0
+ * @since 5.0.0
  * @see org.axonframework.extensions.multitenancy.core.TenantDescriptor
  * @see org.axonframework.extensions.multitenancy.core.TenantComponentFactory
  */
