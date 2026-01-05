@@ -21,7 +21,7 @@
     <parent>
         <artifactId>axon-multitenancy-parent</artifactId>
         <groupId>org.axonframework.extensions.multitenancy</groupId>
-        <version>4.12.1-SNAPSHOT</version>
+        <version>5.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>axon-coverage-report</artifactId>
@@ -38,13 +38,19 @@
         </dependency>
         <dependency>
             <groupId>org.axonframework.extensions.multitenancy</groupId>
-            <artifactId>axon-multitenancy-spring-boot-autoconfigure</artifactId>
+            <artifactId>axon-multitenancy-spring</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.axonframework.extensions.multitenancy</groupId>
-            <artifactId>axon-multitenancy-spring-boot-3-integrationtests</artifactId>
+            <artifactId>axon-multitenancy-axon-server-connector</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.axonframework.extensions.multitenancy</groupId>
+            <artifactId>axon-multitenancy-spring-boot-autoconfigure</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
