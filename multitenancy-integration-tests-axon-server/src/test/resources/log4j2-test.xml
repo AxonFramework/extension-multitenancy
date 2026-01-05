@@ -7,7 +7,7 @@
     </Appenders>
     <Loggers>
         <Logger name="org.axonframework" level="INFO"/>
-        <Logger name="org.axonframework.extensions.multitenancy" level="DEBUG"/>
+        <Logger name="org.axonframework.extension.multitenancy" level="DEBUG"/>
         <Logger name="io.axoniq.axonserver" level="INFO"/>
         <Logger name="org.testcontainers" level="INFO"/>
         <Root level="INFO">
