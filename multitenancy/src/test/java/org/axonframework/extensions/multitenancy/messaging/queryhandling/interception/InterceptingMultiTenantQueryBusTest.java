@@ -18,7 +18,7 @@ package org.axonframework.extensions.multitenancy.messaging.queryhandling.interc
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.messaging.queryhandling.MultiTenantQueryBus;
 import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.MessageDispatchInterceptor;

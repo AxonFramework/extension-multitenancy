@@ -16,7 +16,7 @@
 
 package org.axonframework.extensions.multitenancy.messaging.eventhandling.processing;
 
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.eventhandling.processing.EventProcessor;
 import org.junit.jupiter.api.*;
 

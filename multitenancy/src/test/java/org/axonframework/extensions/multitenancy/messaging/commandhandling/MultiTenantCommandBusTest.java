@@ -16,9 +16,9 @@
 
 package org.axonframework.extensions.multitenancy.messaging.commandhandling;
 
-import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.NoSuchTenantException;
+import org.axonframework.extensions.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.commandhandling.CommandBus;
 import org.axonframework.messaging.commandhandling.CommandHandler;
 import org.axonframework.messaging.commandhandling.CommandMessage;

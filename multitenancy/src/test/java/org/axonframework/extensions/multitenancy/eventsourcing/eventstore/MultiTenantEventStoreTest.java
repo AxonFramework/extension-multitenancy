@@ -18,9 +18,9 @@ package org.axonframework.extensions.multitenancy.eventsourcing.eventstore;
 
 import org.axonframework.common.Registration;
 import org.axonframework.eventsourcing.eventstore.EventStore;
-import org.axonframework.extensions.multitenancy.components.NoSuchTenantException;
-import org.axonframework.extensions.multitenancy.components.TargetTenantResolver;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.NoSuchTenantException;
+import org.axonframework.extensions.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.messaging.core.Message;
 import org.axonframework.messaging.core.MessageType;
 import org.axonframework.messaging.eventhandling.EventMessage;

@@ -18,7 +18,7 @@ package org.axonframework.extensions.multitenancy.messaging.commandhandling.inte
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
-import org.axonframework.extensions.multitenancy.components.TenantDescriptor;
+import org.axonframework.extensions.multitenancy.core.TenantDescriptor;
 import org.axonframework.extensions.multitenancy.messaging.commandhandling.MultiTenantCommandBus;
 import org.axonframework.messaging.commandhandling.CommandBus;
 import org.axonframework.messaging.commandhandling.CommandMessage;
