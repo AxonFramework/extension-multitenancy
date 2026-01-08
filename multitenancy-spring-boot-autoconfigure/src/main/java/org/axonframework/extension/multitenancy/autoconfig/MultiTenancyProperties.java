@@ -70,6 +70,16 @@ public class MultiTenancyProperties {
     private JpaProperties jpa = new JpaProperties();
 
     /**
+     * JDBC-specific configuration for multi-tenant data access.
+     */
+    private JdbcProperties jdbc = new JdbcProperties();
+
+    /**
+     * R2DBC-specific configuration for multi-tenant reactive data access.
+     */
+    private R2dbcProperties r2dbc = new R2dbcProperties();
+
+    /**
      * Returns whether multi-tenancy is enabled.
      *
      * @return {@code true} if multi-tenancy is enabled, {@code false} otherwise
@@ -175,6 +185,42 @@ public class MultiTenancyProperties {
      */
     public void setJpa(JpaProperties jpa) {
         this.jpa = jpa;
+    }
+
+    /**
+     * Returns the JDBC-specific configuration.
+     *
+     * @return the JDBC properties
+     */
+    public JdbcProperties getJdbc() {
+        return jdbc;
+    }
+
+    /**
+     * Sets the JDBC-specific configuration.
+     *
+     * @param jdbc the JDBC properties
+     */
+    public void setJdbc(JdbcProperties jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    /**
+     * Returns the R2DBC-specific configuration.
+     *
+     * @return the R2DBC properties
+     */
+    public R2dbcProperties getR2dbc() {
+        return r2dbc;
+    }
+
+    /**
+     * Sets the R2DBC-specific configuration.
+     *
+     * @param r2dbc the R2DBC properties
+     */
+    public void setR2dbc(R2dbcProperties r2dbc) {
+        this.r2dbc = r2dbc;
     }
 
     /**
@@ -313,6 +359,92 @@ public class MultiTenancyProperties {
          */
         public void setTenantRepositories(boolean tenantRepositories) {
             this.tenantRepositories = tenantRepositories;
+        }
+    }
+
+    /**
+     * JDBC-specific properties for multi-tenant data access.
+     * <p>
+     * When enabled, {@link org.springframework.jdbc.core.JdbcTemplate} and
+     * {@link org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate}
+     * are registered as tenant-scoped components that can be injected into message handlers.
+     * <p>
+     * This provides a lightweight alternative to JPA for projections and queries.
+     */
+    public static class JdbcProperties {
+
+        /**
+         * Whether to enable per-tenant JDBC templates. Defaults to {@code false}.
+         * <p>
+         * When enabled:
+         * <ul>
+         *     <li>A {@link org.axonframework.extension.multitenancy.spring.data.jpa.TenantDataSourceProvider}
+         *         bean is required</li>
+         *     <li>{@link org.springframework.jdbc.core.JdbcTemplate} can be injected into message handlers</li>
+         *     <li>{@link org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate} can be injected
+         *         into message handlers</li>
+         * </ul>
+         */
+        private boolean enabled = false;
+
+        /**
+         * Returns whether per-tenant JDBC templates are enabled.
+         *
+         * @return {@code true} if JDBC templates are enabled, {@code false} otherwise
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Sets whether per-tenant JDBC templates are enabled.
+         *
+         * @param enabled {@code true} to enable per-tenant JDBC templates
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    /**
+     * R2DBC-specific properties for multi-tenant reactive data access.
+     * <p>
+     * When enabled, {@link org.springframework.r2dbc.core.DatabaseClient}
+     * is registered as a tenant-scoped component that can be injected into message handlers
+     * for non-blocking database operations.
+     * <p>
+     * R2DBC is beneficial in high-concurrency scenarios when not using virtual threads.
+     */
+    public static class R2dbcProperties {
+
+        /**
+         * Whether to enable per-tenant R2DBC database clients. Defaults to {@code false}.
+         * <p>
+         * When enabled:
+         * <ul>
+         *     <li>A {@link org.axonframework.extension.multitenancy.spring.data.r2dbc.TenantConnectionFactoryProvider}
+         *         bean is required</li>
+         *     <li>{@link org.springframework.r2dbc.core.DatabaseClient} can be injected into message handlers</li>
+         * </ul>
+         */
+        private boolean enabled = false;
+
+        /**
+         * Returns whether per-tenant R2DBC database clients are enabled.
+         *
+         * @return {@code true} if R2DBC is enabled, {@code false} otherwise
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Sets whether per-tenant R2DBC database clients are enabled.
+         *
+         * @param enabled {@code true} to enable per-tenant R2DBC
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
 }

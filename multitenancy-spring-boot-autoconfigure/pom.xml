@@ -99,6 +99,13 @@
             <version>${spring.version}</version>
             <optional>true</optional>
         </dependency>
+        <!-- Optional: R2DBC support -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-r2dbc</artifactId>
+            <version>${spring.version}</version>
+            <optional>true</optional>
+        </dependency>
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

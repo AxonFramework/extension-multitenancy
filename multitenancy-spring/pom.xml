@@ -70,6 +70,13 @@
             <artifactId>spring-data-jpa</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Optional: R2DBC support (SPI for TenantConnectionFactoryProvider) -->
+        <dependency>
+            <groupId>io.r2dbc</groupId>
+            <artifactId>r2dbc-spi</artifactId>
+            <version>1.0.0.RELEASE</version>
+            <optional>true</optional>
+        </dependency>
         <!-- Other -->
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
