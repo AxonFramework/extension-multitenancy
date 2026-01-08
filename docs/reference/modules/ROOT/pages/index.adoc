@@ -1,15 +1,193 @@
 :navtitle: Introduction
-= Introduction
+= Multitenancy Extension
 
-Axon Framework Multitenancy Extension provides your application ability to serve multiple tenants (event-stores) at once. Multi-tenancy is important in cloud computing and this extension will provide ability to connect to tenants dynamically, physical separate tenants data, scale tenants independently...
+Multitenancy is an architectural pattern where a single application instance serves multiple tenants -- such as universities, departments, or organizations -- while keeping their data and operations logically isolated.
+This extension enables Axon Framework applications to support multiple tenants with complete isolation of commands, events, queries, and event processors.
 
-== Requirements
-Currently, following requirements needs to be meet for extension to work:
+== How It Works
 
-- Use *Spring Framework* together with *Axon Framework 4.6+*
-- Use *Axon Server EE 4.6+* or Axon Cloud as event store
-- This is not hard requirement but if you wish to enable multitenancy on projection side, only SQL databases are supported out-of-the box
+The Multitenancy Extension transforms your single-tenant Axon application into a multi-tenant system by introducing a routing layer.
+Instead of a single command bus, event store, query bus, and event processor, the extension manages multiple _tenant segments_ -- one set of infrastructure components per tenant.
 
-== Restrictions
+=== Single-Tenant Architecture
 
-Only components that interact with Axon Server and or database via JPA are supported out of the box. If you wish to use other components, you need to implement multi-tenancy support for them.
+In a standard Axon application, all messages flow through shared infrastructure:
+
+[source]
+----
+                    +------------------+
+   Command -------->|                  |
+                    |   Command Bus    |-------> Command Handler
+   Query ---------->|                  |
+                    |   Query Bus      |-------> Query Handler
+                    |                  |
+   Event <----------|   Event Store    |<------- Command Handler
+                    |                  |
+                    | Event Processor  |-------> Event Handler
+                    +------------------+
+----
+
+=== Multi-Tenant Architecture
+
+With the Multitenancy Extension, each tenant gets its own isolated segment:
+
+[source]
+----
+                          +---------------------------+
+                          |   Multi-Tenant Command    |
+   Command + tenantId --->|          Bus              |
+                          +---------------------------+
+                                      |
+              +-----------------------+-----------------------+
+              |                       |                       |
+              v                       v                       v
+    +------------------+    +------------------+    +------------------+
+    |   MIT Segment    |    | Stanford Segment |    |  Oxford Segment  |
+    |                  |    |                  |    |                  |
+    |   Command Bus    |    |   Command Bus    |    |   Command Bus    |
+    |   Event Store    |    |   Event Store    |    |   Event Store    |
+    |   Query Bus      |    |   Query Bus      |    |   Query Bus      |
+    | Event Processor  |    | Event Processor  |    | Event Processor  |
+    +------------------+    +------------------+    +------------------+
+----
+
+When a message arrives, the extension:
+
+1. Extracts the tenant identifier from the message (typically from metadata)
+2. Routes the message to the appropriate tenant segment
+3. Processes the message in complete isolation from other tenants
+
+== Key Concepts
+
+=== TenantDescriptor
+
+A `TenantDescriptor` identifies a tenant in the system.
+At its simplest, it contains a tenant identifier string, but it can also carry additional properties for tenant-specific configuration.
+
+[source,java]
+----
+// Simple tenant with just an ID
+TenantDescriptor mit = TenantDescriptor.tenantWithId("mit-university");
+
+// Tenant with additional properties
+TenantDescriptor stanford = new TenantDescriptor("stanford-university",
+    Map.of("region", "us-west", "tier", "premium"));
+----
+
+=== TenantProvider
+
+The `TenantProvider` manages the set of known tenants and notifies multi-tenant components when tenants are added or removed.
+It enables both static configurations (tenants defined at startup) and dynamic configurations (tenants added at runtime).
+
+[source,java]
+----
+// Static configuration: define tenants at startup
+SimpleTenantProvider provider = new SimpleTenantProvider(List.of(
+    TenantDescriptor.tenantWithId("mit-university"),
+    TenantDescriptor.tenantWithId("stanford-university"),
+    TenantDescriptor.tenantWithId("oxford-university")
+));
+
+// Dynamic configuration: add tenants at runtime
+provider.addTenant(TenantDescriptor.tenantWithId("cambridge-university"));
+provider.removeTenant(TenantDescriptor.tenantWithId("oxford-university"));
+----
+
+=== TargetTenantResolver
+
+The `TargetTenantResolver` determines which tenant a message belongs to.
+The most common implementation extracts the tenant identifier from message metadata.
+
+[source,java]
+----
+// Resolves tenant from message metadata using key "tenantId"
+TargetTenantResolver<Message> resolver = new MetadataBasedTenantResolver();
+
+// Custom metadata key
+TargetTenantResolver<Message> resolver = new MetadataBasedTenantResolver("universityId");
+----
+
+When sending commands or queries, include the tenant identifier in the metadata:
+
+[source,java]
+----
+// The tenant ID flows through the entire message chain
+commandGateway.send(
+    new EnrollStudentCommand(courseId, studentId),
+    Metadata.with("tenantId", "mit-university")
+);
+----
+
+=== Segment Factories
+
+Segment factories create tenant-specific infrastructure components.
+Each factory receives a `TenantDescriptor` and returns the appropriate component for that tenant:
+
+[cols="1,2"]
+|===
+|Factory |Purpose
+
+|`TenantCommandSegmentFactory`
+|Creates a command bus for each tenant
+
+|`TenantQuerySegmentFactory`
+|Creates a query bus for each tenant
+
+|`TenantEventSegmentFactory`
+|Creates an event store for each tenant
+
+|`TenantEventProcessorSegmentFactory`
+|Creates event processors for each tenant
+|===
+
+These factories give you complete control over tenant isolation strategies:
+
+* **Separate databases**: Each tenant's events stored in a different database
+* **Separate schemas**: Shared database with tenant-specific schemas
+* **Separate connections**: Tenant-specific connection pools or Axon Server contexts
+
+== When to Use This Extension
+
+The Multitenancy Extension is ideal when you need:
+
+Data isolation::
+Each tenant's commands, events, and queries must be completely separate.
+A university's course enrollments and student records should never be visible to another university.
+
+Tenant-specific scaling::
+Different tenants may require different processing capacities.
+A large university with thousands of courses needs more event processor threads than a small college.
+
+Dynamic tenant onboarding::
+New tenants can be added without application restarts.
+When a new university signs up, their infrastructure is provisioned automatically.
+
+Compliance requirements::
+Regulatory requirements demand strict data separation between customers.
+Each university's data must be provably isolated for audit purposes.
+
+Consider alternatives if:
+
+* You only need logical separation (filtering by tenant ID in queries)
+* All tenants share the same data model and can coexist in a single event store
+* You have a small, fixed number of tenants that rarely changes
+
+== Setup Guides
+
+Choose the setup guide that matches your infrastructure:
+
+xref:setup/getting-started.adoc[Getting Started]::
+Standard setup with any event store backend.
+Use this guide if you are using a custom event store implementation or want to understand the core concepts.
+
+xref:setup/axon-server.adoc[Axon Server Integration]::
+Setup for applications using Axon Server as the event store.
+Leverages Axon Server contexts for tenant isolation.
+
+xref:setup/spring-boot.adoc[Spring Boot Integration]::
+Setup for Spring Boot applications with any event store backend.
+Provides auto-configuration and simplified setup.
+
+xref:setup/spring-boot-axon-server.adoc[Spring Boot with Axon Server]::
+The most streamlined setup for Spring Boot applications using Axon Server.
+Combines Spring Boot auto-configuration with Axon Server context-based isolation.

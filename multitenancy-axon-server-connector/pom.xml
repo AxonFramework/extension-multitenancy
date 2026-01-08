@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2010-2025. Axon Framework
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~    http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>axon-multitenancy-parent</artifactId>
+        <groupId>org.axonframework.extensions.multitenancy</groupId>
+        <version>5.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>axon-multitenancy-axon-server-connector</artifactId>
+
+    <name>Axon Framework Multi-Tenancy Extension - Axon Server Connector</name>
+    <description>
+        Module providing Axon Server integration for multi-tenancy. Contains AxonServerTenantProvider
+        which discovers tenants from Axon Server contexts. This module is Spring-agnostic and can be
+        used with any framework (raw Java, Quarkus, etc.) that uses Axon Server.
+    </description>
+
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <!-- Axon Multitenancy Core -->
+        <dependency>
+            <groupId>org.axonframework.extensions.multitenancy</groupId>
+            <artifactId>axon-multitenancy</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Axon Server Connector -->
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-server-connector</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Axon Common (for ConfigurationEnhancer) -->
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Axon Messaging (for SimpleCommandBus, SimpleQueryBus, UnitOfWorkFactory) -->
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-messaging</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Axon Eventsourcing (for EventStore, StorageEngineBackedEventStore, TagResolver) -->
+        <dependency>
+            <groupId>org.axonframework</groupId>
+            <artifactId>axon-eventsourcing</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Other -->
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+        </dependency>
+        <!-- Test -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

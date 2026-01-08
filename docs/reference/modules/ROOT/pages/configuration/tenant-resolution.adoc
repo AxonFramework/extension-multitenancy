@@ -1,0 +1,410 @@
+:navtitle: Tenant Resolution
+= Tenant Resolution
+
+Tenant resolution determines which tenant a message belongs to. This page covers how to configure tenant resolution and propagation.
+
+== Overview
+
+When a message enters the multi-tenant system, the `TargetTenantResolver` extracts the target tenant:
+
+[source]
+----
+Incoming Message
+    |
+    v
+TargetTenantResolver.resolveTenant(message, tenants)
+    |
+    v
+TenantDescriptor  -->  Route to tenant's infrastructure
+----
+
+== TargetTenantResolver Interface
+
+The `TargetTenantResolver` interface is the core contract for tenant resolution:
+
+[source,java]
+----
+public interface TargetTenantResolver<M extends Message>
+        extends BiFunction<M, Collection<TenantDescriptor>, TenantDescriptor> {
+
+    default TenantDescriptor resolveTenant(M message, Collection<TenantDescriptor> tenants) {
+        return this.apply(message, Collections.unmodifiableCollection(tenants));
+    }
+}
+----
+
+The resolver receives:
+
+* The message being processed
+* The collection of currently registered tenants
+
+It returns the `TenantDescriptor` identifying the target tenant.
+
+== MetadataBasedTenantResolver (Default)
+
+The default implementation extracts tenant ID from message metadata:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.MetadataBasedTenantResolver;
+
+// Using default key "tenantId"
+TargetTenantResolver<Message> resolver = new MetadataBasedTenantResolver();
+
+// Using custom key
+TargetTenantResolver<Message> resolver = new MetadataBasedTenantResolver("universityTenant");
+----
+
+=== Default Metadata Key
+
+The default key is `tenantId`:
+
+[source,java]
+----
+public static final String DEFAULT_TENANT_KEY = "tenantId";
+----
+
+=== Error Handling
+
+When the metadata key is missing, `NoSuchTenantException` is thrown:
+
+[source,java]
+----
+// Command without tenantId in metadata
+commandGateway.sendAndWait(new EnrollStudent(studentId, courseId));
+// Throws: NoSuchTenantException("No tenant identifier found in message metadata under key 'tenantId'")
+----
+
+== Custom Tenant Resolvers
+
+Implement custom resolvers for alternative routing strategies.
+
+=== Payload-Based Resolution
+
+Extract tenant from the message payload:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.core.NoSuchTenantException;
+import org.axonframework.messaging.core.Message;
+
+public class PayloadBasedTenantResolver implements TargetTenantResolver<Message> {
+
+    @Override
+    public TenantDescriptor apply(Message message, Collection<TenantDescriptor> tenants) {
+        Object payload = message.payload();
+
+        if (payload instanceof UniversityCommand cmd) {
+            return TenantDescriptor.tenantWithId(cmd.getUniversityId());
+        }
+
+        throw new NoSuchTenantException("Cannot determine university from command");
+    }
+}
+----
+
+=== Header-Based Resolution with Fallback
+
+Try multiple sources for tenant identification:
+
+[source,java]
+----
+public class FallbackTenantResolver implements TargetTenantResolver<Message> {
+
+    private static final String PRIMARY_KEY = "tenantId";
+    private static final String FALLBACK_KEY = "university";
+
+    @Override
+    public TenantDescriptor apply(Message message, Collection<TenantDescriptor> tenants) {
+        Metadata metadata = message.metadata();
+
+        // Try primary key first
+        String tenantId = metadata.get(PRIMARY_KEY);
+
+        // Fall back to secondary key
+        if (tenantId == null) {
+            tenantId = metadata.get(FALLBACK_KEY);
+        }
+
+        if (tenantId == null) {
+            throw new NoSuchTenantException("No tenant found in metadata");
+        }
+
+        return TenantDescriptor.tenantWithId(tenantId);
+    }
+}
+----
+
+== Tenant Correlation Provider
+
+The `TenantCorrelationProvider` ensures tenant context propagates from one message to subsequent messages:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.autoconfig.TenantCorrelationProvider;
+
+// Creates a provider that propagates the "tenantId" key
+TenantCorrelationProvider provider = new TenantCorrelationProvider("tenantId");
+----
+
+=== How Correlation Works
+
+When a command handler publishes events, the correlation provider copies tenant metadata:
+
+[source]
+----
+EnrollStudentCommand {tenantId: "stanford"}
+    |
+    v
+Command Handler
+    |
+    +-- StudentEnrolledEvent {tenantId: "stanford"}  <-- auto-propagated
+    |
+    v
+Event Handler
+    |
+    +-- SendWelcomeEmailCommand {tenantId: "stanford"}  <-- auto-propagated
+----
+
+=== Default Tenant Handling
+
+If the tenant key is missing, the provider uses `"unknownTenant"`:
+
+[source,java]
+----
+@Override
+public Map<String, String> correlationDataFor(Message message) {
+    Map<String, String> result = new HashMap<>();
+    String tenantId = metadata.containsKey(tenantCorrelationKey)
+            ? metadata.get(tenantCorrelationKey)
+            : "unknownTenant";
+    result.put(tenantCorrelationKey, tenantId);
+    return result;
+}
+----
+
+== Configuration
+
+=== Axon Framework (Programmatic)
+
+[source,java]
+----
+import org.axonframework.eventsourcing.configuration.EventSourcingConfigurer;
+import org.axonframework.extension.multitenancy.core.MetadataBasedTenantResolver;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+
+// Create configurer
+EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+// Create tenant provider
+SimpleTenantProvider tenantProvider = new SimpleTenantProvider(List.of(
+    TenantDescriptor.tenantWithId("stanford"),
+    TenantDescriptor.tenantWithId("mit"),
+    TenantDescriptor.tenantWithId("berkeley")
+));
+
+// Enhance with multi-tenancy
+MultiTenancyConfigurer.enhance(configurer)
+    .registerTenantProvider(config -> tenantProvider)
+    .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver("tenantId"));
+
+// Register correlation provider for propagation
+configurer.messaging(mc -> mc.registerCorrelationDataProvider(config -> message -> {
+    Map<String, String> result = new HashMap<>();
+    if (message.metadata().containsKey("tenantId")) {
+        result.put("tenantId", message.metadata().get("tenantId"));
+    }
+    return result;
+}));
+
+// Build and start
+AxonConfiguration configuration = configurer.start();
+----
+
+=== Spring Boot
+
+Spring Boot auto-configures both the resolver and correlation provider:
+
+[source,yaml]
+----
+# application.yml
+axon:
+  multi-tenancy:
+    enabled: true
+    tenant-key: tenantId  # Used by both resolver and correlation provider
+----
+
+==== Custom Resolver Bean
+
+Override the default resolver by defining a bean:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TargetTenantResolver;
+import org.axonframework.messaging.core.Message;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class TenantConfiguration {
+
+    @Bean
+    public TargetTenantResolver<Message> targetTenantResolver() {
+        return new PayloadBasedTenantResolver();
+    }
+}
+----
+
+== Adding Tenant to Entry Point Messages
+
+At your application's entry point, add tenant context to the first message:
+
+=== REST Controller Example
+
+[source,java]
+----
+import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
+import org.axonframework.messaging.core.Metadata;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/universities/{universityId}/courses")
+public class CourseController {
+
+    private final CommandGateway commandGateway;
+
+    public CourseController(CommandGateway commandGateway) {
+        this.commandGateway = commandGateway;
+    }
+
+    @PostMapping
+    public CompletableFuture<String> createCourse(
+            @PathVariable String universityId,
+            @RequestBody CreateCourseRequest request) {
+
+        return commandGateway.send(
+            new CreateCourse(
+                CourseId.random(),
+                request.getName(),
+                request.getCapacity()
+            ),
+            Metadata.with("tenantId", universityId)
+        ).getResultMessage()
+         .thenApply(result -> result.payload().toString());
+    }
+}
+----
+
+=== Message Listener Example
+
+[source,java]
+----
+@Component
+public class ExternalEventListener {
+
+    private final CommandGateway commandGateway;
+
+    @KafkaListener(topics = "enrollment-requests")
+    public void handleEnrollmentRequest(EnrollmentRequestMessage message) {
+        commandGateway.send(
+            new EnrollStudent(
+                StudentId.from(message.getStudentId()),
+                CourseId.from(message.getCourseId())
+            ),
+            Metadata.with("tenantId", message.getUniversityId())
+        );
+    }
+}
+----
+
+== Best Practices
+
+=== 1. Extract Tenant Early
+
+Determine tenant at the API boundary (authentication, headers, path):
+
+[source,java]
+----
+@RestController
+public class UniversityApiController {
+
+    @PostMapping("/courses")
+    public CompletableFuture<?> createCourse(
+            @RequestHeader("X-University-Id") String universityId,  // From auth system
+            @RequestBody CreateCourseRequest request) {
+        // universityId validated by security filter
+        return commandGateway.send(
+            new CreateCourse(...),
+            Metadata.with("tenantId", universityId)
+        ).getResultMessage();
+    }
+}
+----
+
+=== 2. Use Consistent Metadata Key
+
+Use the same key throughout your application:
+
+[source,yaml]
+----
+# application.yml - Single source of truth
+axon:
+  multi-tenancy:
+    tenant-key: tenantId
+----
+
+=== 3. Validate Tenant Existence
+
+Consider validating tenant before processing:
+
+[source,java]
+----
+@Component
+public class TenantValidationInterceptor implements MessageDispatchInterceptor<CommandMessage> {
+
+    private final TenantProvider tenantProvider;
+
+    @Override
+    public CommandMessage handle(CommandMessage message) {
+        String tenantId = message.metadata().get("tenantId");
+        if (tenantId != null) {
+            boolean exists = tenantProvider.getTenants().stream()
+                .anyMatch(t -> t.tenantId().equals(tenantId));
+            if (!exists) {
+                throw new NoSuchTenantException("Unknown tenant: " + tenantId);
+            }
+        }
+        return message;
+    }
+}
+----
+
+=== 4. Never Hardcode Tenant in Business Logic
+
+Let infrastructure handle routing:
+
+[source,java]
+----
+// WRONG - Tenant logic in command handler
+@CommandHandler
+public void handle(CreateCourse command) {
+    if (command.getUniversityId().equals("stanford")) {  // Don't do this
+        // special logic
+    }
+}
+
+// RIGHT - Command handler is tenant-agnostic
+@CommandHandler
+public static void handle(CreateCourse command, EventAppender appender) {
+    appender.append(new CourseCreated(command.courseId(), command.name(), command.capacity()));
+}
+----
+
+== See Also
+
+* xref:../tenant-management.adoc[Tenant Management] - Managing tenant lifecycle
+* xref:dynamic-tenants.adoc[Dynamic Tenants] - Adding/removing tenants at runtime
+* xref:../message-routing.adoc[Message Routing] - How messages flow through the system

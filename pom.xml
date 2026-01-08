@@ -19,11 +19,18 @@
 
     <groupId>org.axonframework.extensions.multitenancy</groupId>
     <artifactId>axon-multitenancy-parent</artifactId>
-    <version>4.12.1-SNAPSHOT</version>
+    <version>5.1.0-SNAPSHOT</version>
     <modules>
         <module>multitenancy</module>
+        <module>multitenancy-spring</module>
+        <module>multitenancy-axon-server-connector</module>
         <module>multitenancy-spring-boot-autoconfigure</module>
         <module>multitenancy-spring-boot-starter</module>
+        <!-- Integration test modules (each with isolated dependencies) -->
+        <module>multitenancy-integration-tests-embedded</module>
+        <module>multitenancy-integration-tests-axon-server</module>
+        <module>multitenancy-integration-tests-springboot-embedded</module>
+        <module>multitenancy-integration-tests-springboot-axonserver</module>
     </modules>
     <packaging>pom</packaging>
 
@@ -54,19 +61,22 @@
             ${project.basedir}/../coverage-report/target/site/jacoco-aggregate/jacoco.xml
         </sonar.coverage.jacoco.xmlReportPaths>
 
-        <axon.version>4.12.0</axon.version>
+        <axon.version>5.1.0-SNAPSHOT</axon.version>
 
-        <spring.version>5.3.39</spring.version>
-        <spring.boot.version>2.7.18</spring.boot.version>
+        <spring.version>6.2.15</spring.version>
+        <spring.boot.version>3.5.9</spring.boot.version>
+        <spring-data.version>2025.0.7</spring-data.version>
 
-        <slf4j.version>1.7.28</slf4j.version>
-        <log4j.version>2.13.0</log4j.version>
+        <slf4j.version>2.0.17</slf4j.version>
+        <log4j.version>2.25.3</log4j.version>
 
-        <junit.jupiter.version>5.13.3</junit.jupiter.version>
-        <mockito.version>4.11.0</mockito.version>
+        <junit.jupiter.version>6.0.1</junit.jupiter.version>
+        <mockito.version>5.21.0</mockito.version>
 
-        <projectreactor.version>3.7.8</projectreactor.version>
+        <projectreactor.version>3.8.1</projectreactor.version>
         <findbugs-jsr305.version>3.0.2</findbugs-jsr305.version>
+        <jakarta.annotation.version>3.0.0</jakarta.annotation.version>
+        <jakarta.persistence.version>3.2.0</jakarta.persistence.version>
         <!-- Build / Plugin -->
         <central-publishing-maven-plugin.version>0.8.0</central-publishing-maven-plugin.version>
         <jacoco-maven.version>0.8.13</jacoco-maven.version>
@@ -89,6 +99,11 @@
             <!-- Axon -->
             <dependency>
                 <groupId>org.axonframework</groupId>
+                <artifactId>axon-common</artifactId>
+                <version>${axon.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.axonframework</groupId>
                 <artifactId>axon-messaging</artifactId>
                 <version>${axon.version}</version>
             </dependency>
@@ -99,16 +114,22 @@
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
-                <artifactId>axon-server-connector</artifactId>
+                <artifactId>axon-eventsourcing</artifactId>
                 <version>${axon.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.axonframework</groupId>
+                <artifactId>axon-server-connector</artifactId>
+                <version>${axon.version}</version>
+            </dependency>
+            <!-- Axon Spring Extension (separate extension in AF5) -->
+            <dependency>
+                <groupId>org.axonframework.extensions.spring</groupId>
                 <artifactId>axon-spring</artifactId>
                 <version>${axon.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.axonframework</groupId>
+                <groupId>org.axonframework.extensions.spring</groupId>
                 <artifactId>axon-spring-boot-autoconfigure</artifactId>
                 <version>${axon.version}</version>
             </dependency>
@@ -129,7 +150,26 @@
                 <artifactId>spring-boot-autoconfigure</artifactId>
                 <version>${spring.boot.version}</version>
             </dependency>
+            <!-- Spring Data BOM -->
+            <dependency>
+                <groupId>org.springframework.data</groupId>
+                <artifactId>spring-data-bom</artifactId>
+                <version>${spring-data.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Jakarta Persistence -->
+            <dependency>
+                <groupId>jakarta.persistence</groupId>
+                <artifactId>jakarta.persistence-api</artifactId>
+                <version>${jakarta.persistence.version}</version>
+            </dependency>
             <!-- Other -->
+            <dependency>
+                <groupId>jakarta.annotation</groupId>
+                <artifactId>jakarta.annotation-api</artifactId>
+                <version>${jakarta.annotation.version}</version>
+            </dependency>
             <dependency>
                 <groupId>com.google.code.findbugs</groupId>
                 <artifactId>jsr305</artifactId>
@@ -207,8 +247,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven-compiler.version}</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>21</source>
+                    <target>21</target>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
@@ -261,7 +301,7 @@
                 </configuration>
             </plugin>
             <plugin>
-                <!-- just to make sure deployed artifacts are always built (and tested) using JDK 8+ -->
+                <!-- just to make sure deployed artifacts are always built (and tested) using JDK 21+ -->
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <version>${maven-enforcer.version}</version>
                 <executions>
@@ -274,7 +314,7 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>1.8</version>
+                                    <version>21</version>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
                                     <version>3.5</version>
@@ -352,15 +392,18 @@
             </build>
         </profile>
 
+        <!-- Integration tests moved to pending_migration until migration is complete -->
+        <!--
         <profile>
-            <id>java17-modules</id>
+            <id>java21-modules</id>
             <activation>
-                <jdk>[17,)</jdk>
+                <jdk>[21,)</jdk>
             </activation>
             <modules>
                 <module>multitenancy-spring-boot-3-integrationtests</module>
             </modules>
         </profile>
+        -->
 
         <profile>
             <id>sources</id>

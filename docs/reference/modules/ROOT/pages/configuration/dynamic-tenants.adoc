@@ -1,0 +1,513 @@
+:navtitle: Dynamic Tenants
+= Dynamic Tenant Management
+
+Tenants can be added and removed at runtime without restarting the application. This page covers how to manage tenant lifecycle dynamically.
+
+== Overview
+
+Dynamic tenant management enables:
+
+* Adding new tenants when customers sign up
+* Removing tenants when subscriptions end
+* Filtering which tenants the application connects to
+* Responding to external tenant events (e.g., from Axon Server)
+
+== TenantProvider Interface
+
+The `TenantProvider` interface manages the set of known tenants:
+
+[source,java]
+----
+public interface TenantProvider {
+
+    Registration subscribe(MultiTenantAwareComponent component);
+
+    List<TenantDescriptor> getTenants();
+}
+----
+
+When tenants are added or removed, the provider notifies all subscribed `MultiTenantAwareComponent` instances, which create or destroy their tenant-specific resources.
+
+== SimpleTenantProvider
+
+`SimpleTenantProvider` is the standard implementation for programmatic tenant management:
+
+=== Creating with Initial Tenants
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+
+// From a list
+SimpleTenantProvider provider = new SimpleTenantProvider(List.of(
+    TenantDescriptor.tenantWithId("stanford"),
+    TenantDescriptor.tenantWithId("mit"),
+    TenantDescriptor.tenantWithId("berkeley")
+));
+
+// Or empty, to be populated later
+SimpleTenantProvider provider = new SimpleTenantProvider();
+----
+
+=== Adding Tenants at Runtime
+
+[source,java]
+----
+TenantDescriptor newTenant = TenantDescriptor.tenantWithId("caltech");
+
+boolean added = provider.addTenant(newTenant);
+// Returns true if added, false if already registered
+
+// Add multiple tenants
+provider.addTenants(List.of(
+    TenantDescriptor.tenantWithId("caltech"),
+    TenantDescriptor.tenantWithId("princeton")
+));
+----
+
+When a tenant is added:
+
+1. The tenant is added to the provider's registry
+2. All subscribed `MultiTenantAwareComponent` instances are notified
+3. Each component creates and starts its tenant-specific resources
+4. The new tenant becomes available for message routing
+
+=== Removing Tenants at Runtime
+
+[source,java]
+----
+// Remove by descriptor
+boolean removed = provider.removeTenant(TenantDescriptor.tenantWithId("caltech"));
+
+// Or by ID
+boolean removed = provider.removeTenant("caltech");
+// Returns true if removed, false if not registered
+----
+
+When a tenant is removed:
+
+1. The tenant is removed from the provider's registry
+2. All `Registration` handles are cancelled
+3. Tenant-specific resources are cleaned up (event processors stopped, connections closed, etc.)
+4. Messages to the removed tenant will throw `NoSuchTenantException`
+
+=== Checking Tenant Status
+
+[source,java]
+----
+// Check if tenant exists
+boolean exists = provider.hasTenant(TenantDescriptor.tenantWithId("stanford"));
+boolean exists = provider.hasTenant("stanford");
+
+// Get all tenants
+List<TenantDescriptor> tenants = provider.getTenants();
+----
+
+== Subscription Lifecycle
+
+The `subscribe()` method connects components to tenant lifecycle events:
+
+[source,java]
+----
+// Components subscribe to receive tenant notifications
+Registration registration = tenantProvider.subscribe(multiTenantEventStore);
+
+// On subscribe:
+// 1. Existing tenants are registered with the component
+// 2. Future tenant additions/removals will notify the component
+
+// To unsubscribe (e.g., during shutdown):
+registration.cancel();
+----
+
+=== MultiTenantAwareComponent Interface
+
+Components that manage per-tenant resources implement this interface:
+
+[source,java]
+----
+public interface MultiTenantAwareComponent {
+
+    // Called when a tenant is registered (at startup or dynamically)
+    Registration registerTenant(TenantDescriptor tenantDescriptor);
+
+    // Called when a tenant is registered AND should be started immediately
+    Registration registerAndStartTenant(TenantDescriptor tenantDescriptor);
+}
+----
+
+The returned `Registration` is called when the tenant is removed, allowing cleanup.
+
+== TenantConnectPredicate
+
+Filter which tenants the application connects to:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TenantConnectPredicate;
+
+// Accept all tenants (default)
+TenantConnectPredicate all = tenant -> true;
+
+// Filter by tenant ID pattern
+TenantConnectPredicate production = tenant ->
+    !tenant.tenantId().startsWith("test-");
+
+// Filter by tenant properties
+TenantConnectPredicate euRegion = tenant ->
+    "eu".equals(tenant.properties().get("region"));
+----
+
+=== Configuration
+
+==== Axon Framework
+
+[source,java]
+----
+MultiTenancyConfigurer.enhance(configurer)
+    .registerTenantProvider(config -> tenantProvider)
+    .registerTenantConnectPredicate(config -> tenant ->
+        !tenant.tenantId().startsWith("_admin")
+    );
+----
+
+==== Spring Boot
+
+[source,java]
+----
+@Bean
+public TenantConnectPredicate tenantConnectPredicate() {
+    return tenant -> {
+        // Only connect to production tenants
+        return !tenant.tenantId().contains("test");
+    };
+}
+----
+
+== AxonServerTenantProvider
+
+When using Axon Server, `AxonServerTenantProvider` discovers tenants from Axon Server contexts:
+
+=== Predefined Contexts
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.axonserver.AxonServerTenantProvider;
+
+AxonServerTenantProvider provider = AxonServerTenantProvider.builder()
+    .axonServerConnectionManager(connectionManager)
+    .preDefinedContexts("stanford,mit,berkeley")  // Comma-separated
+    .build();
+----
+
+=== Dynamic Context Discovery
+
+Without predefined contexts, the provider discovers tenants via Axon Server's Admin API:
+
+[source,java]
+----
+AxonServerTenantProvider provider = AxonServerTenantProvider.builder()
+    .axonServerConnectionManager(connectionManager)
+    .tenantConnectPredicate(tenant -> !tenant.tenantId().startsWith("_"))
+    .build();
+
+// Discovers all contexts and filters out admin contexts
+----
+
+=== Subscribing to Context Updates
+
+The provider automatically subscribes to Axon Server context events:
+
+[source,java]
+----
+// When a context is created in Axon Server:
+// 1. Provider receives CREATED event
+// 2. If predicate allows, tenant is added
+// 3. All components create resources for new tenant
+
+// When a context is deleted:
+// 1. Provider receives DELETED event
+// 2. Tenant is removed
+// 3. All tenant resources are cleaned up
+// 4. Connection to Axon Server context is closed
+----
+
+=== Spring Boot Configuration
+
+[source,yaml]
+----
+# application.yml
+axon:
+  multi-tenancy:
+    enabled: true
+    axon-server:
+      # Predefined contexts (optional)
+      contexts: stanford,mit,berkeley
+
+      # Filter admin contexts (default: true)
+      filter-admin-contexts: true
+----
+
+Without `contexts` configured, tenants are discovered dynamically from Axon Server.
+
+== Complete Example: REST API for Tenant Management
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/admin/tenants")
+public class TenantManagementController {
+
+    private final SimpleTenantProvider tenantProvider;
+
+    public TenantManagementController(SimpleTenantProvider tenantProvider) {
+        this.tenantProvider = tenantProvider;
+    }
+
+    @GetMapping
+    public List<String> listTenants() {
+        return tenantProvider.getTenants().stream()
+            .map(TenantDescriptor::tenantId)
+            .toList();
+    }
+
+    @PostMapping("/{tenantId}")
+    public ResponseEntity<String> addTenant(@PathVariable String tenantId) {
+        TenantDescriptor tenant = TenantDescriptor.tenantWithId(tenantId);
+
+        if (tenantProvider.addTenant(tenant)) {
+            return ResponseEntity.ok("Tenant added: " + tenantId);
+        } else {
+            return ResponseEntity.badRequest()
+                .body("Tenant already exists: " + tenantId);
+        }
+    }
+
+    @DeleteMapping("/{tenantId}")
+    public ResponseEntity<String> removeTenant(@PathVariable String tenantId) {
+        if (tenantProvider.removeTenant(tenantId)) {
+            return ResponseEntity.ok("Tenant removed: " + tenantId);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{tenantId}/exists")
+    public boolean tenantExists(@PathVariable String tenantId) {
+        return tenantProvider.hasTenant(tenantId);
+    }
+}
+----
+
+== Complete Example: Event-Driven Tenant Provisioning
+
+[source,java]
+----
+@Component
+public class TenantProvisioningHandler {
+
+    private final SimpleTenantProvider tenantProvider;
+
+    public TenantProvisioningHandler(SimpleTenantProvider tenantProvider) {
+        this.tenantProvider = tenantProvider;
+    }
+
+    @EventHandler
+    public void on(UniversityOnboarded event) {
+        TenantDescriptor tenant = new TenantDescriptor(
+            event.universityId(),
+            Map.of(
+                "name", event.universityName(),
+                "region", event.region(),
+                "tier", event.subscriptionTier()
+            )
+        );
+
+        tenantProvider.addTenant(tenant);
+        log.info("Provisioned tenant for university: {}", event.universityName());
+    }
+
+    @EventHandler
+    public void on(UniversityDecommissioned event) {
+        tenantProvider.removeTenant(event.universityId());
+        log.info("Decommissioned tenant: {}", event.universityId());
+    }
+}
+----
+
+== Tenant Lifecycle Events
+
+Understanding the full lifecycle when tenants are added/removed:
+
+=== Tenant Addition Flow
+
+[source]
+----
+tenantProvider.addTenant(tenant)
+    |
+    +-- For each subscribed component:
+        |
+        +-- MultiTenantCommandBus.registerAndStartTenant(tenant)
+        |       +-- Creates SimpleCommandBus for tenant
+        |       +-- Registers command handlers
+        |       +-- Returns Registration for cleanup
+        |
+        +-- MultiTenantQueryBus.registerAndStartTenant(tenant)
+        |       +-- Creates SimpleQueryBus for tenant
+        |       +-- Registers query handlers
+        |       +-- Returns Registration for cleanup
+        |
+        +-- MultiTenantEventStore.registerAndStartTenant(tenant)
+        |       +-- Creates EventStore segment for tenant
+        |       +-- Returns Registration for cleanup
+        |
+        +-- MultiTenantEventProcessor.registerAndStartTenant(tenant)
+                +-- Creates PooledStreamingEventProcessor for tenant
+                +-- Creates TokenStore for tenant
+                +-- Starts processing events
+                +-- Returns Registration for cleanup
+----
+
+=== Tenant Removal Flow
+
+[source]
+----
+tenantProvider.removeTenant(tenant)
+    |
+    +-- Cancels all Registrations for tenant (in reverse order):
+        |
+        +-- EventProcessor Registration cancelled
+        |       +-- Stops processing
+        |       +-- Cleans up token store
+        |
+        +-- EventStore Registration cancelled
+        |       +-- Closes event store segment
+        |
+        +-- QueryBus Registration cancelled
+        |       +-- Unregisters query handlers
+        |       +-- Closes query bus
+        |
+        +-- CommandBus Registration cancelled
+                +-- Unregisters command handlers
+                +-- Closes command bus
+----
+
+== Best Practices
+
+=== 1. Validate Before Adding
+
+[source,java]
+----
+public void provisionTenant(String tenantId) {
+    // Validate tenant ID format
+    if (!isValidTenantId(tenantId)) {
+        throw new IllegalArgumentException("Invalid tenant ID: " + tenantId);
+    }
+
+    // Check for duplicates
+    if (tenantProvider.hasTenant(tenantId)) {
+        throw new TenantAlreadyExistsException(tenantId);
+    }
+
+    // Verify resources are available (database, etc.)
+    verifyResourcesAvailable(tenantId);
+
+    tenantProvider.addTenant(TenantDescriptor.tenantWithId(tenantId));
+}
+----
+
+=== 2. Handle Removal Gracefully
+
+[source,java]
+----
+public void decommissionTenant(String tenantId) {
+    // Drain in-flight messages first
+    drainMessagesForTenant(tenantId);
+
+    // Remove tenant
+    tenantProvider.removeTenant(tenantId);
+
+    // Archive data if needed
+    archiveTenantData(tenantId);
+}
+----
+
+=== 3. Use TenantConnectPredicate for Filtering
+
+[source,java]
+----
+// Filter at the provider level, not in business logic
+TenantConnectPredicate predicate = tenant -> {
+    String region = tenant.properties().get("region");
+    return "eu".equals(region);  // This instance only handles EU tenants
+};
+----
+
+=== 4. Monitor Tenant Operations
+
+[source,java]
+----
+public void addTenantWithMonitoring(TenantDescriptor tenant) {
+    Instant start = Instant.now();
+
+    boolean added = tenantProvider.addTenant(tenant);
+
+    Duration duration = Duration.between(start, Instant.now());
+
+    if (added) {
+        meterRegistry.timer("tenant.provisioning")
+            .record(duration);
+        log.info("Tenant {} provisioned in {}ms", tenant.tenantId(), duration.toMillis());
+    }
+}
+----
+
+=== 5. Expose Health Information
+
+[source,java]
+----
+@Component
+public class TenantHealthIndicator implements HealthIndicator {
+
+    private final TenantProvider tenantProvider;
+
+    @Override
+    public Health health() {
+        List<TenantDescriptor> tenants = tenantProvider.getTenants();
+
+        return Health.up()
+            .withDetail("tenantCount", tenants.size())
+            .withDetail("tenants", tenants.stream()
+                .map(TenantDescriptor::tenantId)
+                .toList())
+            .build();
+    }
+}
+----
+
+== Thread Safety
+
+`SimpleTenantProvider` is thread-safe:
+
+* Uses `ConcurrentHashMap.newKeySet()` for tenant storage
+* Uses `CopyOnWriteArrayList` for subscribers
+* Safe to add/remove tenants from any thread
+
+[source,java]
+----
+// Safe to call from multiple threads
+executor.submit(() -> tenantProvider.addTenant(tenant1));
+executor.submit(() -> tenantProvider.addTenant(tenant2));
+executor.submit(() -> tenantProvider.removeTenant("old-tenant"));
+----
+
+== See Also
+
+* xref:tenant-resolution.adoc[Tenant Resolution] - How tenant context is determined
+* xref:event-processors.adoc[Event Processors] - Per-tenant event processing
+* xref:../tenant-management.adoc[Tenant Management Overview] - High-level concepts

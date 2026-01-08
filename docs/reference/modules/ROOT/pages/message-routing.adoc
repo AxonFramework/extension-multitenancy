@@ -1,0 +1,219 @@
+:navtitle: Message Routing
+= Message Routing
+
+Every message in a multi-tenant application must be routed to the correct tenant. This page explains how tenant resolution works and how to configure it.
+
+== How Routing Works
+
+When you send a command, query, or event:
+
+1. The multi-tenant bus receives the message
+2. `TargetTenantResolver` extracts the tenant from the message
+3. The message is forwarded to that tenant's infrastructure
+4. The response (if any) returns through the same path
+
+[source]
+----
+Command with metadata {tenantId: "tenant-1"}
+    │
+    ▼
+MultiTenantCommandBus
+    │
+    ├── TargetTenantResolver extracts "tenant-1"
+    │
+    ▼
+tenant-1's CommandBus
+    │
+    ▼
+Command Handler
+----
+
+== TargetTenantResolver
+
+The `TargetTenantResolver` interface determines which tenant a message belongs to:
+
+[source,java]
+----
+public interface TargetTenantResolver<M> {
+    TenantDescriptor resolveTenant(M message, List<TenantDescriptor> tenants);
+}
+----
+
+=== MetadataBasedTenantResolver (Default)
+
+The default implementation reads tenant ID from message metadata:
+
+[source,java]
+----
+// Configured with key "tenantId"
+MetadataBasedTenantResolver resolver = new MetadataBasedTenantResolver("tenantId");
+
+// Message with metadata: {"tenantId": "customer-acme"}
+// Resolves to: TenantDescriptor.tenantWithId("customer-acme")
+----
+
+=== Custom Resolver
+
+Implement your own resolver for different routing strategies:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TargetTenantResolver;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.messaging.core.Message;
+
+public class PayloadBasedTenantResolver implements TargetTenantResolver<Message> {
+
+    @Override
+    public TenantDescriptor resolveTenant(Message message, List<TenantDescriptor> tenants) {
+        Object payload = message.payload();
+
+        if (payload instanceof TenantAwareCommand cmd) {
+            return TenantDescriptor.tenantWithId(cmd.getTenantId());
+        }
+
+        throw new NoTenantInMessageException("Cannot determine tenant from message");
+    }
+}
+----
+
+== Adding Tenant to Messages
+
+=== Entry Point
+
+At your application's entry point (REST controller, message listener, etc.), add the tenant ID to the first message:
+
+[source,java]
+----
+import org.axonframework.messaging.commandhandling.gateway.CommandGateway;
+import org.axonframework.messaging.core.Metadata;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class OrderController {
+
+    private final CommandGateway commandGateway;
+
+    @PostMapping("/orders")
+    public CompletableFuture<String> createOrder(
+            @RequestHeader("X-Tenant-Id") String tenantId,
+            @RequestBody CreateOrderRequest request) {
+
+        return commandGateway.send(
+            new CreateOrderCommand(request.getProductId(), request.getQuantity()),
+            Metadata.with("tenantId", tenantId)
+        ).getResultMessage()
+         .thenApply(result -> result.payload().toString());
+    }
+}
+----
+
+=== Automatic Propagation
+
+Once a message has tenant metadata, the `TenantCorrelationProvider` automatically propagates it to all subsequent messages:
+
+[source]
+----
+CreateOrderCommand {tenantId: "tenant-1"}
+    │
+    ▼
+Command Handler
+    │
+    ├── OrderCreatedEvent {tenantId: "tenant-1"}  ← auto-propagated
+    │
+    ▼
+Event Handler
+    │
+    ├── ConfirmInventoryCommand {tenantId: "tenant-1"}  ← auto-propagated
+----
+
+You only need to add the tenant ID once at the entry point.
+
+== Configuration
+
+=== Axon Framework
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.MetadataBasedTenantResolver;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+import org.axonframework.messaging.core.correlation.CorrelationDataProviderRegistry;
+
+MultiTenancyConfigurer.enhance(messagingConfigurer)
+    .registerTenantProvider(config -> tenantProvider)
+    .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver("tenantId"))
+    .build();
+
+// Also register the correlation provider for propagation
+messagingConfigurer.componentRegistry(registry ->
+    registry.getComponent(CorrelationDataProviderRegistry.class)
+            .registerProvider(config -> new TenantCorrelationProvider("tenantId"))
+);
+----
+
+=== Spring Boot
+
+The Spring Boot autoconfiguration provides both components automatically:
+
+[source,yaml]
+----
+# application.yml
+axon:
+  multi-tenancy:
+    tenant-key: tenantId  # Used by both resolver and correlation provider
+----
+
+To customize:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TargetTenantResolver;
+import org.axonframework.messaging.core.Message;
+import org.springframework.context.annotation.Bean;
+
+@Bean
+public TargetTenantResolver<Message> customTenantResolver() {
+    return new PayloadBasedTenantResolver();
+}
+----
+
+== Error Handling
+
+=== NoTenantInMessageException
+
+Thrown when the resolver cannot determine the tenant:
+
+[source,java]
+----
+// Message without tenantId metadata
+commandGateway.send(new CreateOrderCommand(...));
+// Throws: NoTenantInMessageException
+----
+
+Always ensure entry point messages have tenant metadata.
+
+=== NoSuchTenantException
+
+Thrown when the resolved tenant doesn't exist:
+
+[source,java]
+----
+// Tenant "unknown" is not registered
+commandGateway.send(
+    new CreateOrderCommand(...),
+    Metadata.with("tenantId", "unknown")
+);
+// Throws: NoSuchTenantException
+----
+
+== Best Practices
+
+1. **Single entry point for tenant**: Extract tenant ID from authentication token, HTTP header, or request path at your API layer.
+
+2. **Don't hardcode tenants in business logic**: Let the infrastructure handle routing.
+
+3. **Validate tenant early**: Check that the tenant exists before processing requests.
+
+4. **Use consistent key names**: Stick with one metadata key (like `"tenantId"`) throughout your application.

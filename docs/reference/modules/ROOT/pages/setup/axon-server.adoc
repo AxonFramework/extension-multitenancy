@@ -1,0 +1,577 @@
+:navtitle: Using Axon Server
+= Using Axon Server
+
+This guide covers setting up multitenancy with Axon Server using the standard Axon Framework configuration (non-Spring). When using Axon Server, each tenant maps to an Axon Server context, providing natural isolation and automatic tenant discovery.
+
+== Why Axon Server for Multitenancy
+
+Axon Server Enterprise Edition provides native multi-context support that maps perfectly to multitenancy:
+
+* **Context-per-tenant isolation** - Each tenant gets its own Axon Server context with separate event stores, command routing, and query handling
+* **Automatic tenant discovery** - The extension discovers available contexts from Axon Server and registers them as tenants
+* **Dynamic tenant management** - Create or delete contexts in Axon Server, and the application automatically adapts
+* **Distributed command and query routing** - Commands and queries route to the correct context automatically
+* **No local infrastructure management** - Axon Server handles event storage and message distribution
+
+== Prerequisites
+
+Before starting, ensure you have:
+
+* **Axon Server Enterprise Edition** running with multiple contexts configured
+* Each context represents a tenant (e.g., `university-oxford`, `university-cambridge`)
+* Network connectivity from your application to Axon Server
+
+TIP: Without an Axon Server license, only the `default` context is available. This is sufficient for development and testing single-tenant scenarios.
+
+== Dependencies
+
+Add both the multitenancy core and Axon Server connector modules:
+
+[source,xml]
+----
+<dependencies>
+    <!-- Axon Multitenancy Core -->
+    <dependency>
+        <groupId>org.axonframework.extensions.multitenancy</groupId>
+        <artifactId>axon-multitenancy</artifactId>
+        <version>${multitenancy.version}</version>
+    </dependency>
+
+    <!-- Axon Server Connector for Multitenancy -->
+    <dependency>
+        <groupId>org.axonframework.extensions.multitenancy</groupId>
+        <artifactId>axon-multitenancy-axon-server-connector</artifactId>
+        <version>${multitenancy.version}</version>
+    </dependency>
+
+    <!-- Axon Server Connector (from Axon Framework) -->
+    <dependency>
+        <groupId>org.axonframework</groupId>
+        <artifactId>axon-server-connector</artifactId>
+        <version>${axon.version}</version>
+    </dependency>
+
+    <!-- Axon Eventsourcing -->
+    <dependency>
+        <groupId>org.axonframework</groupId>
+        <artifactId>axon-eventsourcing</artifactId>
+        <version>${axon.version}</version>
+    </dependency>
+</dependencies>
+----
+
+== Before: Single-Tenant Application
+
+Here is a typical single-tenant Axon Framework application connected to Axon Server:
+
+[source,java]
+----
+import org.axonframework.axonserver.connector.AxonServerConfiguration;
+import org.axonframework.common.configuration.AxonConfiguration;
+import org.axonframework.eventsourcing.configuration.EventSourcingConfigurer;
+
+public class SingleTenantUniversityApp {
+
+    public static void main(String[] args) {
+        // Configure Axon Server connection
+        AxonServerConfiguration axonServerConfig = new AxonServerConfiguration();
+        axonServerConfig.setServers("localhost:8124");
+
+        // Create the configurer
+        EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+        // Register Axon Server configuration
+        configurer.componentRegistry(cr -> cr.registerComponent(
+                AxonServerConfiguration.class, c -> axonServerConfig));
+
+        // Register domain components (entities, projections, etc.)
+        configurer = CourseConfiguration.configure(configurer);
+        configurer = StudentConfiguration.configure(configurer);
+
+        // Start the application
+        AxonConfiguration configuration = configurer.start();
+
+        // Use the command and query gateways
+        CommandGateway commandGateway = configuration.getComponent(CommandGateway.class);
+        QueryGateway queryGateway = configuration.getComponent(QueryGateway.class);
+
+        // All operations go to the single "default" context
+        commandGateway.sendAndWait(new CreateCourse(CourseId.random(), "Introduction to Multitenancy", 30));
+    }
+}
+----
+
+In this setup:
+
+* All commands route to a single Axon Server context
+* Events store in one context's event store
+* All queries execute against one context
+
+== After: Multi-Tenant Application
+
+Here is the same application transformed to support multiple tenants using Axon Server contexts:
+
+[source,java]
+----
+import org.axonframework.axonserver.connector.AxonServerConfiguration;
+import org.axonframework.common.configuration.AxonConfiguration;
+import org.axonframework.eventsourcing.configuration.EventSourcingConfigurer;
+import org.axonframework.extension.multitenancy.core.MetadataBasedTenantResolver;
+import org.axonframework.extension.multitenancy.core.TenantConnectPredicate;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+import org.axonframework.messaging.core.Metadata;
+
+public class MultiTenantUniversityApp {
+
+    public static void main(String[] args) {
+        // Configure Axon Server connection
+        AxonServerConfiguration axonServerConfig = new AxonServerConfiguration();
+        axonServerConfig.setServers("localhost:8124");
+
+        // Create the base configurer
+        EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+        // Register Axon Server configuration
+        configurer.componentRegistry(cr -> cr.registerComponent(
+                AxonServerConfiguration.class, c -> axonServerConfig));
+
+        // Register tenant filter - only connect to university contexts
+        configurer.componentRegistry(cr -> cr.registerComponent(
+                TenantConnectPredicate.class,
+                c -> tenant -> tenant.tenantId().startsWith("university-")));
+
+        // Enable multitenancy with tenant resolver
+        MultiTenancyConfigurer multiTenancyConfigurer = MultiTenancyConfigurer.enhance(configurer)
+                .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver());
+
+        // Register domain components (same as before)
+        configurer = CourseConfiguration.configure(configurer);
+        configurer = StudentConfiguration.configure(configurer);
+
+        // Register tenant-scoped components (e.g., per-tenant repositories)
+        multiTenancyConfigurer.tenantComponent(
+                CourseRepository.class,
+                tenant -> new InMemoryCourseRepository()
+        );
+
+        // Ensure tenant ID propagates to events and subsequent messages
+        configurer.messaging(mc -> mc.registerCorrelationDataProvider(config -> message -> {
+            Map<String, String> result = new HashMap<>();
+            if (message.metadata().containsKey("tenantId")) {
+                result.put("tenantId", message.metadata().get("tenantId"));
+            }
+            return result;
+        }));
+
+        // Start the application
+        AxonConfiguration configuration = configurer.start();
+
+        // Use the gateways with tenant metadata
+        CommandGateway commandGateway = configuration.getComponent(CommandGateway.class);
+        QueryGateway queryGateway = configuration.getComponent(QueryGateway.class);
+
+        // Create course for Oxford University
+        commandGateway.send(
+                new CreateCourse(CourseId.random(), "Medieval History", 25),
+                Metadata.with("tenantId", "university-oxford")
+        );
+
+        // Create course for Cambridge University
+        commandGateway.send(
+                new CreateCourse(CourseId.random(), "Quantum Physics", 20),
+                Metadata.with("tenantId", "university-cambridge")
+        );
+    }
+}
+----
+
+=== What Changed
+
+The transformation involves these key additions:
+
+==== 1. AxonServerConfiguration Setup
+
+[source,java]
+----
+AxonServerConfiguration axonServerConfig = new AxonServerConfiguration();
+axonServerConfig.setServers("localhost:8124");
+
+configurer.componentRegistry(cr -> cr.registerComponent(
+        AxonServerConfiguration.class, c -> axonServerConfig));
+----
+
+The `AxonServerConfiguration` tells the extension how to connect to Axon Server. The multitenancy connector uses this to discover available contexts and create per-tenant connections.
+
+==== 2. TenantConnectPredicate for Filtering Contexts
+
+[source,java]
+----
+configurer.componentRegistry(cr -> cr.registerComponent(
+        TenantConnectPredicate.class,
+        c -> tenant -> tenant.tenantId().startsWith("university-")));
+----
+
+The `TenantConnectPredicate` filters which Axon Server contexts become tenants. This is essential because:
+
+* Axon Server may have system contexts (like `_admin`) you do not want as tenants
+* You may want to connect only to specific contexts based on naming conventions
+* In production, you might filter based on context metadata
+
+Common patterns:
+
+[source,java]
+----
+// Accept all non-system contexts
+tenant -> !tenant.tenantId().startsWith("_")
+
+// Accept only contexts with specific prefix
+tenant -> tenant.tenantId().startsWith("tenant-")
+
+// Accept contexts based on metadata
+tenant -> "production".equals(tenant.properties().get("environment"))
+
+// Accept specific named contexts
+Set<String> allowed = Set.of("university-oxford", "university-cambridge");
+tenant -> allowed.contains(tenant.tenantId())
+----
+
+==== 3. Automatic Tenant Discovery
+
+When using the `axon-multitenancy-axon-server-connector` module, the `AxonServerTenantProvider` is automatically registered via SPI. It:
+
+* Queries Axon Server's Admin API to discover available contexts
+* Filters contexts using your `TenantConnectPredicate`
+* Registers each matching context as a tenant
+* Subscribes to context updates for dynamic tenant management
+
+You do not need to manually register tenants - they are discovered automatically.
+
+==== 4. Commands and Queries Route to Correct Context
+
+[source,java]
+----
+// Command routes to university-oxford context in Axon Server
+commandGateway.send(
+        new CreateCourse(CourseId.random(), "Medieval History", 25),
+        Metadata.with("tenantId", "university-oxford")
+);
+----
+
+The `MultiTenantAxonServerCommandBusConnector` (registered automatically) uses the `TargetTenantResolver` to determine which tenant a command belongs to, then routes it to that tenant's Axon Server context.
+
+=== Complete Working Example
+
+Here is a complete example with domain classes:
+
+[source,java]
+----
+// Command
+public record CreateCourse(
+        @TargetEntityId CourseId courseId,
+        String name,
+        int capacity
+) {}
+
+// Event
+@Event(name = "CourseCreated")
+public record CourseCreated(
+        @EventTag(key = "courseId") CourseId courseId,
+        String name,
+        int capacity
+) {}
+
+// State entity - only reconstructs state from events
+@EventSourcedEntity(tagKey = "courseId")
+public class CourseState {
+
+    private CourseId id;
+    private String name;
+    private int capacity;
+    private boolean created = false;
+
+    @EntityCreator
+    public CourseState() {}
+
+    @EventSourcingHandler
+    public void on(CourseCreated event) {
+        this.id = event.courseId();
+        this.name = event.name();
+        this.capacity = event.capacity();
+        this.created = true;
+    }
+
+    public boolean isCreated() { return created; }
+}
+
+// Command handler - separate from state entity
+public class CreateCourseHandler {
+
+    @CommandHandler
+    public void handle(CreateCourse command, CourseState state, EventAppender appender) {
+        appender.append(new CourseCreated(
+                command.courseId(),
+                command.name(),
+                command.capacity()
+        ));
+    }
+}
+----
+
+[source,java]
+----
+// Query
+public record FindAllCourses() {
+    public record Result(List<CourseStats> courses) {}
+}
+
+// Query Handler - uses parameter injection for tenant-scoped repository
+public class FindAllCoursesQueryHandler {
+
+    @QueryHandler
+    public FindAllCourses.Result handle(FindAllCourses query, CourseRepository repository) {
+        return new FindAllCourses.Result(repository.findAll());
+    }
+}
+----
+
+[source,java]
+----
+// Configuration module for the Course entity
+public class CourseConfiguration {
+
+    public static EventSourcingConfigurer configure(EventSourcingConfigurer configurer) {
+        var entityModule = EventSourcedEntityModule
+                .autodetected(CourseId.class, Course.class);
+
+        return configurer.registerEntity(entityModule);
+    }
+}
+
+// Configuration module for the Course projection
+public class CourseStatsConfiguration {
+
+    public static EventSourcingConfigurer configure(EventSourcingConfigurer configurer) {
+        var processor = MultiTenantPooledStreamingEventProcessorModule
+                .create("CourseStatsProjection")
+                .eventHandlingComponents(c -> c
+                        .autodetected(cfg -> new CourseStatsProjector())
+                )
+                .notCustomized();
+
+        QueryHandlingModule queryModule = QueryHandlingModule.named("CourseStats-Handler")
+                .queryHandlers()
+                .annotatedQueryHandlingComponent(cfg -> new FindAllCoursesQueryHandler())
+                .build();
+
+        return configurer
+                .componentRegistry(cr -> cr.registerModule(processor.build()))
+                .registerQueryHandlingModule(queryModule);
+    }
+}
+----
+
+[source,java]
+----
+// Main application
+public class MultiTenantUniversityApp {
+
+    public static void main(String[] args) {
+        AxonServerConfiguration axonServerConfig = new AxonServerConfiguration();
+        axonServerConfig.setServers("localhost:8124");
+
+        EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+        configurer.componentRegistry(cr -> cr.registerComponent(
+                AxonServerConfiguration.class, c -> axonServerConfig));
+
+        configurer.componentRegistry(cr -> cr.registerComponent(
+                TenantConnectPredicate.class,
+                c -> tenant -> tenant.tenantId().startsWith("university-")));
+
+        MultiTenancyConfigurer multiTenancyConfigurer = MultiTenancyConfigurer.enhance(configurer)
+                .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver());
+
+        configurer = CourseConfiguration.configure(configurer);
+        configurer = CourseStatsConfiguration.configure(configurer);
+
+        multiTenancyConfigurer.tenantComponent(
+                CourseRepository.class,
+                tenant -> new InMemoryCourseRepository()
+        );
+
+        configurer.messaging(mc -> mc.registerCorrelationDataProvider(config -> message -> {
+            Map<String, String> result = new HashMap<>();
+            if (message.metadata().containsKey("tenantId")) {
+                result.put("tenantId", message.metadata().get("tenantId"));
+            }
+            return result;
+        }));
+
+        AxonConfiguration configuration = configurer.start();
+
+        // Wait for tenant discovery
+        TenantProvider provider = configuration.getComponent(TenantProvider.class);
+        // In production, use proper synchronization
+
+        CommandGateway commandGateway = configuration.getComponent(CommandGateway.class);
+        QueryGateway queryGateway = configuration.getComponent(QueryGateway.class);
+
+        // Operations now route to correct Axon Server context based on tenant metadata
+    }
+}
+----
+
+== Key Differences from Non-Axon-Server Setup
+
+When using Axon Server, several things work differently compared to embedded mode:
+
+|===
+|Aspect |Embedded Mode |With Axon Server
+
+|Tenant Discovery
+|Manual registration via `SimpleTenantProvider`
+|Automatic discovery from Axon Server contexts
+
+|Event Storage
+|In-memory or custom `StorageEngine` per tenant
+|Axon Server context per tenant (events stored in Axon Server)
+
+|Command Routing
+|Local `SimpleCommandBus` per tenant
+|Distributed via `MultiTenantAxonServerCommandBusConnector`
+
+|Query Routing
+|Local `SimpleQueryBus` per tenant
+|Distributed via `MultiTenantAxonServerQueryBusConnector`
+
+|Dynamic Tenants
+|Call `tenantProvider.addTenant()`
+|Create new context in Axon Server (auto-discovered)
+
+|Infrastructure Management
+|Application manages all infrastructure
+|Axon Server manages event stores and message routing
+|===
+
+=== Automatically Registered Components
+
+When `axon-multitenancy-axon-server-connector` is on the classpath, these components are registered via SPI:
+
+|===
+|Component |Role
+
+|`AxonServerTenantProvider`
+|Discovers tenants from Axon Server contexts
+
+|`MultiTenantAxonServerCommandBusConnector`
+|Routes commands to tenant-specific Axon Server contexts
+
+|`MultiTenantAxonServerQueryBusConnector`
+|Routes queries to tenant-specific Axon Server contexts
+
+|`AxonServerTenantEventSegmentFactory`
+|Creates `EventStore` instances backed by Axon Server per tenant
+|===
+
+These override the embedded defaults without any additional configuration.
+
+== Production Considerations
+
+=== Axon Server Cluster Configuration
+
+For production deployments:
+
+[source,java]
+----
+AxonServerConfiguration axonServerConfig = new AxonServerConfiguration();
+axonServerConfig.setServers("axonserver-1:8124,axonserver-2:8124,axonserver-3:8124");
+axonServerConfig.setClientId("university-service-" + instanceId);
+axonServerConfig.setComponentName("university-service");
+----
+
+=== Error Handling for Missing Tenants
+
+Commands sent to non-existent tenants will fail with `NoSuchTenantException`:
+
+[source,java]
+----
+try {
+    // Note: .getResultMessage().join() blocks - necessary here to catch the exception
+    commandGateway.send(
+            new CreateCourse(courseId, "Test Course", 10),
+            Metadata.with("tenantId", "non-existent-tenant")
+    ).getResultMessage().join();
+} catch (CompletionException e) {
+    if (e.getCause() instanceof NoSuchTenantException) {
+        // Handle missing tenant
+        log.error("Tenant not found: {}", e.getCause().getMessage());
+    }
+}
+----
+
+=== Waiting for Tenant Registration
+
+After startup, tenants are discovered asynchronously. In production, wait for tenants to be available:
+
+[source,java]
+----
+TenantProvider provider = configuration.getComponent(TenantProvider.class);
+TenantDescriptor expectedTenant = TenantDescriptor.tenantWithId("university-oxford");
+
+// Wait for tenant to be registered
+Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .until(() -> provider.getTenants().contains(expectedTenant));
+----
+
+=== Health Checks
+
+Monitor tenant connectivity:
+
+[source,java]
+----
+TenantProvider provider = configuration.getComponent(TenantProvider.class);
+List<TenantDescriptor> tenants = provider.getTenants();
+
+for (TenantDescriptor tenant : tenants) {
+    // Verify connectivity per tenant
+    log.info("Connected to tenant: {}", tenant.tenantId());
+}
+----
+
+=== Context Naming Conventions
+
+Establish clear naming conventions for contexts:
+
+* `tenant-<customer-id>` - Customer-specific contexts
+* `region-<region-code>` - Regional contexts
+* `env-<environment>` - Environment-specific contexts (dev, staging, prod)
+
+Then filter with `TenantConnectPredicate`:
+
+[source,java]
+----
+// Only connect to production tenant contexts
+TenantConnectPredicate predicate = tenant ->
+        tenant.tenantId().startsWith("tenant-") &&
+        !"_admin".equals(tenant.tenantId());
+----
+
+=== Graceful Shutdown
+
+The extension handles shutdown automatically, but ensure proper cleanup:
+
+[source,java]
+----
+Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+    log.info("Shutting down multi-tenant application...");
+    configuration.shutdown();
+}));
+----
+
+The shutdown process:
+
+1. Disconnects from each tenant's Axon Server context
+2. Stops event processors for each tenant
+3. Cleans up tenant-specific resources

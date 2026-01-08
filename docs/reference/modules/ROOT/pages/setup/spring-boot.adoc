@@ -1,0 +1,655 @@
+:navtitle: Spring Boot
+= Spring Boot Integration
+
+This guide covers setting up the Multitenancy Extension with Spring Boot using embedded storage (JPA). For Axon Server deployments, see xref:setup/axon-server.adoc[Axon Server Integration].
+
+== Benefits of Spring Boot Autoconfiguration
+
+Spring Boot autoconfiguration provides:
+
+* **Zero-configuration startup**: Multi-tenant infrastructure is created automatically
+* **Handler auto-discovery**: `@CommandHandler`, `@EventHandler`, and `@QueryHandler` methods are discovered via component scanning
+* **Tenant-scoped injection**: Spring Data repositories and `TenantComponent` implementations are automatically resolved per-tenant
+* **Configuration properties**: Customize behavior via `application.yml`
+
+== Prerequisites
+
+* Spring Boot 3.x
+* Axon Framework 5.x
+* JPA provider (Hibernate recommended)
+
+== Dependencies
+
+Add the Spring Boot starter to your `pom.xml`:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.axonframework.extension.multitenancy</groupId>
+    <artifactId>multitenancy-spring-boot-starter</artifactId>
+    <version>${multitenancy.version}</version>
+</dependency>
+----
+
+This starter includes:
+
+* Core multitenancy components
+* Spring Boot autoconfiguration
+* Spring Data JPA integration
+
+For JPA, also include:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.h2database</groupId>
+    <artifactId>h2</artifactId>
+    <scope>runtime</scope>
+</dependency>
+----
+
+== Before: Single-Tenant Application
+
+Here is a typical single-tenant Spring Boot application managing university courses:
+
+=== Application Class
+
+[source,java]
+----
+@SpringBootApplication
+public class UniversityApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(UniversityApplication.class, args);
+    }
+}
+----
+
+=== Domain Model
+
+[source,java]
+----
+// Command
+public record CreateCourse(
+    @TargetEntityId CourseId courseId,
+    String name,
+    int capacity
+) {}
+
+// Event
+public record CourseCreated(
+    CourseId courseId,
+    String name,
+    int capacity
+) {}
+----
+
+=== JPA Entity
+
+[source,java]
+----
+@Entity
+@Table(name = "course_stats")
+public class CourseStatsReadModel {
+
+    @Id
+    private String courseId;
+    private String name;
+    private int capacity;
+
+    public CourseStatsReadModel() {}
+
+    public CourseStatsReadModel(String courseId, String name, int capacity) {
+        this.courseId = courseId;
+        this.name = name;
+        this.capacity = capacity;
+    }
+
+    // Getters and setters
+    public String getCourseId() { return courseId; }
+    public void setCourseId(String courseId) { this.courseId = courseId; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public int getCapacity() { return capacity; }
+    public void setCapacity(int capacity) { this.capacity = capacity; }
+}
+----
+
+=== Spring Data Repository
+
+[source,java]
+----
+public interface CourseStatsJpaRepository extends JpaRepository<CourseStatsReadModel, String> {
+}
+----
+
+=== Event Handler (Single-Tenant)
+
+In a single-tenant application, the repository is typically injected via constructor:
+
+[source,java]
+----
+@Component
+public class CourseStatsProjector {
+
+    private final CourseStatsJpaRepository repository;
+
+    public CourseStatsProjector(CourseStatsJpaRepository repository) {
+        this.repository = repository;  // Single shared instance
+    }
+
+    @EventHandler
+    public void on(CourseCreated event) {
+        repository.save(new CourseStatsReadModel(
+            event.courseId().raw(),
+            event.name(),
+            event.capacity()
+        ));
+    }
+}
+----
+
+This approach fails in multi-tenant scenarios because all tenants share the same repository instance, causing data to mix between tenants.
+
+== After: Multi-Tenant Transformation
+
+=== Application Configuration
+
+Configure multi-tenancy in `application.yml`:
+
+[source,yaml]
+----
+axon:
+  axonserver:
+    enabled: false  # Using embedded storage, not Axon Server
+  multi-tenancy:
+    tenant-key: tenantId  # Metadata key for tenant identification (default)
+    jpa:
+      tenant-repositories: true  # Enable per-tenant JPA repositories
+----
+
+=== Tenant Provider
+
+Provide a `TenantProvider` bean that defines available tenants:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.core.TenantProvider;
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+
+@Configuration
+public class MultiTenancyConfiguration {
+
+    public static final TenantDescriptor UNIVERSITY_A =
+        TenantDescriptor.tenantWithId("university-a");
+    public static final TenantDescriptor UNIVERSITY_B =
+        TenantDescriptor.tenantWithId("university-b");
+
+    @Bean
+    public TenantProvider tenantProvider() {
+        return new SimpleTenantProvider(List.of(UNIVERSITY_A, UNIVERSITY_B));
+    }
+}
+----
+
+=== Per-Tenant DataSource Provider
+
+When using `axon.multi-tenancy.jpa.tenant-repositories=true`, you must provide a `TenantDataSourceProvider` that supplies a `DataSource` for each tenant:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.spring.data.jpa.TenantDataSourceProvider;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import javax.sql.DataSource;
+
+@Configuration
+public class MultiTenancyConfiguration {
+
+    @Bean
+    public TenantDataSourceProvider tenantDataSourceProvider() {
+        Map<String, DataSource> cache = new ConcurrentHashMap<>();
+        return tenant -> cache.computeIfAbsent(tenant.tenantId(), id ->
+            DataSourceBuilder.create()
+                .url("jdbc:h2:mem:" + id + ";DB_CLOSE_DELAY=-1")
+                .driverClassName("org.h2.Driver")
+                .username("sa")
+                .password("")
+                .build()
+        );
+    }
+}
+----
+
+For production, connect to separate databases per tenant:
+
+[source,java]
+----
+@Bean
+public TenantDataSourceProvider tenantDataSourceProvider(
+        @Value("${db.username}") String username,
+        @Value("${db.password}") String password) {
+
+    Map<String, DataSource> cache = new ConcurrentHashMap<>();
+    return tenant -> cache.computeIfAbsent(tenant.tenantId(), id ->
+        DataSourceBuilder.create()
+            .url("jdbc:postgresql://localhost:5432/" + id)
+            .driverClassName("org.postgresql.Driver")
+            .username(username)
+            .password(password)
+            .build()
+    );
+}
+----
+
+=== EntityManagerFactory Configuration
+
+Optionally customize the `TenantEntityManagerFactoryBuilder` for Hibernate settings:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.spring.data.jpa.TenantEntityManagerFactoryBuilder;
+
+@Bean
+public TenantEntityManagerFactoryBuilder tenantEntityManagerFactoryBuilder(
+        TenantDataSourceProvider dataSourceProvider) {
+    return TenantEntityManagerFactoryBuilder
+        .forDataSourceProvider(dataSourceProvider)
+        .packagesToScan("com.example.university.domain.read")
+        .jpaProperty("hibernate.hbm2ddl.auto", "create-drop")
+        .jpaProperty("hibernate.show_sql", "true")
+        .build();
+}
+----
+
+=== Repository Interface (No Changes Required)
+
+Your Spring Data repository interface stays exactly the same:
+
+[source,java]
+----
+public interface CourseStatsJpaRepository extends JpaRepository<CourseStatsReadModel, String> {
+}
+----
+
+When `axon.multi-tenancy.jpa.tenant-repositories=true`, the extension automatically:
+
+1. Discovers all `Repository` interfaces via classpath scanning
+2. Registers them as tenant components
+3. Creates tenant-scoped instances on demand
+
+=== Event Handler (Multi-Tenant)
+
+The key change is using **method parameter injection** instead of constructor injection:
+
+[source,java]
+----
+@Component
+public class CourseStatsProjector {
+
+    private static final Logger logger = LoggerFactory.getLogger(CourseStatsProjector.class);
+
+    @EventHandler
+    public void on(CourseCreated event, CourseStatsJpaRepository repository) {
+        // repository is automatically scoped to the event's tenant
+        logger.info("Saving course {} for current tenant", event.courseId());
+
+        repository.save(new CourseStatsReadModel(
+            event.courseId().raw(),
+            event.name(),
+            event.capacity()
+        ));
+    }
+}
+----
+
+The `repository` parameter is resolved by `TenantRepositoryParameterResolverFactory`, which:
+
+1. Extracts the tenant from the event's metadata
+2. Gets or creates the `EntityManagerFactory` for that tenant
+3. Creates a Spring Data repository bound to that tenant's `EntityManager`
+
+=== Query Handler
+
+Query handlers also receive tenant-scoped repositories:
+
+[source,java]
+----
+public record FindAllCourses() {
+    public record Result(List<CourseStatsReadModel> courses) {}
+}
+
+@Component
+public class FindAllCoursesQueryHandler {
+
+    @QueryHandler
+    public FindAllCourses.Result handle(FindAllCourses query,
+                                         CourseStatsJpaRepository repository) {
+        // repository is scoped to the query's tenant
+        return new FindAllCourses.Result(repository.findAll());
+    }
+}
+----
+
+== TenantComponent for Tenant-Scoped Services
+
+Beyond repositories, you can create custom tenant-scoped services using the `TenantComponent` interface.
+
+=== Defining a TenantComponent
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.spring.TenantComponent;
+
+// Note: Do NOT add @Component annotation!
+public class TenantAuditService implements TenantComponent<TenantAuditService> {
+
+    private final Clock clock;          // Spring dependency
+    private final String tenantId;      // Tenant context
+
+    // Constructor for factory instance - Spring injects Clock
+    public TenantAuditService(Clock clock) {
+        this.clock = clock;
+        this.tenantId = null;
+    }
+
+    // Private constructor for tenant-specific instances
+    private TenantAuditService(Clock clock, String tenantId) {
+        this.clock = clock;
+        this.tenantId = tenantId;
+    }
+
+    @Override
+    public TenantAuditService createForTenant(TenantDescriptor tenant) {
+        return new TenantAuditService(clock, tenant.tenantId());
+    }
+
+    public void recordAudit(String action) {
+        Instant timestamp = clock.instant();
+        // Record audit for this tenant
+        System.out.println(tenantId + ": " + action + " at " + timestamp);
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+}
+----
+
+Key points:
+
+* Do NOT annotate with `@Component` - the autoconfiguration discovers and manages these
+* Spring dependencies are injected into the factory constructor
+* The `createForTenant` method creates tenant-specific instances
+* Instances are cached per-tenant
+
+=== Using TenantComponent in Handlers
+
+[source,java]
+----
+@Component
+public class CourseStatsProjector {
+
+    @EventHandler
+    public void on(CourseCreated event,
+                   CourseStatsJpaRepository repository,
+                   TenantAuditService auditService) {
+
+        // Both are automatically scoped to the event's tenant
+        auditService.recordAudit("course_created:" + event.courseId().raw());
+
+        repository.save(new CourseStatsReadModel(
+            event.courseId().raw(),
+            event.name(),
+            event.capacity()
+        ));
+    }
+}
+----
+
+== TenantAwareProcessingContext
+
+For advanced scenarios, inject `ProcessingContext` to access tenant-scoped components programmatically:
+
+[source,java]
+----
+import org.axonframework.messaging.core.unitofwork.ProcessingContext;
+
+@EventHandler
+public void on(CourseCreated event, ProcessingContext context) {
+    // Get tenant-scoped repository from context
+    CourseStatsJpaRepository repository =
+        context.component(CourseStatsJpaRepository.class);
+
+    // Get tenant-scoped service from context
+    TenantAuditService auditService =
+        context.component(TenantAuditService.class);
+
+    auditService.recordAudit("course_created:" + event.courseId().raw());
+    repository.save(new CourseStatsReadModel(
+        event.courseId().raw(),
+        event.name(),
+        event.capacity()
+    ));
+}
+----
+
+When multi-tenancy is enabled, `ProcessingContext` is wrapped in `TenantAwareProcessingContext`, which intercepts `component()` calls for registered tenant-scoped types.
+
+== Sending Messages with Tenant Context
+
+When sending commands or queries, include the tenant ID in metadata:
+
+[source,java]
+----
+import org.axonframework.messaging.core.Metadata;
+
+// Sending a command
+// Note: .getResultMessage().join() blocks until completion - only needed in main() or tests.
+// In REST controllers, return CompletableFuture instead.
+commandGateway.send(
+    new CreateCourse(courseId, "Introduction to Java", 30),
+    Metadata.with("tenantId", "university-a")
+).getResultMessage().join();
+
+// Sending a query
+QueryMessage query = new GenericQueryMessage(
+    new MessageType(FindAllCourses.class),
+    new FindAllCourses()
+).andMetadata(Metadata.with("tenantId", "university-a"));
+
+List<CourseStatsReadModel> courses = queryGateway
+    .query(query, FindAllCourses.Result.class)
+    .thenApply(FindAllCourses.Result::courses)
+    .join();
+----
+
+Messages without tenant metadata will fail with `NoSuchTenantException`.
+
+== Key Spring Boot Features
+
+=== Auto-Discovered Handlers
+
+Handler classes annotated with `@Component` are automatically discovered:
+
+[source,java]
+----
+@Component  // Spring discovers this
+public class CourseStatsProjector {
+
+    @EventHandler  // Axon registers this handler
+    public void on(CourseCreated event, CourseStatsJpaRepository repository) {
+        // ...
+    }
+}
+----
+
+=== Tenant-Scoped Repository Injection
+
+When `axon.multi-tenancy.jpa.tenant-repositories=true`:
+
+* Spring Data repositories are NOT registered as Spring beans
+* Instead, they are created per-tenant on demand
+* Inject via handler method parameters, not constructor injection
+
+=== Configuration Properties
+
+[cols="2,1,3"]
+|===
+|Property |Default |Description
+
+|`axon.multi-tenancy.enabled`
+|`true`
+|Enable/disable multi-tenancy
+
+|`axon.multi-tenancy.tenant-key`
+|`tenantId`
+|Metadata key for tenant identification
+
+|`axon.multi-tenancy.jpa.tenant-repositories`
+|`false`
+|Enable per-tenant Spring Data repositories
+
+|`axon.multi-tenancy.tenant-components.enabled`
+|`true`
+|Enable TenantComponent auto-discovery
+|===
+
+== Complete Example
+
+=== Configuration
+
+[source,java]
+----
+@Configuration
+public class UniversityMultiTenancyConfig {
+
+    public static final TenantDescriptor UNIVERSITY_A =
+        TenantDescriptor.tenantWithId("university-a");
+    public static final TenantDescriptor UNIVERSITY_B =
+        TenantDescriptor.tenantWithId("university-b");
+
+    @Bean
+    public TenantProvider tenantProvider() {
+        return new SimpleTenantProvider(List.of(UNIVERSITY_A, UNIVERSITY_B));
+    }
+
+    @Bean
+    public TenantDataSourceProvider tenantDataSourceProvider() {
+        Map<String, DataSource> cache = new ConcurrentHashMap<>();
+        return tenant -> cache.computeIfAbsent(tenant.tenantId(), id ->
+            DataSourceBuilder.create()
+                .url("jdbc:h2:mem:" + id + ";DB_CLOSE_DELAY=-1")
+                .driverClassName("org.h2.Driver")
+                .username("sa")
+                .password("")
+                .build()
+        );
+    }
+
+    @Bean
+    public TenantEntityManagerFactoryBuilder tenantEntityManagerFactoryBuilder(
+            TenantDataSourceProvider dataSourceProvider) {
+        return TenantEntityManagerFactoryBuilder
+            .forDataSourceProvider(dataSourceProvider)
+            .packagesToScan("com.example.university.domain.read")
+            .jpaProperty("hibernate.hbm2ddl.auto", "create-drop")
+            .build();
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+}
+----
+
+=== application.yml
+
+[source,yaml]
+----
+axon:
+  axonserver:
+    enabled: false
+  multi-tenancy:
+    jpa:
+      tenant-repositories: true
+
+logging:
+  level:
+    org.axonframework: INFO
+    org.axonframework.extension.multitenancy: DEBUG
+----
+
+=== Repository
+
+[source,java]
+----
+public interface CourseStatsJpaRepository
+        extends JpaRepository<CourseStatsReadModel, String> {
+}
+----
+
+=== Projector
+
+[source,java]
+----
+@Component
+public class CourseStatsProjector {
+
+    @EventHandler
+    public void on(CourseCreated event,
+                   CourseStatsJpaRepository repository,
+                   TenantAuditService auditService) {
+
+        auditService.recordAudit("course_created:" + event.courseId().raw());
+
+        repository.save(new CourseStatsReadModel(
+            event.courseId().raw(),
+            event.name(),
+            event.capacity()
+        ));
+    }
+}
+----
+
+=== Query Handler
+
+[source,java]
+----
+@Component
+public class FindAllCoursesQueryHandler {
+
+    @QueryHandler
+    public FindAllCourses.Result handle(FindAllCourses query,
+                                         CourseStatsJpaRepository repository) {
+        return new FindAllCourses.Result(repository.findAll());
+    }
+}
+----
+
+== What Happens Automatically
+
+When you add the multitenancy starter with the configuration above:
+
+1. **Multi-tenant infrastructure**: `MultiTenantCommandBus`, `MultiTenantQueryBus`, and `MultiTenantEventStore` replace the standard implementations
+
+2. **Handler registration**: Handlers are registered with all tenants via `MultiTenantMessageHandlerLookup`
+
+3. **Repository discovery**: All `JpaRepository` interfaces are discovered and registered as tenant components
+
+4. **TenantComponent discovery**: All `TenantComponent` implementations are discovered and registered
+
+5. **Parameter resolution**: Handler parameters are resolved per-tenant based on message metadata
+
+6. **Tenant correlation**: Tenant ID automatically propagates from commands to events via `TenantCorrelationProvider`
+
+== Next Steps
+
+* xref:tenant-management.adoc[Tenant Management] - Dynamic tenant registration
+* xref:projections.adoc[Projections] - Advanced projection strategies
+* xref:event-processors.adoc[Event Processors] - Multi-tenant event processing

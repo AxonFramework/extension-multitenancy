@@ -1,0 +1,523 @@
+:navtitle: Tenant Components
+= Tenant-Scoped Components
+
+Tenant-scoped components provide per-tenant dependencies to message handlers. This page covers how to define, register, and use tenant components.
+
+== Overview
+
+In multi-tenant applications, handlers often need tenant-specific resources like repositories, services, or configuration. Tenant components solve this by:
+
+* Creating isolated instances per tenant
+* Automatically resolving the correct instance based on message context
+* Managing lifecycle (creation and cleanup) per tenant
+
+[source]
+----
+@EventHandler
+void on(CourseCreated event, CourseRepository repository) {
+    // repository is automatically the correct tenant's instance
+    repository.save(new CourseReadModel(event));
+}
+----
+
+== TenantComponentFactory Interface
+
+The `TenantComponentFactory` is the core interface for creating tenant-scoped components:
+
+[source,java]
+----
+@FunctionalInterface
+public interface TenantComponentFactory<T> extends Function<TenantDescriptor, T> {
+
+    T apply(TenantDescriptor tenant);
+
+    default void cleanup(TenantDescriptor tenant, T component) {
+        if (component instanceof AutoCloseable autoCloseable) {
+            try {
+                autoCloseable.close();
+            } catch (Exception e) {
+                // Logged but not propagated
+            }
+        }
+    }
+}
+----
+
+=== Simple Factory
+
+Use a lambda for simple cases:
+
+[source,java]
+----
+TenantComponentFactory<CourseRepository> factory =
+    tenant -> new InMemoryCourseRepository();
+----
+
+=== Factory with Tenant Context
+
+Access tenant information when creating components:
+
+[source,java]
+----
+TenantComponentFactory<CourseRepository> factory =
+    tenant -> new JpaCourseRepository(
+        getDataSourceForTenant(tenant.tenantId())
+    );
+----
+
+=== Factory with Custom Cleanup
+
+Override cleanup for resources requiring special handling:
+
+[source,java]
+----
+TenantComponentFactory<EntityManagerFactory> factory = new TenantComponentFactory<>() {
+
+    @Override
+    public EntityManagerFactory apply(TenantDescriptor tenant) {
+        return createEntityManagerFactory(tenant);
+    }
+
+    @Override
+    public void cleanup(TenantDescriptor tenant, EntityManagerFactory emf) {
+        emf.close();
+        logger.info("Closed EMF for tenant {}", tenant.tenantId());
+    }
+};
+----
+
+== Registering Tenant Components
+
+=== Axon Framework (Programmatic)
+
+Use `MultiTenancyConfigurer.tenantComponent()`:
+
+[source,java]
+----
+import org.axonframework.eventsourcing.configuration.EventSourcingConfigurer;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+
+EventSourcingConfigurer configurer = EventSourcingConfigurer.create();
+
+MultiTenancyConfigurer.enhance(configurer)
+    .registerTenantProvider(config -> tenantProvider)
+    .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver())
+    // Register tenant components
+    .tenantComponent(CourseRepository.class, tenant -> new InMemoryCourseRepository())
+    .tenantComponent(MetricsService.class, tenant -> new TenantMetrics(tenant.tenantId()));
+----
+
+With custom cleanup:
+
+[source,java]
+----
+MultiTenancyConfigurer.enhance(configurer)
+    .tenantComponent(
+        ConnectionPool.class,
+        tenant -> createPoolForTenant(tenant),
+        (tenant, pool) -> {
+            pool.drain();
+            pool.close();
+        }
+    );
+----
+
+=== MultiTenantPooledStreamingEventProcessorModule
+
+Register per-processor tenant components:
+
+[source,java]
+----
+MultiTenantPooledStreamingEventProcessorModule
+    .create("courseProjection")
+    .eventHandlingComponents(c -> c.autodetected(cfg -> new CourseProjector()))
+    .tenantComponent(CourseRepository.class, tenant -> new InMemoryCourseRepository())
+    .tenantComponent(AuditService.class, tenant -> new TenantAuditService(tenant.tenantId()))
+----
+
+=== Spring Boot with TenantComponent Interface
+
+For Spring Boot applications, implement the `TenantComponent` interface for automatic discovery:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.spring.TenantComponent;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+
+// Note: Do NOT add @Component annotation!
+public class TenantAuditService implements TenantComponent<TenantAuditService> {
+
+    private final Clock clock;           // Spring-injected dependency
+    private final String tenantId;       // Tenant context
+
+    // Constructor for factory instance - Spring injects Clock
+    public TenantAuditService(Clock clock) {
+        this.clock = clock;
+        this.tenantId = null;
+    }
+
+    // Private constructor for tenant-specific instances
+    private TenantAuditService(Clock clock, String tenantId) {
+        this.clock = clock;
+        this.tenantId = tenantId;
+    }
+
+    @Override
+    public TenantAuditService createForTenant(TenantDescriptor tenant) {
+        return new TenantAuditService(clock, tenant.tenantId());
+    }
+
+    public void recordAudit(String action) {
+        Instant timestamp = clock.instant();
+        // ... record audit entry for tenantId
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+}
+----
+
+IMPORTANT: Do NOT annotate `TenantComponent` implementations with `@Component`, `@Service`, or similar. The auto-configuration discovers them via classpath scanning and creates factory instances with Spring DI without registering them as beans.
+
+=== Spring Data JPA Repositories
+
+For JPA repositories, use `TenantRepositoryParameterResolverFactory`:
+
+[source,java]
+----
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CourseStatsJpaRepository extends JpaRepository<CourseStatsReadModel, String> {
+    List<CourseStatsReadModel> findAll();
+}
+----
+
+The repository is automatically injected as tenant-scoped when `TenantDataSourceProvider` is configured:
+
+[source,java]
+----
+@EventHandler
+public void on(CourseCreated event, CourseStatsJpaRepository repository) {
+    // repository uses the tenant's EntityManagerFactory
+    repository.save(new CourseStatsReadModel(
+        event.courseId().raw(),
+        event.name(),
+        event.capacity()
+    ));
+}
+----
+
+== TenantComponentRegistry
+
+The `TenantComponentRegistry` manages component instances per tenant:
+
+[source,java]
+----
+TenantComponentRegistry<CourseRepository> registry = new TenantComponentRegistry<>(
+    CourseRepository.class,
+    tenant -> new InMemoryCourseRepository()
+);
+
+// Get (or create) component for a tenant
+CourseRepository repo = registry.getComponent(TenantDescriptor.tenantWithId("stanford"));
+
+// Check registered tenants
+Set<TenantDescriptor> tenants = registry.getTenants();
+----
+
+=== Lazy Creation
+
+Components are created lazily on first access, not when a tenant is registered:
+
+[source,java]
+----
+// Tenant registered, but no component created yet
+registry.registerTenant(tenant);
+
+// Now component is created and cached
+CourseRepository repo = registry.getComponent(tenant);
+
+// Subsequent calls return cached instance
+CourseRepository sameRepo = registry.getComponent(tenant);  // Same instance
+----
+
+=== Cleanup on Tenant Removal
+
+When a tenant is unregistered, the registry cleans up its component:
+
+[source,java]
+----
+Registration registration = registry.registerTenant(tenant);
+
+// Later, when tenant is removed:
+registration.cancel();  // Calls factory.cleanup(tenant, component)
+----
+
+== TenantAwareProcessingContext
+
+Access tenant components via `ProcessingContext.component()`:
+
+[source,java]
+----
+@EventHandler
+void on(CourseCreated event, ProcessingContext context) {
+    CourseRepository repository = context.component(CourseRepository.class);
+    // repository is the tenant-scoped instance
+    repository.save(new CourseReadModel(event));
+}
+----
+
+This uses `TenantAwareProcessingContext` which wraps the standard context and intercepts `component()` calls for registered tenant types.
+
+== Per-Tenant Spring Data JPA Repositories
+
+For full tenant isolation with separate databases, configure per-tenant JPA:
+
+=== Configuration
+
+[source,yaml]
+----
+# application.yml
+axon:
+  multi-tenancy:
+    enabled: true
+    jpa:
+      tenant-repositories: true
+----
+
+=== TenantDataSourceProvider
+
+Implement the provider to supply tenant-specific data sources:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.spring.data.jpa.TenantDataSourceProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import javax.sql.DataSource;
+
+@Component
+public class UniversityDataSourceProvider implements TenantDataSourceProvider {
+
+    private final Map<String, DataSource> dataSources = new ConcurrentHashMap<>();
+
+    @Override
+    public DataSource getDataSource(TenantDescriptor tenant) {
+        return dataSources.computeIfAbsent(tenant.tenantId(), this::createDataSource);
+    }
+
+    private DataSource createDataSource(String tenantId) {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl("jdbc:postgresql://localhost:5432/university_" + tenantId);
+        config.setUsername("app");
+        config.setPassword("secret");
+        return new HikariDataSource(config);
+    }
+}
+----
+
+=== Using TenantJpaRepositoryFactory
+
+For programmatic registration:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.spring.data.jpa.TenantJpaRepositoryFactory;
+import org.axonframework.extension.multitenancy.spring.data.jpa.TenantEntityManagerFactoryBuilder;
+import org.axonframework.extension.multitenancy.spring.data.jpa.TenantTransactionManagerBuilder;
+
+TenantJpaRepositoryFactory<CourseStatsJpaRepository> factory =
+    TenantJpaRepositoryFactory.forRepository(
+        CourseStatsJpaRepository.class,
+        emfBuilder,
+        txBuilder
+    );
+
+MultiTenancyConfigurer.enhance(configurer)
+    .tenantComponent(CourseStatsJpaRepository.class, factory);
+----
+
+== Complete Example
+
+=== Domain Model
+
+[source,java]
+----
+// Read model entity
+@Entity
+@Table(name = "course_stats")
+public class CourseStatsReadModel {
+
+    @Id
+    private String courseId;
+    private String name;
+    private int capacity;
+    private int enrollmentCount = 0;
+
+    // constructors, getters, setters
+}
+
+// Repository interface
+public interface CourseStatsJpaRepository extends JpaRepository<CourseStatsReadModel, String> {
+    List<CourseStatsReadModel> findAll();
+}
+----
+
+=== Tenant-Scoped Service
+
+[source,java]
+----
+// Note: No @Component annotation!
+public class EnrollmentMetricsService implements TenantComponent<EnrollmentMetricsService> {
+
+    private final MeterRegistry meterRegistry;  // Spring dependency
+    private final String tenantId;
+    private final Counter enrollmentCounter;
+
+    public EnrollmentMetricsService(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+        this.tenantId = null;
+        this.enrollmentCounter = null;
+    }
+
+    private EnrollmentMetricsService(MeterRegistry meterRegistry, String tenantId) {
+        this.meterRegistry = meterRegistry;
+        this.tenantId = tenantId;
+        this.enrollmentCounter = Counter.builder("enrollments")
+            .tag("tenant", tenantId)
+            .register(meterRegistry);
+    }
+
+    @Override
+    public EnrollmentMetricsService createForTenant(TenantDescriptor tenant) {
+        return new EnrollmentMetricsService(meterRegistry, tenant.tenantId());
+    }
+
+    public void recordEnrollment() {
+        enrollmentCounter.increment();
+    }
+}
+----
+
+=== Event Handler
+
+[source,java]
+----
+@ProcessingGroup("courseProjection")
+@Component
+public class CourseStatsProjector {
+
+    @EventHandler
+    public void on(CourseCreated event,
+                   CourseStatsJpaRepository repository,
+                   EnrollmentMetricsService metricsService) {
+
+        repository.save(new CourseStatsReadModel(
+            event.courseId().raw(),
+            event.name(),
+            event.capacity()
+        ));
+    }
+
+    @EventHandler
+    public void on(StudentEnrolled event,
+                   CourseStatsJpaRepository repository,
+                   EnrollmentMetricsService metricsService) {
+
+        repository.findById(event.courseId().raw())
+            .ifPresent(stats -> {
+                stats.setEnrollmentCount(stats.getEnrollmentCount() + 1);
+                repository.save(stats);
+                metricsService.recordEnrollment();
+            });
+    }
+}
+----
+
+== Best Practices
+
+=== 1. Keep Factory Instances Stateless
+
+Factory instances should only hold shared dependencies, not tenant state:
+
+[source,java]
+----
+// CORRECT - Factory holds shared dependency
+public class TenantService implements TenantComponent<TenantService> {
+    private final SharedDependency shared;  // Shared across all tenants
+
+    public TenantService(SharedDependency shared) {
+        this.shared = shared;
+    }
+
+    @Override
+    public TenantService createForTenant(TenantDescriptor tenant) {
+        return new TenantService(shared, tenant.tenantId());
+    }
+}
+
+// INCORRECT - Factory accumulates state
+public class BadTenantService implements TenantComponent<BadTenantService> {
+    private final List<String> processedIds = new ArrayList<>();  // Don't do this!
+}
+----
+
+=== 2. Use Private Constructors for Tenant Instances
+
+Prevent accidental creation of tenant instances:
+
+[source,java]
+----
+public class TenantAuditService implements TenantComponent<TenantAuditService> {
+
+    // Public constructor for factory (Spring DI)
+    public TenantAuditService(Clock clock) {
+        this.clock = clock;
+        this.tenantId = null;
+    }
+
+    // Private constructor for tenant instances
+    private TenantAuditService(Clock clock, String tenantId) {
+        this.clock = clock;
+        this.tenantId = tenantId;
+    }
+}
+----
+
+=== 3. Implement AutoCloseable for Resource Cleanup
+
+[source,java]
+----
+public class TenantConnectionPool implements TenantComponent<TenantConnectionPool>,
+                                              AutoCloseable {
+
+    @Override
+    public void close() {
+        pool.shutdown();
+    }
+
+    // cleanupForTenant will automatically call close()
+}
+----
+
+=== 4. Validate Tenant Context
+
+Guard against usage on factory instances:
+
+[source,java]
+----
+public void recordAudit(String action) {
+    if (tenantId == null) {
+        throw new IllegalStateException(
+            "Cannot record audit on factory instance - no tenant context"
+        );
+    }
+    // ... implementation
+}
+----
+
+== See Also
+
+* xref:event-processors.adoc[Event Processors] - Configuring multi-tenant processors
+* xref:tenant-resolution.adoc[Tenant Resolution] - How tenant context is determined
+* xref:dynamic-tenants.adoc[Dynamic Tenants] - Adding/removing tenants at runtime

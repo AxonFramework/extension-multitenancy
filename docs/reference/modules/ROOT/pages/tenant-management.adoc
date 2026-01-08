@@ -1,0 +1,173 @@
+:navtitle: Tenant Management
+= Tenant Management
+
+Tenant management is handled by the `TenantProvider` interface. This component tracks which tenants exist and notifies other components when tenants are added or removed.
+
+== TenantProvider Interface
+
+[source,java]
+----
+public interface TenantProvider {
+    Registration subscribe(MultiTenantAwareComponent component);
+    List<TenantDescriptor> getTenants();
+}
+----
+
+The provider serves two purposes:
+
+1. **Query**: Returns the current list of tenants via `getTenants()`
+2. **Subscribe**: Notifies components when tenants change via `subscribe()`
+
+Multi-tenant infrastructure components (like `MultiTenantCommandBus`) subscribe to the provider and automatically create/destroy tenant segments as tenants come and go.
+
+== Choosing a TenantProvider
+
+=== With Axon Server (Recommended)
+
+When using the `multitenancy-axon-server-connector` module, `AxonServerTenantProvider` is auto-registered via SPI. It discovers tenants from Axon Server contexts.
+
+[source,yaml]
+----
+# application.yml
+axon:
+  multi-tenancy:
+    axon-server:
+      # Option 1: Explicit list
+      contexts: tenant-1,tenant-2,tenant-3
+
+      # Option 2: Auto-discovery with filtering
+      filter-admin-contexts: true  # Excludes contexts starting with "_"
+----
+
+With auto-discovery, the provider monitors Axon Server and automatically adds/removes tenants as contexts are created/deleted.
+
+=== SimpleTenantProvider
+
+For deployments without Axon Server, use `SimpleTenantProvider`:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+
+// Static tenants at startup
+SimpleTenantProvider provider = new SimpleTenantProvider();
+provider.addTenant(TenantDescriptor.tenantWithId("tenant-1"));
+provider.addTenant(TenantDescriptor.tenantWithId("tenant-2"));
+----
+
+Or with initial tenants in the constructor:
+
+[source,java]
+----
+SimpleTenantProvider provider = new SimpleTenantProvider(List.of(
+    TenantDescriptor.tenantWithId("tenant-1"),
+    TenantDescriptor.tenantWithId("tenant-2")
+));
+----
+
+=== Dynamic Tenant Management
+
+`SimpleTenantProvider` supports runtime tenant changes:
+
+[source,java]
+----
+// Add a tenant at runtime
+provider.addTenant(TenantDescriptor.tenantWithId("new-tenant"));
+
+// Remove a tenant
+provider.removeTenant(TenantDescriptor.tenantWithId("old-tenant"));
+
+// Check if tenant exists
+boolean exists = provider.hasTenant("tenant-1");
+----
+
+When you add a tenant, all subscribed components (command bus, query bus, event store, event processors) automatically create infrastructure for that tenant.
+
+== Configuration
+
+=== Axon Framework
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.core.configuration.MultiTenancyConfigurer;
+import org.axonframework.messaging.core.configuration.MessagingConfigurer;
+
+SimpleTenantProvider tenantProvider = new SimpleTenantProvider(List.of(
+    TenantDescriptor.tenantWithId("tenant-1"),
+    TenantDescriptor.tenantWithId("tenant-2")
+));
+
+MessagingConfigurer messagingConfigurer = MessagingConfigurer.create();
+// ... configure handlers, entities, etc.
+
+MultiTenancyConfigurer.enhance(messagingConfigurer)
+    .registerTenantProvider(config -> tenantProvider)
+    .registerTargetTenantResolver(config -> new MetadataBasedTenantResolver("tenantId"))
+    .build()
+    .start();
+----
+
+=== Spring Boot
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.SimpleTenantProvider;
+import org.axonframework.extension.multitenancy.core.TenantDescriptor;
+import org.axonframework.extension.multitenancy.core.TenantProvider;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class TenantConfiguration {
+
+    @Bean
+    public TenantProvider tenantProvider() {
+        return new SimpleTenantProvider(List.of(
+            TenantDescriptor.tenantWithId("tenant-1"),
+            TenantDescriptor.tenantWithId("tenant-2")
+        ));
+    }
+}
+----
+
+NOTE: With Axon Server and Spring Boot, you typically don't need to define a `TenantProvider` bean - the `AxonServerTenantProvider` is auto-registered via SPI.
+
+== Filtering Tenants
+
+Use `TenantConnectPredicate` to filter which tenants your application connects to:
+
+[source,java]
+----
+import org.axonframework.extension.multitenancy.core.TenantConnectPredicate;
+import org.springframework.context.annotation.Bean;
+
+@Bean
+public TenantConnectPredicate tenantFilter() {
+    return tenant -> tenant.tenantId().startsWith("customer-");
+}
+----
+
+This is useful when:
+
+* Multiple applications share an Axon Server cluster but handle different tenant subsets
+* You want to exclude administrative or system contexts
+* You're doing a rolling deployment and want to gradually migrate tenants
+
+== TenantDescriptor
+
+`TenantDescriptor` is a simple record that identifies a tenant:
+
+[source,java]
+----
+TenantDescriptor tenant = TenantDescriptor.tenantWithId("my-tenant");
+String id = tenant.tenantId();  // "my-tenant"
+----
+
+The tenant ID is typically used:
+
+* As the Axon Server context name
+* In database connection strings for tenant-specific schemas
+* As a routing key in message metadata
